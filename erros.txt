@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 1.3  ·  Data: 2026-10-13  ·  Versão do app: 0.4.0
+ Versão do documento: 1.4  ·  Data: 2026-10-13  ·  Versão do app: 0.4.1
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -536,14 +536,18 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Como verificar: tests\test_units.py compara com a modulação antiga.
 
 [NX-VOZ-016] Nome pronunciado "NÊXUS" (ou soletrado "N, E, X, U, S")
-  Severidade : BAIXA            Status: CORRIGIDO (v0.4)   Observado: SIM
+  Severidade : BAIXA            Status: CORRIGIDO (v0.4.1) Observado: SIM
   Causa      : As vozes em português/espanhol leem "Nexus" com E fechado e
-               soletram "N.E.X.U.S".
-  Correção   : O texto enviado à voz troca o nome por "Nécsus" (pt/es), que
-               soa NÉCSUS / NÉ-QUI-SÚS; a tela continua mostrando N.E.X.U.S
+               soletram "N.E.X.U.S". O nome deve soar como em inglês/espanhol:
+               "NÉK-sus", sem vogal entre o K e o S.
+  Correção   : O texto enviado à voz troca o nome por uma grafia escolhida por
+               medição acústica (espectro log-mel + DTW contra a voz inglesa
+               dizendo "Nexus"): "Nécsus" na voz masculina (Daniel) e
+               "Néc-sus" na feminina (Maria). "Néxus" (v0.4.0) e "Néquissus"
+               eram as mais distantes. A tela continua mostrando N.E.X.U.S
                (tts.pronounce()).
-  Dicas      : Se uma voz nova ainda pronunciar errado, ajuste _SPOKEN_NAME
-               em nexus/tts.py (ex.: "Néquissus").
+  Dicas      : Para uma voz nova, teste grafias e ajuste _SPOKEN_NAME em
+               nexus/tts.py; confira sempre no ouvido.
 
 ================================================================================
  DAT — DADOS, MEMÓRIA E CONHECIMENTO

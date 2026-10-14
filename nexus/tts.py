@@ -133,14 +133,17 @@ def apply_effect(x: np.ndarray, effect: str) -> np.ndarray:
     return (x / peak * 0.9).astype(np.float32)
 
 
-# The name is pronounced "NÉCSUS" (open E, "NÉ-QUI-SÚS"). Portuguese/Spanish voices read "Nexus" as "NÊXUS" and spell
-# "N.E.X.U.S" letter by letter, so the spoken text uses an accented spelling (the screen keeps N.E.X.U.S).
+# The name is pronounced like English/Spanish "Nexus": NÉK-sus, open E, no vowel between K and S.
+# Portuguese/Spanish voices read "Nexus" as "NÊXUS" and spell "N.E.X.U.S", so the spoken text uses a respelling
+# (the screen keeps N.E.X.U.S). Spellings were ranked by acoustic distance (log-mel DTW) to the English voice
+# saying "Nexus": "Nécsus" is closest for Daniel, "Néc-sus" for Maria; "Néxus"/"Néquissus" were the farthest.
 _NAME = re.compile(r"\bN\.E\.X\.U\.S\b|\bnexus\b", re.IGNORECASE)
-_SPOKEN_NAME = {"pt": "Nécsus", "es": "Nécsus", "en": "Nexus"}  # NÉCSUS / NÉ-QUI-SÚS
+_SPOKEN_NAME = {"pt": {"male": "Nécsus", "female": "Néc-sus"}, "es": {"male": "Nécsus", "female": "Néc-sus"}}
 
 
-def pronounce(text: str, lang: str) -> str:
-    return _NAME.sub(_SPOKEN_NAME.get(lang, "Nexus"), text)
+def pronounce(text: str, lang: str, gender: str = "male") -> str:
+    spelling = _SPOKEN_NAME.get(lang, {}).get(gender, "Nexus")
+    return _NAME.sub(spelling, text)
 
 
 def split_sentences(text: str) -> list[str]:

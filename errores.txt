@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 1.3  ·  Fecha: 2026-10-13  ·  Versión de la app: 0.4.0
+ Versión del documento: 1.4  ·  Fecha: 2026-10-13  ·  Versión de la app: 0.4.1
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -565,14 +565,18 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Cómo verificar: tests\test_units.py lo compara con la modulación antigua.
 
 [NX-VOZ-016] Nombre pronunciado "NÊXUS" (o deletreado "N, E, X, U, S")
-  Gravedad   : BAJA             Estado: CORREGIDO (v0.4)   Observado: SÍ
+  Gravedad   : BAJA             Estado: CORREGIDO (v0.4.1) Observado: SÍ
   Causa      : Las voces en portugués/español leen "Nexus" con E cerrada y
-               deletrean "N.E.X.U.S".
-  Corrección : El texto enviado a la voz cambia el nombre por "Nécsus"
-               (pt/es), que suena NÉCSUS / NÉ-QUI-SÚS; la pantalla sigue
-               mostrando N.E.X.U.S (tts.pronounce()).
-  Consejos   : Si una voz nueva aún lo pronuncia mal, ajusta _SPOKEN_NAME en
-               nexus/tts.py (p. ej. "Néquissus").
+               deletrean "N.E.X.U.S". El nombre debe sonar como en inglés/
+               español: "NÉK-sus", sin vocal entre la K y la S.
+  Corrección : El texto enviado a la voz cambia el nombre por una grafía
+               elegida por medición acústica (espectro log-mel + DTW contra la
+               voz inglesa diciendo "Nexus"): "Nécsus" para la voz masculina
+               (Daniel) y "Néc-sus" para la femenina (Maria). "Néxus" (v0.4.0)
+               y "Néquissus" eran las más lejanas. La pantalla sigue mostrando
+               N.E.X.U.S (tts.pronounce()).
+  Consejos   : Para una voz nueva, prueba grafías y ajusta _SPOKEN_NAME en
+               nexus/tts.py; compruébalo siempre de oído.
 
 ================================================================================
  DAT — DATOS, MEMORIA Y CONOCIMIENTO

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 1.3  ·  Date: 2026-10-13  ·  App version: 0.4.0
+ Document version: 1.4  ·  Date: 2026-10-13  ·  App version: 0.4.1
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -534,14 +534,18 @@ QUICK DIAGNOSTICS (run these before investigating)
   How to check: tests\test_units.py compares it with the old modulation.
 
 [NX-VOZ-016] Name pronounced "NÊXUS" (or spelled "N, E, X, U, S")
-  Severity   : LOW              Status: FIXED (v0.4)       Observed: YES
+  Severity   : LOW              Status: FIXED (v0.4.1)     Observed: YES
   Cause      : Portuguese/Spanish voices read "Nexus" with a closed E and
-               spell out "N.E.X.U.S".
-  Fix        : The text sent to the voice replaces the name with "Nécsus"
-               (pt/es), which sounds NÉCSUS / NÉ-QUI-SÚS; the screen still
+               spell out "N.E.X.U.S". The name must sound as in English/
+               Spanish: "NEK-sus", no vowel between K and S.
+  Fix        : The text sent to the voice replaces the name with a spelling
+               chosen by acoustic measurement (log-mel spectrum + DTW against
+               the English voice saying "Nexus"): "Nécsus" for the male voice
+               (Daniel) and "Néc-sus" for the female one (Maria). "Néxus"
+               (v0.4.0) and "Néquissus" were the farthest. The screen still
                shows N.E.X.U.S (tts.pronounce()).
-  Tips       : If a new voice still mispronounces it, adjust _SPOKEN_NAME in
-               nexus/tts.py (e.g. "Néquissus").
+  Tips       : For a new voice, try spellings and adjust _SPOKEN_NAME in
+               nexus/tts.py; always check by ear.
 
 ================================================================================
  DAT — DATA, MEMORY AND KNOWLEDGE

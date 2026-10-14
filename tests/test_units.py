@@ -68,7 +68,8 @@ check("jarvis effect has far less 45 Hz buzz than the old ring modulation",
       buzz(wet) < buzz(ring_modulated) / 10, f"new {buzz(wet):.3f} vs old {buzz(ring_modulated):.3f}")
 
 # -- spoken name: NÉCSUS / NÉ-QUI-SÚS (NX-VOZ-016) ---------------------------------------------------------
-check("name spoken as Nécsus in Portuguese", tts.pronounce("Eu sou NEXUS. N.E.X.U.S online.", "pt") == "Eu sou Nécsus. Nécsus online.")
+check("name spoken as Nécsus (male voice)", tts.pronounce("Eu sou NEXUS. N.E.X.U.S online.", "pt", "male") == "Eu sou Nécsus. Nécsus online.")
+check("name spoken as Néc-sus (female voice)", tts.pronounce("Eu sou NEXUS.", "pt", "female") == "Eu sou Néc-sus.")
 check("name untouched in English", tts.pronounce("I am NEXUS.", "en") == "I am Nexus.")
 check("other words untouched", tts.pronounce("nexusAI e annexus", "pt") == "nexusAI e annexus")
 

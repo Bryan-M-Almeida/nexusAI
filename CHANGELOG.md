@@ -8,6 +8,16 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.4.1 — Protótipo · 2026-10-13
+
+**Pronúncia do nome como em inglês/espanhol ("NÉK-sus").**
+- Grafia falada escolhida por medição acústica: cada candidata foi comparada (espectro log-mel alinhado por DTW)
+  com a voz inglesa dizendo "Nexus". Mais próximas: **"Nécsus"** para a voz masculina (Daniel) e **"Néc-sus"** para a
+  feminina (Maria). As mais distantes eram "Néxus" (usada na v0.4.0) e "Néquissus".
+- A grafia agora depende da voz usada (NX-VOZ-016).
+
+---
+
 ## v0.4.0 — Protótipo · 2026-10-13
 
 **Correções da primeira conversa real.** Análise completa nos catálogos de erros (NX-LLM-019, NX-LLM-020, NX-VOZ-015,
