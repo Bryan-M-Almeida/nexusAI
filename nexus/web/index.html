@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>N.E.X.U.S</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ BOOT ============ -->
+<section id="boot" class="boot">
+  <div class="hud-corners" aria-hidden="true"><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
+  <div class="hud-sideticks left" aria-hidden="true"></div>
+  <div class="hud-sideticks right" aria-hidden="true"></div>
+  <div class="boot-stage">
+    <svg class="hero-connector left" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M100 17 H72 L62 6 H0"/><path d="M100 23 H72 L62 34 H0"/><path class="accent" d="M100 20 H90"/></svg>
+    <svg class="hero-connector right" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M100 17 H72 L62 6 H0"/><path d="M100 23 H72 L62 34 H0"/><path class="accent" d="M100 20 H90"/></svg>
+    <div class="rings-slot" data-rings="boot"></div>
+    <div class="boot-title">
+      <h1 class="wordmark" aria-label="NEXUS"></h1>
+      <p class="boot-acronym">Networked Experiential Intelligence &amp; User System</p>
+    </div>
+  </div>
+  <ul class="boot-log mono" id="bootLog"></ul>
+</section>
+
+<!-- ============ APP ============ -->
+<main id="app" class="app" hidden>
+  <header class="topbar">
+    <div class="brand"><span class="wordmark wordmark-xs is-on"></span></div>
+    <div class="chips">
+      <span class="chip" id="chipAi"><i class="dot"></i><span data-i18n="ai">IA</span></span>
+      <span class="chip" id="chipVoice"><i class="dot"></i><span data-i18n="voice">VOZ</span></span>
+      <span class="chip mono" id="clock">--:--</span>
+    </div>
+    <div class="top-actions">
+      <div class="lang-switch" id="langSwitch">
+        <button data-lang="pt">PT</button><button data-lang="en">EN</button><button data-lang="es">ES</button>
+      </div>
+      <button class="icon-btn" id="btnSettings" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- left: profile, schedule, tasks -->
+  <aside class="col col-left">
+    <section class="panel" id="profilePanel">
+      <h2 class="panel-title mono"><span>01</span> // <span data-i18n="profile">PERFIL</span></h2>
+      <div id="profileCard" class="profile-card"></div>
+    </section>
+    <section class="panel grow">
+      <h2 class="panel-title mono"><span>02</span> // <span data-i18n="schedule">AGENDA</span></h2>
+      <ul class="list" id="eventList"></ul>
+    </section>
+    <section class="panel grow">
+      <h2 class="panel-title mono"><span>03</span> // <span data-i18n="tasks">TAREFAS</span></h2>
+      <form class="inline-form" id="taskForm">
+        <input id="taskInput" autocomplete="off" data-i18n-ph="newTask">
+        <button class="btn-mini" type="submit">+</button>
+      </form>
+      <ul class="list" id="taskList"></ul>
+    </section>
+  </aside>
+
+  <!-- center: core + conversation -->
+  <section class="col col-center">
+    <div class="core" id="core" data-state="idle">
+      <div class="rings-slot" data-rings="core"></div>
+      <div class="core-label mono" id="coreLabel"></div>
+    </div>
+    <div class="chat" id="chat" aria-live="polite"></div>
+    <form class="composer" id="composer">
+      <button type="button" class="mic" id="btnMic" aria-label="Push to talk">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+      <input id="prompt" autocomplete="off" data-i18n-ph="ask">
+      <button type="submit" class="btn-send" data-i18n="send">ENVIAR</button>
+    </form>
+    <div class="composer-opts mono">
+      <label class="toggle"><input type="checkbox" id="wakeToggle"><span></span><b data-i18n="wake">Escuta contínua ("Nexus")</b></label>
+      <label class="toggle"><input type="checkbox" id="voiceToggle"><span></span><b data-i18n="speakReplies">Falar respostas</b></label>
+      <button type="button" class="link" id="btnStop" data-i18n="stop">silenciar</button>
+    </div>
+  </section>
+
+  <!-- right: memory, knowledge, data, log -->
+  <aside class="col col-right">
+    <nav class="tabs mono" id="tabs">
+      <button data-tab="memory" class="on" data-i18n="memory">MEMÓRIA</button>
+      <button data-tab="knowledge" data-i18n="knowledge">SABER</button>
+      <button data-tab="data" data-i18n="data">DADOS</button>
+      <button data-tab="log" data-i18n="log">LOG</button>
+    </nav>
+    <section class="panel grow tab-body" data-body="memory">
+      <ul class="list" id="memoryList"></ul>
+    </section>
+    <section class="panel grow tab-body" data-body="knowledge" hidden>
+      <div class="kb-stats" id="kbStats"></div>
+      <div class="row-btns">
+        <button class="btn-ghost" id="btnImportKb" data-i18n="importFiles">Importar arquivos</button>
+        <button class="btn-ghost" id="btnTeach" data-i18n="teach">Ensinar</button>
+      </div>
+      <form class="teach-form" id="teachForm" hidden>
+        <input id="teachTitle" data-i18n-ph="title" required>
+        <input id="teachCat" data-i18n-ph="category">
+        <textarea id="teachContent" rows="5" data-i18n-ph="content" required></textarea>
+        <button class="btn-primary" type="submit" data-i18n="save">Salvar</button>
+      </form>
+      <input id="kbSearch" class="search" data-i18n-ph="searchKb">
+      <ul class="list" id="kbList"></ul>
+    </section>
+    <section class="panel grow tab-body" data-body="data" hidden>
+      <h3 class="sub mono" data-i18n="collections">COLEÇÕES</h3>
+      <ul class="list" id="collectionList"></ul>
+      <div id="recordView"></div>
+      <h3 class="sub mono" data-i18n="notes">NOTAS</h3>
+      <ul class="list" id="noteList"></ul>
+    </section>
+    <section class="panel grow tab-body" data-body="log" hidden>
+      <ul class="list log" id="actionList"></ul>
+    </section>
+  </aside>
+</main>
+
+<!-- ============ ONBOARDING ============ -->
+<div class="modal" id="onboarding" hidden>
+  <div class="modal-box">
+    <p class="mono kicker">NEXUS://onboarding</p>
+    <h2 data-i18n="onbTitle">Vamos nos conhecer</h2>
+    <p class="muted" data-i18n="onbText">Importe o JSON gerado pelo formulário da landing page NEXUS.</p>
+    <button class="btn-primary" id="btnProfileFile" data-i18n="chooseJson">Escolher arquivo JSON</button>
+    <p class="muted small" data-i18n="orPaste">ou cole o JSON abaixo:</p>
+    <textarea id="profileJson" rows="7" spellcheck="false" class="mono"></textarea>
+    <p class="err" id="profileErr"></p>
+    <div class="row-btns">
+      <button class="btn-primary" id="btnProfilePaste" data-i18n="import">Importar</button>
+      <button class="btn-ghost" id="btnProfileSkip" data-i18n="later">Depois</button>
+    </div>
+    <p class="muted small mono" id="bridgeHint"></p>
+  </div>
+</div>
+
+<!-- ============ SETTINGS ============ -->
+<div class="modal" id="settings" hidden>
+  <form class="modal-box" id="settingsForm">
+    <p class="mono kicker">NEXUS://config</p>
+    <h2 data-i18n="settings">Configurações</h2>
+    <div class="ai-status mono" id="aiStatus"></div>
+    <label><span data-i18n="llmUrl">Servidor de IA (compatível com OpenAI)</span><input name="llm_base_url"></label>
+    <label><span data-i18n="llmModel">Modelo</span><input name="llm_model" list="modelList"><datalist id="modelList"></datalist></label>
+    <label><span data-i18n="language">Idioma</span>
+      <select name="language"><option value="auto">Auto</option><option value="pt">Português</option><option value="en">English</option><option value="es">Español</option></select></label>
+    <label><span data-i18n="sttModel">Modelo de voz (Whisper)</span>
+      <select name="stt_model"><option>tiny</option><option>base</option><option>small</option><option>medium</option></select></label>
+    <label><span data-i18n="ttsRate">Velocidade da fala</span><input name="tts_rate" type="number" min="100" max="300"></label>
+    <label class="check"><input type="checkbox" name="auto_memory"><span data-i18n="autoMemory">Memorizar fatos automaticamente</span></label>
+    <div class="row-btns">
+      <button class="btn-primary" type="submit" data-i18n="save">Salvar</button>
+      <button class="btn-ghost" type="button" id="btnReimport" data-i18n="reimport">Reimportar perfil</button>
+      <button class="btn-ghost" type="button" id="btnClearChat" data-i18n="clearChat">Limpar conversa</button>
+      <button class="btn-ghost" type="button" data-close data-i18n="close">Fechar</button>
+    </div>
+  </form>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="mock.js"></script>
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

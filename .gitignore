@@ -1,1 +1,21 @@
 *.txt
+!requirements.txt
+!erros.txt
+!errors.txt
+!errores.txt
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local user data (database, settings, inbox)
+data/
+
+# Build output
+build/
+dist/
+*.spec
+
+# Local tool config
+.claude/

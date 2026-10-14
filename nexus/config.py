@@ -1,0 +1,71 @@
+"""Paths and user settings."""
+import json
+import os
+import sys
+from pathlib import Path
+
+PKG_DIR = Path(__file__).resolve().parent
+WEB_DIR = PKG_DIR / "web"
+SEED_DIR = PKG_DIR / "seed"
+
+
+def _data_dir() -> Path:
+    # Installed (frozen) builds write to %LOCALAPPDATA%\NEXUS; dev runs use ./data.
+    if env := os.environ.get("NEXUS_HOME"):
+        return Path(env)
+    if getattr(sys, "frozen", False):
+        return Path(os.environ.get("LOCALAPPDATA", Path.home())) / "NEXUS"
+    return PKG_DIR.parent / "data"
+
+
+DATA_DIR = _data_dir()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DATA_DIR / "nexus.db"
+SETTINGS_PATH = DATA_DIR / "settings.json"
+INBOX_DIR = DATA_DIR / "inbox"  # drop .md/.txt/.pdf/.json here to be learned on boot
+INBOX_DIR.mkdir(exist_ok=True)
+
+DEFAULTS = {
+    # Any OpenAI-compatible server: Ollama (http://localhost:11434/v1) or LM Studio (http://localhost:1234/v1)
+    "llm_base_url": "http://localhost:11434/v1",
+    "llm_model": "qwen3:8b",          # best tool use that fits 8 GB VRAM (qwen2.5:7b skipped tool calls in tests)
+    "llm_api_key": "ollama",
+    "llm_provider": "auto",       # auto (Ollama native API when the URL is :11434) | ollama | openai
+    "llm_context": 8192,          # context window requested from Ollama (its default 4096 truncates the tools)
+    "llm_temperature": 0.3,
+    "auto_memory": True,          # extract facts about the user after each exchange
+    "voice_enabled": True,        # speak replies
+    "tts_rate": 185,
+    "stt_model": "small",         # faster-whisper size: tiny | base | small | medium
+    "language": "auto",           # auto (from profile) | pt | en | es
+    "wake_word": "nexus",
+    "wake_mode": False,           # always listening for the wake word
+    "bridge_port": 47800,         # local endpoint the landing page form can POST the profile to
+    "history_turns": 12,
+}
+
+
+class Settings(dict):
+    def __init__(self):
+        super().__init__(DEFAULTS)
+        if SETTINGS_PATH.exists():
+            try:
+                self.update(json.loads(SETTINGS_PATH.read_text("utf-8")))
+            except json.JSONDecodeError:
+                pass
+
+    def save(self):
+        SETTINGS_PATH.write_text(json.dumps(self, indent=2, ensure_ascii=False), "utf-8")
+
+    def apply(self, changes: dict):
+        for k, v in changes.items():
+            if k not in DEFAULTS:
+                continue
+            kind = type(DEFAULTS[k])
+            if kind is bool and not isinstance(v, bool):
+                v = str(v).lower() in ("1", "true", "on", "sim", "yes")
+            self[k] = kind(v)
+        self.save()
+
+
+settings = Settings()

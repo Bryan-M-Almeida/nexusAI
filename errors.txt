@@ -1,0 +1,615 @@
+================================================================================
+ N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
+ Document version: 1.0  ·  Date: 2026-10-13  ·  App version: 0.1.0
+ (Português: erros.txt · Español: errores.txt)
+================================================================================
+
+HOW TO USE THIS DOCUMENT
+------------------------
+Each issue has a unique identifier in the format NX-<AREA>-<NUMBER>.
+Use the ID when opening issues, in commits ("fix NX-LLM-003: ...") and when
+talking to the team. Areas:
+
+  LLM  - AI core (Ollama / LM Studio / models)
+  VOZ  - Speech recognition (Whisper) and speech synthesis (SAPI)
+  DAT  - Database, memory and knowledge base
+  UI   - Desktop interface (pywebview / WebView2)
+  INT  - Landing page integration (JSON profile / local bridge)
+  ENV  - Environment, installation and executable build
+
+(The IDs are identical in the three language versions; "VOZ" means voice.)
+
+Fields of each entry:
+  Severity : CRITICAL (blocks usage) · HIGH (core feature broken)
+             MEDIUM (works with flaws) · LOW (cosmetic / rare)
+  Status   : FIXED (solved in code) · MITIGATED (reduced, may still occur)
+             · KNOWN (current limitation, with workaround)
+             · PENDING (requires action from the team)
+  Observed : YES = reproduced in the 2026-10-13 tests ·
+             EXPECTED = risk identified by analysis, not reproduced
+
+Reference test environment: Windows 11 Pro, AMD Radeon RX 6600 XT (8 GB),
+16 GB RAM, Python 3.14.8, Ollama 0.40.3 (Vulkan backend), models qwen2.5:7b
+and qwen3:8b.
+
+
+QUICK DIAGNOSTICS (run these before investigating)
+--------------------------------------------------
+  ollama --version                         -> is Ollama installed?
+  curl http://localhost:11434/api/version  -> is the AI server responding?
+  ollama list                              -> downloaded models
+  ollama ps                                -> loaded model and PROCESSOR
+                                              (should be "100% GPU")
+  %LOCALAPPDATA%\Ollama\server.log         -> server log (GPU, errors)
+  curl http://127.0.0.1:47800/status       -> is the NEXUS local bridge up?
+  set NEXUS_DEBUG=1 && python run_nexus.py -> opens the UI DevTools
+  Data folder: .\data (development) or %LOCALAPPDATA%\NEXUS (installed)
+
+
+================================================================================
+ INDEX
+================================================================================
+ LLM  NX-LLM-001  AI offline: Ollama server not found
+      NX-LLM-002  Configured model is not downloaded
+      NX-LLM-003  AI claims to have performed actions without calling tools
+      NX-LLM-004  Context truncated to 4096 tokens by Ollama's /v1 API
+      NX-LLM-005  Relative dates resolved to the wrong day
+      NX-LLM-006  Reply in the wrong language
+      NX-LLM-007  Weekday names translated incorrectly
+      NX-LLM-008  Intermediate narration and JSON blocks leaking into replies
+      NX-LLM-009  Model template drops extra system messages
+      NX-LLM-010  Slow replies (10 to 25 seconds)
+      NX-LLM-011  First reply after opening the app is very slow
+      NX-LLM-012  Inconsistent behavior between runs
+      NX-LLM-013  "AMD driver is too old" warning in the Ollama log
+      NX-LLM-014  Model running partly on CPU (not enough VRAM)
+      NX-LLM-015  Thinking mode makes qwen3 slow
+      NX-LLM-016  Automatic memory stores redundant or generic facts
+      NX-LLM-017  Model invents tool arguments
+ VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
+      NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
+      NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
+      NX-VOZ-004  Recording doesn't start or doesn't stop (voice detection)
+      NX-VOZ-005  NEXUS hears its own voice (echo)
+      NX-VOZ-006  No Spanish voice / voice in the wrong language
+      NX-VOZ-007  Speech synthesis stops working after a while
+      NX-VOZ-008  Slow transcription
+      NX-VOZ-009  "Mute" only stops at the end of the current sentence
+ DAT  NX-DAT-001  Knowledge base doesn't find an existing topic
+      NX-DAT-002  Imported PDF has no text ("Could not extract text")
+      NX-DAT-003  "Invalid date" when creating an event/task
+      NX-DAT-004  Reminder did not fire
+      NX-DAT-005  nexus.db file in use / database locked
+      NX-DAT-006  Seed books re-indexed or duplicated
+      NX-DAT-007  File in the inbox folder is not re-imported
+ UI   NX-UI-001   Fonts differ from the landing page (offline)
+      NX-UI-002   Window doesn't open: WebView2 missing
+      NX-UI-003   Window opens blank or stuck at boot
+      NX-UI-004   Interface out of scale on small screens
+ INT  NX-INT-001  Landing page has no real onboarding form yet
+      NX-INT-002  Browser blocks the landing page request to 127.0.0.1
+      NX-INT-003  Port 47800 busy: local bridge disabled
+      NX-INT-004  "The JSON must contain at least the 'name' field"
+ ENV  NX-ENV-001  requirements.txt ignored by Git
+      NX-ENV-002  setup.ps1 / build.ps1 blocked by PowerShell policy
+      NX-ENV-003  Dependencies not supported on the Python version
+      NX-ENV-004  Antivirus blocks or removes NEXUS.exe
+      NX-ENV-005  Executable opens and closes / module not found
+      NX-ENV-006  Port 11434 busy or two Ollama instances running
+
+
+================================================================================
+ LLM — AI CORE
+================================================================================
+
+[NX-LLM-001] AI offline: Ollama server not found
+  Severity   : CRITICAL         Status: KNOWN              Observed: YES
+  Symptom    : "AI" chip is red in the top bar; message "My AI core is
+               offline" on any command. Boot step "AI CORE" marked "!!".
+  Cause      : Ollama not installed, not running, or wrong URL in Settings
+               (llm_base_url).
+  Solution   : 1. Install: winget install Ollama.Ollama
+               2. Check: curl http://localhost:11434/api/version
+               3. If it doesn't respond, open Ollama from the Start menu or
+                  run "ollama serve" in a terminal.
+               4. In NEXUS Settings the URL must be
+                  http://localhost:11434/v1 (Ollama) or
+                  http://localhost:1234/v1 (LM Studio).
+  Tips       : NEXUS keeps working without AI for schedule, tasks, memory and
+               knowledge through the panels; only the chat depends on it.
+
+[NX-LLM-002] Configured model is not downloaded
+  Severity   : CRITICAL         Status: KNOWN              Observed: YES
+  Symptom    : Message "Server online, but model X is not downloaded".
+  Cause      : The model set in Settings does not appear in "ollama list".
+  Solution   : ollama pull qwen3:8b   (current default, ~5.2 GB)
+  Tips       : The name must match exactly (including the ":8b" tag).
+               The Model field in Settings lists the installed models.
+
+[NX-LLM-003] AI claims to have performed actions without calling tools
+  Severity   : HIGH             Status: MITIGATED          Observed: YES
+  Symptom    : Replies such as "I logged your expenses", "I'll remember you
+               are allergic" or "I learned the hours" with nothing saved in
+               the database (Memory/Data/Knowledge panels empty).
+  Cause      : (a) qwen2.5:7b ignored the record_data, remember and
+               learn_knowledge tools in 100% of the tests;
+               (b) truncated context (see NX-LLM-004) removed the
+               instructions; (c) small models sometimes "pretend" to act.
+  Fixes      : - Default model switched to qwen3:8b (called every tool
+                 correctly in the tests).
+               - Explicit prompt rules ("ACTIONS REQUIRE TOOL CALLS") with an
+                 intent -> tool map.
+               - Safety net (assistant.py, _needs_tool): if the reply claims
+                 an action ("registrei", "aprendeu", "saved", "guardé"...)
+                 and no tool was called, NEXUS sends the message back to the
+                 model demanding the call (once).
+  How to check: "⚙ ..." chips appear above the reply when a tool runs.
+               No chip = nothing was saved.
+  Tips       : If it happens often, lower llm_temperature to 0.1 in
+               data\settings.json. Avoid models smaller than 7-8B for tool
+               use. When adding confirmation phrases in other languages,
+               update the CLAIMED regex in assistant.py.
+
+[NX-LLM-004] Context truncated to 4096 tokens by Ollama's /v1 API
+  Severity   : HIGH             Status: FIXED              Observed: YES
+  Symptom    : The model ignores rules and tools; "ollama ps" shows
+               CONTEXT 4096.
+  Cause      : Ollama's OpenAI-compatible route (/v1/chat/completions) does
+               not accept num_ctx and uses the 4096-token default. The NEXUS
+               prompt (rules + 21 tools + context) exceeds 2,500 tokens and
+               grows with history; the beginning was being dropped.
+  Fix        : llm.py uses Ollama's native API (/api/chat) when the URL is
+               :11434 (llm_provider = "auto"), sending
+               options.num_ctx = llm_context (default 8192).
+  Tips       : With LM Studio (provider "openai"), set the model "Context
+               Length" to 8192 or more in LM Studio itself. Global
+               alternative for Ollama: environment variable
+               OLLAMA_CONTEXT_LENGTH=8192.
+
+[NX-LLM-005] Relative dates resolved to the wrong day
+  Severity   : HIGH             Status: FIXED              Observed: YES
+  Symptom    : "Schedule a meeting on Friday" created the event on
+               2026-10-20 (Tuesday) instead of 2026-10-16 (Friday).
+  Cause      : Language models are bad at computing weekdays from a date.
+  Fix        : Each message's context includes a ready-made calendar of the
+               next 8 days ("Friday 2026-10-16; ...") and the rule "never
+               compute weekdays, use the calendar".
+  Tips       : For dates beyond 8 days, check the event in the Schedule
+               panel. Absolute dates ("the 25th at 2 pm") are always more
+               reliable.
+
+[NX-LLM-006] Reply in the wrong language
+  Severity   : MEDIUM           Status: MITIGATED          Observed: YES
+  Symptom    : Question in English answered in Portuguese.
+  Cause      : The system prompt asks for the profile language and the model
+               prioritized that rule over the message language.
+  Fix        : i18n.detect() identifies pt/en/es from frequent words and the
+               context instructs "reply ONLY in <language>".
+  Limitation : Very short ("ok", "thanks") or mixed messages are not
+               detected; the profile/settings language applies then.
+  Tips       : Pin the language in Settings > Language if the user always
+               uses the same one. For new languages, extend _MARKERS in
+               i18n.py.
+
+[NX-LLM-007] Weekday names translated incorrectly
+  Severity   : MEDIUM           Status: FIXED              Observed: YES
+  Symptom    : "Quarta-feira 14" (Wednesday) shown as "terça-feira"
+               (Tuesday), Friday as Saturday in Portuguese replies.
+  Cause      : The context sent weekdays in English and the model
+               mistranslated them.
+  Fix        : Weekdays are sent already in the message language
+               (i18n.WEEKDAYS).
+
+[NX-LLM-008] Intermediate narration and JSON blocks leaking into replies
+  Severity   : MEDIUM           Status: FIXED              Observed: YES
+  Symptom    : Replies with "Let me list your tasks..." followed by
+               ```json``` blocks and repeated text.
+  Cause      : Text generated before each tool call was appended to the
+               final reply.
+  Fix        : Only the text of the last round (without tools) becomes the
+               reply; the UI receives a "reset" event and clears the
+               narration, keeping the tool chips. Prompt rule: "never show
+               JSON, tool names or internal steps".
+
+[NX-LLM-009] Model template drops extra system messages
+  Severity   : HIGH             Status: FIXED              Observed: YES
+  Symptom    : Rules ignored after moving the context into a second
+               "system" message; prompt cache invalidated on every turn.
+  Cause      : qwen2.5's chat template in Ollama renders only ONE system
+               message (at the top) and ignores the rest. Also, an assistant
+               message with text + tool_calls has its calls omitted by the
+               template.
+  Fix        : The dynamic context goes inside the user message of the
+               current turn (<context>...</context>); history stores only the
+               original text. Tool-call messages are sent with empty content.
+  Tips       : When testing a new model, inspect its template with
+               "ollama show <model> --template".
+
+[NX-LLM-010] Slow replies (10 to 25 seconds)
+  Severity   : MEDIUM           Status: MITIGATED          Observed: YES
+  Symptom    : Each reply takes 10 to 25 s on the reference hardware; long
+               replies (e.g. first aid) up to ~25 s.
+  Cause      : Prompt processing on the RX 6600 XT via Vulkan measured
+               ~100-220 tokens/s. Each message sends ~300-1,200 new tokens
+               (context + question). Tool calls require a second model
+               round.
+  Fixes      : - Prompt split into a fixed part (rules, profile, tools), kept
+                 in Ollama's cache, and a per-message context. Measured: an
+                 identical prompt dropped from 12.5 s to 0.6 s.
+               - Knowledge excerpts only enter the context when the search is
+                 truly relevant (BM25 <= -7.5, max. 2 excerpts).
+               - 30-minute keep_alive keeps the model loaded in VRAM.
+  Tips       : 1. Update the AMD Adrenalin driver (see NX-LLM-013): the most
+                  likely performance gain.
+               2. Smaller model for weaker PCs: ollama pull qwen3:4b and
+                  switch it in Settings (less accurate with tools).
+               3. Reduce history_turns (default 12) in data\settings.json.
+               4. Try OLLAMA_FLASH_ATTENTION=1 (environment variable,
+                  restart Ollama) and compare timings.
+               5. Close games/apps using the GPU.
+
+[NX-LLM-011] First reply after opening the app is very slow
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Symptom    : The first message takes 15-35 s; following ones are faster.
+  Cause      : Loading the model (~5 GB) into VRAM and processing the whole
+               fixed prompt for the first time.
+  Workaround : Wait for the first reply. Planned improvement: "warm up" the
+               model during the boot animation with an empty request.
+
+[NX-LLM-012] Inconsistent behavior between runs
+  Severity   : MEDIUM           Status: KNOWN              Observed: YES
+  Symptom    : The same request works in one run and fails in another.
+               E.g. "what commitments do I have?" listed 2 events in one run
+               and only 1 in another; "Learn that..." sometimes didn't call
+               the tool.
+  Cause      : Probabilistic generation (temperature 0.3) of an 8B model.
+  Mitigation : Explicit rules, safety net (NX-LLM-003), context with the
+               schedule already formatted.
+  Tips       : llm_temperature = 0.1 makes the model more predictable. For
+               demos (e.g. the hackathon judges), rehearse the exact
+               commands you will use.
+
+[NX-LLM-013] "AMD driver is too old" warning in the Ollama log
+  Severity   : LOW              Status: PENDING            Observed: YES
+  Symptom    : server.log contains "AMD driver is too old. Update your AMD
+               driver to enable GPU inference."
+  Cause      : Ollama's ROCm backend requires a newer driver. With it
+               unavailable, Ollama uses the Vulkan backend (which worked:
+               "library=Vulkan ... AMD Radeon RX 6600 XT", "100% GPU").
+  Solution   : Update AMD Software: Adrenalin Edition from AMD's website.
+               Manual user action (NEXUS never changes drivers).
+  Tips       : After updating, restart Ollama, check in server.log which
+               library was chosen (ROCm or Vulkan) and compare reply times.
+
+[NX-LLM-014] Model running partly on CPU (not enough VRAM)
+  Severity   : HIGH             Status: KNOWN              Observed: EXPECTED
+  Symptom    : "ollama ps" shows PROCESSOR as "40%/60% CPU/GPU" and replies
+               become very slow (minutes).
+  Cause      : Model + context don't fit in free VRAM (other apps using the
+               GPU, cards with less than 8 GB).
+  Solution   : Use a smaller model (qwen3:4b), reduce llm_context to 4096
+               (may worsen NX-LLM-004) or close apps using the GPU.
+
+[NX-LLM-015] Thinking mode makes qwen3 slow
+  Severity   : MEDIUM           Status: FIXED              Observed: EXPECTED
+  Cause      : qwen3 "thinks" before answering by default, generating
+               hundreds of extra tokens.
+  Fix        : llm.py sends "think": false on Ollama's native API.
+  Tips       : With LM Studio (OpenAI API) the parameter is not sent: add
+               "/no_think" to the system instructions or disable reasoning in
+               the LM Studio interface.
+
+[NX-LLM-016] Automatic memory stores redundant or generic facts
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Symptom    : Memories like "The user prefers working late at night" that
+               resemble existing ones.
+  Cause      : Automatic extraction runs after each exchange and duplicate
+               removal only compares identical text.
+  Workaround : Remove items with "✕" in the Memory panel or disable
+               "Automatically memorize facts" in Settings.
+  Improvement: Semantic de-duplication with embeddings (roadmap).
+
+[NX-LLM-017] Model invents tool arguments
+  Severity   : MEDIUM           Status: FIXED              Observed: YES
+  Symptom    : Calls like list_events(status="pending") raised errors and the
+               model retried several times.
+  Fix        : tools.execute() drops parameters the function doesn't accept
+               and null values before running.
+
+
+================================================================================
+ VOZ — SPEECH RECOGNITION AND SYNTHESIS
+================================================================================
+
+[NX-VOZ-001] Microphone doesn't respond on first use (Whisper download)
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Symptom    : Clicking the microphone shows "Preparing the voice model...".
+  Cause      : The Whisper model is downloaded only on first use (tiny
+               ~75 MB, base ~145 MB, small ~480 MB, medium ~1.5 GB) so the
+               app's first launch isn't delayed.
+  Solution   : Wait for the download (requires internet once) and click
+               again.
+  Tips       : For offline PCs, open NEXUS once with internet and use voice
+               to download the model; it stays cached
+               (%USERPROFILE%\.cache\huggingface). If the download fails the
+               error appears in the chat; switch to "base" in Settings.
+
+[NX-VOZ-002] Wrong microphone selected (e.g. DroidCam)
+  Severity   : HIGH             Status: PENDING            Observed: YES
+  Symptom    : NEXUS doesn't react to speech or records silence.
+  Cause      : NEXUS uses Windows' DEFAULT input device. On the reference PC
+               the default was "Microphone (DroidCam Audio)", a virtual
+               microphone.
+  Solution   : Windows Settings > System > Sound > Input: choose the real
+               microphone as default and restart NEXUS.
+  Improvement: Add device selection to NEXUS Settings
+               (sounddevice.query_devices).
+
+[NX-VOZ-003] Wake word "Nexus" not recognized / false triggers
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Symptom    : Saying "Nexus" doesn't activate it; or NEXUS answers side
+               conversations.
+  Cause      : Whisper transcribes "Nexus" in various ways ("Néxus",
+               "Nexos", "Next us"). The WAKE_RE regex in voice.py covers the
+               most common variants.
+  Tips       : Say "Nexus" and pause briefly before the command. Use the
+               "small" model (more accurate than "base"/"tiny"). If a new
+               variant shows up, add it to WAKE_RE. In noisy places prefer
+               the microphone button or Ctrl+Space.
+
+[NX-VOZ-004] Recording doesn't start or doesn't stop (voice detection)
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Symptom    : State stays "LISTENING" forever, or speech is not captured.
+  Cause      : Voice detection uses signal energy with a threshold adapted
+               to ambient noise. Fans, music or a microphone gain that is too
+               low/high interfere.
+  Tips       : Recording ends after ~0.75 s of silence or 30 s maximum. Set
+               the microphone volume in Windows to ~70-80%. Use a headset in
+               noisy environments.
+
+[NX-VOZ-005] NEXUS hears its own voice (echo)
+  Severity   : MEDIUM           Status: MITIGATED          Observed: EXPECTED
+  Cause      : Speakers picked up by the microphone while NEXUS talks.
+  Mitigation : In always-listening mode, audio is ignored while NEXUS
+               speaks, plus a 250 ms margin.
+  Tips       : Use headphones; disable "Speak replies" if needed.
+
+[NX-VOZ-006] No Spanish voice / voice in the wrong language
+  Severity   : MEDIUM           Status: PENDING            Observed: YES
+  Symptom    : Spanish replies read with the Portuguese/English voice.
+  Cause      : Only installed SAPI voices are used. The reference PC has only
+               "Microsoft Maria" (pt-BR) and "Microsoft Zira" (en-US).
+  Solution   : Windows Settings > Time & language > Speech > Add voices >
+               Español. Restart NEXUS.
+  Note       : Some Windows 11 "natural" voices are not exposed to the SAPI5
+               API used by pyttsx3 and may not appear.
+
+[NX-VOZ-007] Speech synthesis stops working after a while
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : Known pyttsx3 issue with repeated runAndWait() calls on some
+               systems.
+  Workaround : Restart NEXUS. Speech runs on a dedicated thread to reduce the
+               risk.
+  Improvement: Replace it with a dedicated TTS engine (also needed for the
+               J.A.R.V.I.S-style robotic voice on the roadmap).
+
+[NX-VOZ-008] Slow transcription
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : Whisper runs on the CPU (CTranslate2 does not use AMD GPUs on
+               Windows).
+  Tips       : Use "base" in Settings for speed and "small" for accuracy.
+               Short sentences are transcribed faster.
+
+[NX-VOZ-009] "Mute" only stops at the end of the current sentence
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : Speech is produced sentence by sentence; interruption happens
+               between sentences.
+  Tips       : Esc or "mute" stops before the next sentence.
+
+
+================================================================================
+ DAT — DATA, MEMORY AND KNOWLEDGE
+================================================================================
+
+[NX-DAT-001] Knowledge base doesn't find an existing topic
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : Search is keyword based (SQLite FTS5 + BM25), not meaning
+               based. Synonyms ("heart attack" vs "myocardial infarction")
+               and questions without the text's terms may fail.
+  Tips       : Use terms present in the text. When teaching something,
+               include synonyms in the content. Use the "Knowledge" panel
+               search to test. Planned improvement: semantic search with
+               embeddings (nomic-embed-text via Ollama).
+
+[NX-DAT-002] Imported PDF has no text ("Could not extract text")
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : Scanned PDF (image) without a text layer.
+  Solution   : Run the PDF through OCR (e.g. OCRmyPDF) or convert it to .txt
+               before importing.
+
+[NX-DAT-003] "Invalid date" when creating an event/task
+  Severity   : LOW              Status: FIXED              Observed: YES
+  Cause      : The model sent dates as text ("tomorrow") instead of ISO.
+  Fix        : The tool returns the error with the expected format
+               (YYYY-MM-DDTHH:MM) and the model corrects it in the next
+               round.
+
+[NX-DAT-004] Reminder did not fire
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : (a) NEXUS was closed at that time: reminders more than 1 h
+               late are discarded on launch, to avoid an avalanche of old
+               alerts. (b) The scheduler checks every 15 s.
+  Tips       : Keep NEXUS open (start with Windows is on the roadmap). Check
+               the event in the Schedule panel.
+
+[NX-DAT-005] nexus.db file in use / database locked
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Symptom    : The data folder cannot be deleted or copied.
+  Cause      : Another NEXUS process (or the executable) is still open.
+  Solution   : Close every NEXUS window; in Task Manager end any remaining
+               "NEXUS.exe"/"python.exe".
+  Tips       : For backups, copy nexus.db with the app closed.
+
+[NX-DAT-006] Seed books re-indexed or duplicated
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : Re-indexing happens when a file in nexus/seed changes its
+               modification date (by design). Renaming a file creates a new
+               document and keeps the old one.
+  Solution   : Remove the old document in the "Knowledge" panel (only
+               non-seed documents have "✕") or delete data\nexus.db to rebuild
+               the base (DELETES all data).
+
+[NX-DAT-007] File in the inbox folder is not re-imported
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : After import the file is renamed to *.learned.
+  Solution   : Remove the ".learned" extension to import it again on the
+               next boot, or use the "Import files" button.
+
+
+================================================================================
+ UI — DESKTOP INTERFACE
+================================================================================
+
+[NX-UI-001] Fonts differ from the landing page (offline)
+  Severity   : LOW              Status: PENDING            Observed: EXPECTED
+  Cause      : Michroma, Rajdhani and JetBrains Mono come from Google Fonts;
+               offline, the app falls back to system fonts.
+  Solution   : Download the .woff2 files (OFL license), place them in
+               nexus/web/fonts and declare them with @font-face in style.css.
+
+[NX-UI-002] Window doesn't open: WebView2 missing
+  Severity   : CRITICAL         Status: KNOWN              Observed: EXPECTED
+  Symptom    : Startup error mentioning WebView2/EdgeChromium.
+  Cause      : pywebview uses the Microsoft Edge WebView2 Runtime. It ships
+               with Windows 11 but may be missing on older Windows 10
+               installs.
+  Solution   : Install the "WebView2 Runtime (Evergreen)" from Microsoft's
+               website.
+
+[NX-UI-003] Window opens blank or stuck at boot
+  Severity   : HIGH             Status: KNOWN              Observed: EXPECTED
+  Diagnosis  : Run with NEXUS_DEBUG=1 to open DevTools and check JavaScript
+               errors in the Console.
+  Causes     : JavaScript error after editing the UI; exception in Python's
+               boot() (check the terminal).
+  Tips       : To edit the look without Python, open
+               nexus/web/index.html?mock in a browser (mock mode).
+
+[NX-UI-004] Interface out of scale on small screens
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : The 3-column layout targets 980x660 or larger (minimum window
+               size).
+  Tips       : Use Windows scaling at 100-125% or maximize the window.
+
+
+================================================================================
+ INT — LANDING PAGE INTEGRATION
+================================================================================
+
+[NX-INT-001] Landing page has no real onboarding form yet
+  Severity   : HIGH             Status: PENDING            Observed: YES
+  Situation  : The landing "NEXUS://onboarding" section is an animated demo;
+               there are no fields for the user to fill in.
+  Solution   : Build the form (name, profession, routine, interests, goals,
+               profile, language) and on submit POST to
+               http://127.0.0.1:47800/profile, falling back to downloading the
+               .json (code in the README, "Perfil do usuário" section).
+
+[NX-INT-002] Browser blocks the landing page request to 127.0.0.1
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : Chromium-based browsers apply protections to public (https)
+               sites that access the local network and may ask permission or
+               block the request.
+  Mitigation : The bridge answers the CORS and
+               Access-Control-Allow-Private-Network headers.
+  Solution   : Always offer the .json download as an alternative and import
+               it with "Choose JSON file" in NEXUS.
+
+[NX-INT-003] Port 47800 busy: local bridge disabled
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Symptom    : curl http://127.0.0.1:47800/status doesn't respond.
+  Cause      : Another NEXUS instance or another program uses the port; the
+               bridge is silently disabled and the app keeps working.
+  Solution   : Close the other instance or change "bridge_port" in
+               data\settings.json (and in the landing form).
+
+[NX-INT-004] "The JSON must contain at least the 'name' field"
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : JSON without "name"/"nome", or with invalid syntax.
+  Solution   : Compare with examples/profile.example.json. Keys accepted in
+               English or Portuguese; lists may be comma-separated text.
+
+
+================================================================================
+ ENV — ENVIRONMENT, INSTALLATION AND BUILD
+================================================================================
+
+[NX-ENV-001] requirements.txt ignored by Git
+  Severity   : HIGH             Status: FIXED              Observed: YES
+  Cause      : The "*.txt" rule in .gitignore (which protects
+               "NEXUS INFOS.txt") also ignored requirements.txt and these
+               documents.
+  Fix        : Exceptions "!requirements.txt", "!erros.txt", "!errors.txt"
+               and "!errores.txt".
+  Tips       : When creating new .txt files that belong in the repository,
+               add the matching exception.
+
+[NX-ENV-002] setup.ps1 / build.ps1 blocked by PowerShell policy
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Symptom    : "Running scripts is disabled on this system".
+  Solution   : powershell -ExecutionPolicy Bypass -File setup.ps1
+
+[NX-ENV-003] Dependencies not supported on the Python version
+  Severity   : HIGH             Status: KNOWN              Observed: EXPECTED
+  Situation  : Tested with Python 3.14.8 and the versions pinned in
+               requirements.txt.
+  Tips       : If pip install fails compiling packages (numpy, ctranslate2),
+               use Python 3.12, which has broad prebuilt-wheel support. The
+               whole team should use the same version.
+
+[NX-ENV-004] Antivirus blocks or removes NEXUS.exe
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : Unsigned PyInstaller executables sometimes trigger false
+               positives.
+  Solution   : Add an exception for the dist\NEXUS folder or distribute the
+               source with setup.ps1. Definitive fix: sign the executable and
+               build an installer (Inno Setup).
+
+[NX-ENV-005] Executable opens and closes / module not found
+  Severity   : HIGH             Status: FIXED              Observed: EXPECTED
+  Cause      : PyInstaller doesn't detect dynamic imports (pyttsx3 drivers,
+               comtypes, faster-whisper data).
+  Fix        : build.ps1 includes the required --collect-all, --hidden-import
+               and --add-data flags. Build tested: starts, indexes the
+               knowledge base and opens the local bridge.
+  Tips       : When adding a dependency, build and run dist\NEXUS\NEXUS.exe
+               before distributing. To see errors, build temporarily without
+               --windowed.
+
+[NX-ENV-006] Port 11434 busy or two Ollama instances running
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Symptom    : "ollama serve" fails with "address already in use".
+  Cause      : Ollama is already running from the system tray.
+  Solution   : There's no need to run "ollama serve" manually if the Ollama
+               icon is in the tray. To restart it, quit from the icon and
+               open it again.
+
+
+================================================================================
+ TEST HISTORY (2026-10-13)
+================================================================================
+ Suite: 10 commands (reminder, schedule, 2 expenses, total, memory, first
+ aid, learn, query learned fact, question in English, schedule in Spanish),
+ validating results in the database.
+
+ qwen2.5:7b (/v1 API, 4096 context)   : schedule OK; expenses, memory and
+   learning FAKED; "Friday" date wrong; wrong language.
+ qwen2.5:7b (native API, 8192)         : expenses and total OK; memory and
+   learning still faked, even with the safety net.
+ qwen3:8b (native API, think=false)    : every tool called correctly; dates
+   and languages correct; 1 intermittent learning failure and 1 incomplete
+   schedule (NX-LLM-012). Time: 11-25 s.
+
+================================================================================
+ END OF DOCUMENT
+================================================================================
