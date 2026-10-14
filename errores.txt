@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 2.0  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.9.0
+ Versión del documento: 2.1  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.10.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -75,6 +75,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-LLM-023  Datos en vivo inventados o rechazados (clima, noticias, divisas)
       NX-LLM-024  Simulacro/quiz: respuestas guardadas, mal corregidas o nunca corregidas
       NX-LLM-025  "No entendí" sin explicación (ej.: chiste repetido en vez de explicado)
+      NX-LLM-026  Proveedor en la nube: "sin conexión", clave rechazada o el modelo no usa herramientas
  VOZ  NX-VOZ-001  El micrófono no responde en el primer uso (descarga Whisper)
       NX-VOZ-002  Micrófono equivocado seleccionado (p. ej. DroidCam)
       NX-VOZ-003  Palabra de activación "Nexus" no reconocida / falsos disparos
@@ -102,6 +103,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-DAT-008  El saludo "¿continuamos con...?" no aparece / aparece solo una vez
       NX-DAT-009  Una conversación antigua no aparece en la lista o no tiene título/descripción
       NX-DAT-010  La respuesta usa un tema de otra conversación
+      NX-DAT-011  El recordatorio no se dijo / no apareció / llegó solo una vez
  UI   NX-UI-001   Fuentes distintas de la landing (sin internet)
       NX-UI-002   La ventana no abre: falta WebView2
       NX-UI-003   La ventana se abre en blanco o se bloquea en el arranque
@@ -111,6 +113,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-UI-007   La pestaña Saber (conocimiento) no tiene desplazamiento
       NX-UI-008   Texto no seleccionable / sin copiar / conversación invisible en modo audio
       NX-UI-009   Botones Interrumpir/Repetir clicables sin nada que hacer
+      NX-UI-010   La notificación de Windows no aparece
  INT  NX-INT-001  La landing aún no tiene un formulario de registro real
       NX-INT-002  El navegador bloquea el envío de la landing a 127.0.0.1
       NX-INT-003  Puerto 47800 ocupado: puente local desactivado
@@ -512,6 +515,25 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                gracioso), prohibiendo repetir la misma frase. La introducción
                hablada ahora es "Está bien, te lo explico de otra forma".
 
+[NX-LLM-026] Proveedor en la nube: "sin conexión", clave rechazada o el modelo no usa herramientas
+  Gravedad   : MEDIA            Estado: CONOCIDO           Observado: PREVISTO
+  Síntoma    : En Configuración > Inteligencia, "Probar conexión" muestra
+               "Sin conexión: 401/403", o el modelo responde pero no guarda
+               nada.
+  Causa      : (1) Clave de API ausente, incorrecta o sin créditos.
+               (2) Dirección cambiada a mano. (3) El modelo elegido no admite
+               "tool calling" (herramientas) y sin eso NEXUS no guarda
+               recordatorios ni datos. (4) Algunos proveedores no listan
+               modelos (/models); la prueba dice que el modelo "no está en la
+               lista" aunque funcione.
+  Solución   : Elige el proveedor de la lista (la dirección se rellena sola),
+               pega la clave, pulsa Probar conexión y elige un modelo de la
+               lista. Usa modelos con soporte de herramientas.
+  Privacidad : Con proveedores en la nube, mensajes, recuerdos y datos del
+               contexto salen del ordenador (aviso amarillo en pantalla). La
+               clave se guarda como texto en settings.json en la carpeta de
+               datos.
+
 ================================================================================
  VOZ — RECONOCIMIENTO Y SÍNTESIS
 ================================================================================
@@ -531,7 +553,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                error aparece en el chat; cambia a "base" en Configuración.
 
 [NX-VOZ-002] Micrófono equivocado seleccionado (p. ej. DroidCam)
-  Gravedad   : ALTA             Estado: PENDIENTE          Observado: SÍ
+  Gravedad   : ALTA             Estado: CORREGIDO (v0.10)  Observado: SÍ
   Síntoma    : NEXUS no reacciona al habla o graba silencio.
   Causa      : NEXUS usa el dispositivo de entrada PREDETERMINADO de
                Windows. En el PC de referencia era "Micrófono (DroidCam
@@ -540,6 +562,12 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                micrófono real como predeterminado y reinicia NEXUS.
   Mejora     : Añadir la selección de dispositivo en la Configuración de
                NEXUS (sounddevice.query_devices).
+  Corrección : (v0.10) Configuración > Micrófono > Dispositivo de entrada
+               lista los micrófonos (sin el "Asignador de sonido" virtual) y
+               cambia al momento, sin reiniciar. Si el elegido se desconecta,
+               NEXUS vuelve al predeterminado de Windows. Si tu micrófono no
+               aparece, Windows no lo ve: comprueba que esté conectado y
+               activado en Configuración de Windows > Sonido.
 
 [NX-VOZ-003] Palabra de activación "Nexus" no reconocida / falsos disparos
   Gravedad   : MEDIA            Estado: CORREGIDO (v0.8)   Observado: SÍ
@@ -805,6 +833,22 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                derecho. Tras 2 h sin mensajes, el siguiente mensaje ya abre
                una conversación nueva (misma regla que la v0.5, NX-LLM-019).
 
+[NX-DAT-011] El recordatorio no se dijo / no apareció / llegó solo una vez
+  Gravedad   : MEDIA            Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : (1) Los recordatorios solo funcionan con NEXUS abierto (puede
+               estar minimizado). (2) En el horario silencioso solo van a la
+               central (campana). (3) "Decir los recordatorios" desactivado o
+               la voz de la IA silenciada. (4) Cada antelación se dispara una
+               vez; si NEXUS se abrió tarde, solo se avisa la más cercana.
+               (5) Las antelaciones que ya habían pasado al crear el
+               compromiso no se disparan (un evento dentro de 30 min no dice
+               "en 1 hora"). (6) Los elementos con más de 1 hora de retraso se
+               descartan. (7) "Recuérdame beber agua a las 15 h" solo avisa a
+               la hora.
+  Solución   : Configuración > Notificaciones: elige las antelaciones y usa
+               "Probar notificación". La campana de la barra superior muestra
+               todo lo que ya se avisó.
+
 ================================================================================
  UI — INTERFAZ DE ESCRITORIO
 ================================================================================
@@ -903,6 +947,16 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Corrección : Interrumpir solo está activo mientras NEXUS escucha, piensa o
                habla; Repetir solo cuando ya hay una respuesta. Desactivados
                se ven atenuados y no se pueden pulsar.
+
+[NX-UI-010] La notificación de Windows no aparece
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : NEXUS usa las notificaciones de Windows a través de PowerShell
+               (el instalador registrará un nombre propio). "No molestar" /
+               Asistente de concentración, notificaciones de PowerShell
+               desactivadas o políticas de empresa las bloquean.
+  Solución   : Configuración de Windows > Sistema > Notificaciones: desactiva
+               "No molestar" y permite "Windows PowerShell". El aviso sigue
+               dentro de NEXUS (sonido, voz y campana) sin la de Windows.
 
 ================================================================================
  INT — INTEGRACIÓN CON LA LANDING PAGE

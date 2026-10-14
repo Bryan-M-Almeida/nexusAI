@@ -103,6 +103,21 @@ CREATE TABLE IF NOT EXISTS conversations (
     created TEXT NOT NULL,
     updated TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    read INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS reminders_sent (
+    kind TEXT NOT NULL,
+    item_id INTEGER NOT NULL,
+    lead INTEGER NOT NULL,
+    ts TEXT NOT NULL,
+    PRIMARY KEY (kind, item_id, lead)
+);
 CREATE VIRTUAL TABLE IF NOT EXISTS kb_chunks USING fts5(
     heading, content, category UNINDEXED, doc_id UNINDEXED,
     tokenize='unicode61 remove_diacritics 2'

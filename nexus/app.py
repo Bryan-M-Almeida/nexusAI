@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 
 import webview
 
-from . import MODEL_NAME, __version__, assistant, bridge, control, i18n, knowledge, llm, memory, profile, scheduler, tools
+from . import (MODEL_NAME, __version__, assistant, bridge, control, i18n, knowledge, llm, memory, notify, profile,
+               scheduler, tools)
 from .config import WEB_DIR, settings
 from .db import db
 from .i18n import LANGS, detect, lang
@@ -48,8 +49,18 @@ class Api:
         self.ai_state = "cold"  # cold | warming | ready | offline
 
     def _on_alert(self, alert):
-        emit("alert", alert)
-        self._speaker.say(alert["text"], remember=False)
+        """Scheduler reminders and the daily briefing: notification center + in-app toast, and - outside quiet
+        hours - a Windows notification and the voice (even in text mode; muting the AI voice silences it)."""
+        title = {"event": i18n.t("notif_event"), "task": i18n.t("notif_task")}.get(alert["kind"], alert.get("title", "NEXUS"))
+        quiet = notify.in_quiet_hours()
+        item = notify.add(alert["kind"], title, alert["text"])
+        emit("alert", {**alert, "notification": item, "quiet": quiet, "sound": settings["notify_sound"] and not quiet})
+        if quiet:
+            return
+        if settings["desktop_notifications"]:
+            notify.toast(f"N.E.X.U.S · {title}", alert["text"])
+        if settings["speak_reminders"] and settings["voice_enabled"]:
+            self._speaker.say(alert["text"], force=True, remember=False)
 
     def _on_brain_event(self, event, payload):
         """Forward to the UI and speak while the answer is still being generated (sentence by sentence)."""
@@ -131,7 +142,8 @@ class Api:
 
     def greet(self):
         text = assistant.greeting()
-        self._speaker.say(text)
+        if settings["greet_on_start"]:
+            self._speaker.say(text)
         return text
 
     # -- modes and dock buttons ------------------------------------------------
@@ -403,16 +415,65 @@ class Api:
     # -- settings --------------------------------------------------------------
     def get_settings(self):
         return {"settings": dict(settings), "llm": llm.status(), "langs": LANGS, "lang": lang(),
-                "voices": self._speaker.voices}
+                "voices": self._speaker.voices, "presets": llm.PRESETS, "mics": self.list_mics()}
+
+    # -- notifications (v0.10) -------------------------------------------------------------------------------
+    def notifications(self):
+        return notify.listing()
+
+    def mark_notifications_read(self):
+        notify.mark_read()
+
+    def clear_notifications(self):
+        notify.clear()
+
+    def briefing_now(self):
+        """Settings > Notifications > "Hear today's briefing now"."""
+        self._on_alert({"kind": "briefing", "title": i18n.t("briefing_title"), "text": scheduler.briefing_text()})
+
+    def test_notification(self):
+        self._on_alert({"kind": "test", "title": "NEXUS", "text": i18n.t("notif_test")})
+
+    # -- AI provider / microphone / data (v0.10) ---------------------------------------------------------------
+    def test_llm(self, changes):
+        """Save the AI provider fields and report whether the server answers and has the model."""
+        settings.apply({k: v for k, v in changes.items() if k.startswith("llm_")})
+        return llm.status()
+
+    @staticmethod
+    def list_mics():
+        try:
+            import sounddevice as sd
+
+            default = sd.query_devices(kind="input")["name"]
+            names = []
+            for d in sd.query_devices():
+                virtual = any(w in d["name"].lower() for w in ("mapeador", "mapper", "asignador"))  # sound mapper
+                if d["max_input_channels"] > 0 and d["hostapi"] == 0 and not virtual and d["name"] not in names:
+                    names.append(d["name"])
+            return {"devices": names, "default": default}
+        except Exception as exc:
+            return {"devices": [], "default": "", "error": str(exc)}
+
+    def open_data_folder(self):
+        from .config import DATA_DIR
+
+        try:
+            os.startfile(DATA_DIR)
+        except Exception:
+            pass
 
     def save_settings(self, changes):
         restart_stt = changes.get("stt_model", settings["stt_model"]) != settings["stt_model"]
+        new_mic = changes.get("mic_device", settings["mic_device"]) != settings["mic_device"]
         new_calendar = changes.get("calendar_ics_url", settings["calendar_ics_url"]) != settings["calendar_ics_url"]
         settings.apply(changes)
         if new_calendar and settings["calendar_ics_url"].strip():
             threading.Thread(target=lambda: (tools.sync_calendar(), emit("refresh")), daemon=True).start()
         if restart_stt:
             self._listener.reload_model()
+        if new_mic:
+            self._listener.reopen()
         return self.get_settings()
 
 
@@ -459,7 +520,7 @@ def main():
     _window = webview.create_window(
         "N.E.X.U.S", str(WEB_DIR / "index.html"), js_api=api,
         width=1360, height=860, min_size=(980, 660), background_color="#030508",
-        fullscreen=not os.environ.get("NEXUS_WINDOWED"), text_select=True,
+        fullscreen=settings["start_fullscreen"] and not os.environ.get("NEXUS_WINDOWED"), text_select=True,
     )
     webview.start(debug=bool(os.environ.get("NEXUS_DEBUG")))
     llm.unload()  # window closed: give the VRAM back to games and other apps

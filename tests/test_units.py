@@ -223,6 +223,44 @@ memory.add_message("user", "oi")
 check("greeting-only conversations are cleaned up",
       db.one("SELECT COUNT(*) n FROM messages WHERE content = 'Olá, o que teremos para hoje?'")["n"] == 0)  # ids are reused
 
+# -- reminders with several lead times, quiet hours, briefing (v0.10) --------------------------------------------
+from nexus import notify, scheduler  # noqa: E402
+from nexus.config import settings as cfg  # noqa: E402
+
+cfg["reminder_leads"] = "60,10,0"
+fired = []
+iso = lambda d: d.isoformat(timespec="minutes")  # noqa: E731
+n = datetime.now()
+db.execute("DELETE FROM events"); db.execute("DELETE FROM tasks"); db.execute("DELETE FROM reminders_sent")
+ins = "INSERT INTO events(title, start, notes, remind_minutes, created) VALUES (?,?,?,?,?)"
+db.execute(ins, ("Reunião antiga", iso(n + timedelta(minutes=30)), "", 10, iso(n - timedelta(hours=2))))
+db.execute(ins, ("Criada agora", iso(n + timedelta(minutes=30)), "", 10, iso(n)))
+db.execute(ins, ("Ontem", iso(n - timedelta(hours=20)), "", 10, iso(n - timedelta(days=2))))
+db.execute(ins, ("beber água", iso(n - timedelta(minutes=1)), "reminder", 0, iso(n - timedelta(hours=1))))
+scheduler._check(fired.append)
+texts = {f["title"]: f["text"] for f in fired}
+check("reminder: 1 h lead fires with the real time left",  # stored without seconds: 29 or 30
+      any(f"{m} minutos" in texts.get("Reunião antiga", "") for m in (29, 30)), str(texts))
+check("reminder: leads already past at creation don't fire", "Criada agora" not in texts, str(texts))
+check("reminder: items from yesterday stay silent", "Ontem" not in texts, str(texts))
+check("reminder: 'remind me to...' fires only at the time", texts.get("beber água", "").endswith("agora."), str(texts))
+fired.clear(); scheduler._check(fired.append)
+check("reminder: each lead fires once", fired == [], str(fired))
+check("reminder leads parsed and sorted", scheduler.leads() == [60, 10, 0])
+cfg["quiet_hours"] = "22:00-07:00"
+check("quiet hours cross midnight", notify.in_quiet_hours(datetime(2026, 1, 1, 23, 30))
+      and notify.in_quiet_hours(datetime(2026, 1, 1, 6, 59)) and not notify.in_quiet_hours(datetime(2026, 1, 1, 12, 0)))
+cfg["quiet_hours"] = ""
+check("no quiet hours by default", not notify.in_quiet_hours())
+notify.clear(); notify.add("event", "Compromisso", "Lembrete: teste")
+check("notification center stores and counts unread", notify.listing()["unread"] == 1)
+notify.mark_read()
+check("notification center: mark read", notify.listing()["unread"] == 0)
+check("daily briefing mentions today's agenda", "compromisso" in scheduler.briefing_text().lower())
+from nexus import llm  # noqa: E402
+check("AI presets include local and cloud providers",
+      {"ollama", "lmstudio", "openai", "anthropic", "gemini", "custom"} <= {x["id"] for x in llm.PRESETS})
+
 # migration of pre-v0.9 messages: a 2 h gap splits them into two conversations
 import sqlite3  # noqa: E402
 import tempfile  # noqa: E402

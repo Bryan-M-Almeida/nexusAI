@@ -386,6 +386,61 @@ button, .dock, .rail, .topbar, .core-label { user-select: none; }
 .tl-msg.assistant span { color: var(--silver); }
 .conv-more { display: block; margin: 6px auto 12px; }
 
+/* ---------------------------------------------------------------- v0.10 settings (sections) & notifications */
+.modal-box.settings-box { width: min(920px, 100%); height: min(88vh, 760px); max-height: none; padding: 0; display: grid;
+  grid-template-columns: 196px 1fr; grid-template-rows: 1fr auto; overflow: hidden; }
+.settings-box .drawer-close { z-index: 2; }
+.set-nav { grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 2px; padding: 26px 10px; border-right: 1px solid var(--line);
+  background: rgba(3, 5, 8, .45); }
+.set-nav .kicker { margin: 0 8px 14px; }
+.set-nav button { text-align: left; background: none; border: 0; border-left: 2px solid transparent; padding: 9px 12px;
+  font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.set-nav button:hover { color: var(--text); }
+.set-nav button.on { color: var(--text); border-left-color: var(--red); background: rgba(61, 139, 219, .1); }
+.set-body { overflow-y: auto; overscroll-behavior: contain; padding: 26px 30px 10px; }
+.set-sec { animation: rise .25s var(--ease-out); }
+.set-sec h2 { margin-top: 0; }
+.set-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 30px; border-top: 1px solid var(--line); }
+.set-foot .muted { margin-right: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.inline input[type="time"] { flex: none; width: 110px; }
+.modal-box label output { font-size: 11px; color: var(--blue-bright); }
+.modal-box input[type="range"] { padding: 0; accent-color: var(--red); }
+.hint { font-size: 12.5px; color: var(--muted); margin: -4px 0 10px; line-height: 1.45; }
+.warn-cloud { color: #f2b33d; border-left: 2px solid #f2b33d; padding-left: 8px; margin-top: 4px; }
+.dim { opacity: .45; }
+.small-btn { padding: 5px 10px; flex: none; }
+.btn-ghost.danger:hover { border-color: var(--red); color: #ffb3b0; }
+.chips-select { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.chip-opt { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; padding: 5px 10px; background: none;
+  border: 1px solid var(--line-strong); color: var(--muted); }
+.chip-opt.on { color: var(--blue-bright); border-color: rgba(61, 139, 219, .7); background: rgba(61, 139, 219, .14); }
+.chip-opt.fixed { cursor: default; }
+
+.notif-btn { position: relative; }
+.notif-badge { position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: var(--red); color: #fff; font-size: 9.5px; font-style: normal; line-height: 16px; text-align: center;
+  box-shadow: 0 0 8px rgba(229, 50, 45, .7); }
+.notif-box { width: min(560px, 96vw); }
+.notif-head { display: flex; align-items: center; justify-content: space-between; }
+.notif-head h2 { margin: 0; font-size: 12px; font-weight: 400; letter-spacing: .2em; color: var(--muted); }
+.notif-item { display: grid; gap: 2px; padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--line); border-left: 2px solid var(--line-strong);
+  background: var(--panel); user-select: text; }
+.notif-item.unread { border-left-color: var(--red); }
+.notif-item time { font-size: 10.5px; color: var(--muted); letter-spacing: .06em; }
+.notif-item b { font-weight: 600; font-size: 14px; }
+.notif-item span { font-size: 14.5px; color: var(--silver); }
+
+/* Interface options */
+.app.no-hud .telemetry, .app.no-hud .pulse, .app.no-hud ~ .hud-frame, .app.no-hud .hud-frame, .app.no-hud::after { display: none; }
+.app.reduce-motion .ring-spin, .app.reduce-motion .ring-sway, .app.reduce-motion .ring-core { animation: none !important; }
+@media (max-width: 760px) {
+  .modal-box.settings-box { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .set-nav { grid-row: auto; flex-direction: row; flex-wrap: wrap; padding: 14px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .two { grid-template-columns: 1fr; }
+}
+
 /* ---------------------------------------------------------------- modals & toasts */
 .modal { position: fixed; inset: 0; z-index: 20; background: rgba(3, 5, 8, .78); display: grid; place-items: center; padding: 20px; backdrop-filter: blur(4px); }
 .modal-box { width: min(560px, 100%); max-height: 92vh; overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line-strong); padding: 26px; position: relative; animation: rise .4s var(--ease-out); }

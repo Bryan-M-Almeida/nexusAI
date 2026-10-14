@@ -129,6 +129,8 @@ async function start() {
   setAi(st.llm);
   $("#version").textContent = "v" + st.version;
   $("#modelName").textContent = st.model_name || "NEX-1.0";
+  applyInterface();
+  api().notifications().then((r) => setBadge(r.unread));
   applyState({ ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: st.stt,
     ai_mode: settings.ai_mode || "assistant", temporary: false });
   await new Promise((r) => setTimeout(r, Math.max(0, BOOT_MIN_MS - (Date.now() - t0))));
@@ -241,7 +243,42 @@ function onControl(p) {
   if (p.action === "stop" && streaming) onDone({ text: streaming.text, interrupted: true });
 }
 
+let unread = 0;
+function setBadge(n) {
+  unread = n;
+  $("#notifBadge").hidden = !n;
+  $("#notifBadge").textContent = n > 9 ? "9+" : n;
+}
+
+// Short two-tone chime (WebAudio, no file): plays for reminders when "Alert sound" is on.
+let audioCtx;
+function chime() {
+  try {
+    audioCtx = audioCtx || new AudioContext();
+    const t0 = audioCtx.currentTime;
+    [[880, 0], [1320, 0.12]].forEach(([f, d]) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + d); g.gain.exponentialRampToValueAtTime(0.18, t0 + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.35);
+      o.connect(g).connect(audioCtx.destination); o.start(t0 + d); o.stop(t0 + d + 0.4);
+    });
+  } catch (e) { /* no audio device */ }
+}
+
+async function openNotifications() {
+  const r = await api().notifications();
+  $("#notifList").innerHTML = r.items.map((n) => `
+    <div class="notif-item ${n.read ? "" : "unread"}"><time class="mono">${esc(fmtDate(n.ts))}</time>
+      <b>${esc(n.title)}</b><span>${esc(n.body)}</span></div>`).join("") || `<p class="muted">${esc(T("notifEmpty"))}</p>`;
+  $("#notifDrawer").hidden = false;
+  api().mark_notifications_read();
+  setBadge(0);
+}
+
 function onAlert(a) {
+  if (a.notification) setBadge(unread + 1);
+  if (a.sound) chime();
   const el = document.createElement("div");
   el.className = "toast";
   el.innerHTML = `<b>${esc(T("reminder"))}</b>${esc(a.text)}`;
@@ -359,8 +396,14 @@ function drawPulse(now) {
 
 /* ------------------------------------------------------------------ captions & notices (audio mode has no chat) */
 let captionTimer;
+function applyInterface() {
+  const app = $("#app");
+  app.classList.toggle("no-hud", settings.show_hud === false);
+  app.classList.toggle("reduce-motion", !!settings.reduce_motion);
+}
+
 function caption(text, ms = 3000) {
-  if (state.ui_mode !== "audio" || !text) return;
+  if (state.ui_mode !== "audio" || !text || settings.show_captions === false) return;
   const el = $("#caption");
   el.textContent = text.length > 160 ? text.slice(0, 157) + "…" : text;
   el.classList.add("show");
@@ -538,26 +581,89 @@ async function importResult(r) {
   if (r && r.ok === false && r.error) $("#profileErr").textContent = r.error;
 }
 
-// Opens instantly with the settings the UI already has; only the AI status, model list and voices are fetched
-// afterwards. (v0.6 and older waited for Python - and for Ollama while the model was loading - before showing
-// anything, so the click looked ignored and users clicked again.)
-function openSettings() {
+// Opens instantly with the settings the UI already has; the AI status, model list, voices and microphones are
+// fetched afterwards. (v0.6 and older waited for Python - and for Ollama while the model was loading - first.)
+const LEADS = [1440, 120, 60, 30, 15, 10, 5];
+let presets = [];
+
+function leadLabel(m) { return m >= 1440 ? T("leadDay") : m >= 60 ? `${m / 60} h` : `${m} min`; }
+
+function fillSettings() {
   const f = $("#settingsForm");
   for (const [k, v] of Object.entries(settings)) {
     const el = f.elements[k];
-    if (!el) continue;
+    if (!el || el.type === "hidden" || el.tagName === "SELECT" && k === "llm_preset" && !presets.length) continue;
     if (el.type === "checkbox") el.checked = !!v; else el.value = v;
   }
+  const leads = String(settings.reminder_leads || "").split(",").map(Number);
+  $("#leadChips").innerHTML = LEADS.map((m) => `<button type="button" class="chip-opt ${leads.includes(m) ? "on" : ""}" data-lead="${m}">${esc(leadLabel(m))}</button>`).join("")
+    + `<span class="chip-opt on fixed">${esc(T("leadNow"))}</span>`;
+  const [qf, qt] = String(settings.quiet_hours || "").split("-");
+  $("#quietOn").checked = !!settings.quiet_hours; $("#quietFrom").value = qf || "22:00"; $("#quietTo").value = qt || "07:00";
+  $("#briefingOn").checked = !!settings.daily_briefing; $("#briefingAt").value = settings.daily_briefing || "08:00";
+  $$("output[data-for]", f).forEach(syncOutput);
   renderVoiceInfo();
+}
+
+function syncOutput(out) {
+  const v = $("#settingsForm").elements[out.dataset.for].value;
+  out.textContent = { tts_volume: v + "%", vad_silence: v + " s", tts_speed: (v > 0 ? "+" : "") + v }[out.dataset.for] ?? v;
+}
+
+function collectSettings() {
+  const f = $("#settingsForm"), changes = {};
+  f.elements.reminder_leads.value = [...$$("#leadChips [data-lead].on")].map((b) => b.dataset.lead).concat("0").join(",");
+  f.elements.quiet_hours.value = $("#quietOn").checked ? `${$("#quietFrom").value}-${$("#quietTo").value}` : "";
+  f.elements.daily_briefing.value = $("#briefingOn").checked ? $("#briefingAt").value : "";
+  for (const el of f.elements) if (el.name) changes[el.name] = el.type === "checkbox" ? el.checked : el.value;
+  return changes;
+}
+
+function showSection(sec) {
+  $$("#setNav [data-sec]").forEach((b) => b.classList.toggle("on", b.dataset.sec === sec));
+  $$(".set-sec").forEach((x) => (x.hidden = x.dataset.sec !== sec));
+}
+
+function onPresetChange() {
+  const f = $("#settingsForm"), pr = presets.find((x) => x.id === f.elements.llm_preset.value);
+  if (!pr) return;
+  if (pr.url) f.elements.llm_base_url.value = pr.url;
+  if (pr.local && !f.elements.llm_api_key.value) f.elements.llm_api_key.value = "ollama";
+  renderPresetHints();
+}
+
+function renderPresetHints() {
+  const f = $("#settingsForm"), pr = presets.find((x) => x.id === f.elements.llm_preset.value);
+  $("#cloudWarn").hidden = !pr || pr.local !== false;
+  $("#keyRow").classList.toggle("dim", !!(pr && !pr.key));
+}
+
+function aiStatusHTML(llm) {
+  if (!llm.online) return `<span class="bad">● ${esc(T("connFail", { error: (llm.error || "").slice(0, 120) }))}</span>`;
+  return llm.model_ready ? `<span class="ok">● ${esc(T("connOk", { model: llm.model }))}</span>`
+    : `<span class="bad">● ${esc(T("connNoModel", { model: llm.model }))}</span>`;
+}
+
+function openSettings(sec) {
+  fillSettings();
+  showSection(typeof sec === "string" ? sec : "general");
+  $("#setSaved").textContent = "";
   $("#aiStatus").innerHTML = `<span class="muted">● ${esc(T("checking"))}</span>`;
   $("#settings").hidden = false;
   api().get_settings().then((r) => {
+    presets = r.presets || [];
+    const f = $("#settingsForm");
+    f.elements.llm_preset.innerHTML = presets.map((x) => `<option value="${x.id}">${esc(x.name)}${x.local ? " · local" : ""}</option>`).join("");
+    f.elements.llm_preset.value = settings.llm_preset || "ollama";
+    renderPresetHints();
     $("#modelList").innerHTML = r.llm.models.map((m) => `<option value="${esc(m)}">`).join("");
+    const mics = r.mics || { devices: [], default: "" };
+    f.elements.mic_device.innerHTML = `<option value="">${esc(T("micDefault", { name: mics.default || "—" }))}</option>`
+      + mics.devices.map((d) => `<option>${esc(d)}</option>`).join("");
+    f.elements.mic_device.value = settings.mic_device || "";
     voices = r.voices || [];
     renderVoiceInfo();
-    $("#aiStatus").innerHTML = r.llm.online && r.llm.model_ready
-      ? `<span class="ok">● ${esc(T("aiOk"))}</span> — ${esc(r.llm.model)}`
-      : `<span class="bad">● ${esc(aiHelp(r.llm))}</span>`;
+    $("#aiStatus").innerHTML = aiStatusHTML(r.llm);
     setAi(r.llm);
   });
 }
@@ -575,7 +681,7 @@ function renderVoiceInfo() {
 async function testVoice() {
   const f = $("#settingsForm");
   const changes = { voice_gender: f.elements.voice_gender.value, voice_effect: f.elements.voice_effect.value,
-    tts_speed: f.elements.tts_speed.value };
+    tts_speed: f.elements.tts_speed.value, tts_volume: f.elements.tts_volume.value };
   settings = (await api().save_settings(changes)).settings;
   api().test_voice(T("voiceSample", { name: profile ? profile.name.split(" ")[0] : "" }));
 }
@@ -604,6 +710,14 @@ function wire() {
       if (open.length) open.forEach((m) => (m.hidden = true)); else dock("interrupt");
     }
     if (e.key === "F11") { e.preventDefault(); api().toggle_fullscreen(); }
+    // v0.10 shortcuts: Ctrl+, settings · Ctrl+Shift+N new conversation · Ctrl+H conversations · Ctrl+J notifications
+    // · Ctrl+T transcript (audio mode)
+    if (e.ctrlKey && !e.altKey) {
+      const k = e.key.toLowerCase();
+      const act = { ",": openSettings, h: () => openConversations("threads"), j: openNotifications,
+        t: () => state.ui_mode === "audio" && toggleTranscript(), n: e.shiftKey ? newConversation : null }[k];
+      if (act) { e.preventDefault(); act(); }
+    }
   });
 
   // Click outside a modal/drawer box closes it (press and release on the backdrop, so selecting text doesn't).
@@ -686,14 +800,37 @@ function wire() {
   $("#settingsForm").elements.voice_gender.onchange = renderVoiceInfo;
   $("#settingsForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const f = e.target, changes = {};
-    for (const el of f.elements) if (el.name) changes[el.name] = el.type === "checkbox" ? el.checked : el.value;
-    const r = await api().save_settings(changes);
+    const r = await api().save_settings(collectSettings());
     settings = r.settings;
     setAi(r.llm);
     applyLang(r.lang);
+    applyInterface();
     $("#settings").hidden = true;
   });
+  $$("#setNav [data-sec]").forEach((b) => (b.onclick = () => showSection(b.dataset.sec)));
+  $("#leadChips").addEventListener("click", (e) => e.target.closest("[data-lead]")?.classList.toggle("on"));
+  $$("#settingsForm output[data-for]").forEach((out) => ($("#settingsForm").elements[out.dataset.for].oninput = () => syncOutput(out)));
+  $("#settingsForm").elements.llm_preset.onchange = onPresetChange;
+  $("#btnShowKey").onclick = () => {
+    const k = $("#settingsForm").elements.llm_api_key, show = k.type === "password";
+    k.type = show ? "text" : "password";
+    $("#btnShowKey").textContent = T(show ? "hide" : "show");
+  };
+  $("#btnTestLlm").onclick = async () => {
+    $("#aiStatus").innerHTML = `<span class="muted">● ${esc(T("checking"))}</span>`;
+    const c = collectSettings(), llmFields = Object.fromEntries(Object.entries(c).filter(([k]) => k.startsWith("llm_")));
+    const st = await api().test_llm(llmFields);
+    Object.assign(settings, llmFields);
+    $("#modelList").innerHTML = (st.models || []).map((m) => `<option value="${esc(m)}">`).join("");
+    $("#aiStatus").innerHTML = aiStatusHTML(st);
+    setAi(st);
+  };
+  $("#btnTestNotif").onclick = async () => { await api().save_settings(collectSettings()); api().test_notification(); };
+  $("#btnBriefing").onclick = () => api().briefing_now();
+  $("#btnOpenData").onclick = () => api().open_data_folder();
+  $("#btnCenterRing").onclick = () => setRingPos(0, 0);
+  $("#btnNotif").onclick = openNotifications;
+  $("#btnNotifClear").onclick = async () => { await api().clear_notifications(); openNotifications(); };
   $("#btnReimport").onclick = () => { $("#settings").hidden = true; openOnboarding(); };
   $("#btnClearChat").onclick = async () => { await api().clear_history(); $("#chat").innerHTML = ""; $("#settings").hidden = true; };
   $("#btnReport").onclick = async () => {

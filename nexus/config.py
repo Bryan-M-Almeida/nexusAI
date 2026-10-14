@@ -50,6 +50,24 @@ DEFAULTS = {
     "calendar_ics_url": "",       # read-only calendar feed (Google Calendar "secret address in iCal format")
     "bridge_port": 47800,         # local endpoint the landing page form can POST the profile to
     "history_turns": 12,
+    # v0.10 -------------------------------------------------------------------------------------------------
+    "llm_preset": "ollama",       # Settings > AI provider preset (fills URL; "custom" = edit freely)
+    "auto_title": True,           # the AI writes each conversation's title/description in the background
+    "greet_on_start": True,       # speak the greeting when the app opens
+    "start_fullscreen": True,
+    "tts_volume": 100,            # 0..100
+    "mic_device": "",             # input device name; "" = Windows default (NX-VOZ-002)
+    "vad_threshold": 0.5,         # speech probability that opens a recording (Silero)
+    "vad_silence": 0.7,           # seconds of silence that close it
+    "reminder_leads": "60,10,0",  # minutes before events/tasks to remind (0 = at the time)
+    "speak_reminders": True,      # say reminders aloud even in text mode (unless the AI voice is muted)
+    "desktop_notifications": True,  # Windows notifications
+    "notify_sound": True,         # short chime in the app
+    "quiet_hours": "",            # e.g. "22:00-07:00": reminders are only listed, never spoken or popped up
+    "daily_briefing": "",         # e.g. "08:00": once a day, a spoken summary of today's agenda and tasks
+    "show_hud": True,             # telemetry, corners and pulse around the ring
+    "show_captions": True,        # audio mode: the reply as a caption while it is generated
+    "reduce_motion": False,       # stops the ring animations (low-end PCs / preference)
 }
 
 

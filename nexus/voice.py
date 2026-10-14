@@ -145,6 +145,7 @@ class Speaker:
                         self.on_state("speaking")
                     audio = tts.apply_effect(engine.render(sentences[i], voice, pitch, settings["tts_speed"]),
                                              settings["voice_effect"])
+                    audio = audio * (max(0, min(100, int(settings["tts_volume"]))) / 100)  # Settings > Voice volume
                     self.on_audio({"env": self._envelope(audio, tts.RATE), "dt": ENV_STEP})
                     sd.play(audio, tts.RATE)
                     sd.wait()
@@ -189,9 +190,16 @@ class SpeechDetector:
 
     def __init__(self, max_seconds: float = 30):
         self.max_frames = int(max_seconds * FRAMES_PER_SECOND)
-        self.end_frames = int(self.END_SILENCE * FRAMES_PER_SECOND)
         self.session = self._load()
+        self.configure()
         self.reset()
+
+    def configure(self):
+        """Sensitivity and end-of-speech pause from Settings > Microphone (read again for every utterance)."""
+        self.ON = min(0.9, max(0.2, float(settings.get("vad_threshold", 0.5))))
+        self.OFF = self.ON * 0.7
+        silence = min(3.0, max(0.3, float(settings.get("vad_silence", self.END_SILENCE))))
+        self.end_frames = int(silence * FRAMES_PER_SECOND)
 
     @classmethod
     def _load(cls):
@@ -251,6 +259,7 @@ class SpeechDetector:
 
     def reset_segment(self):
         self.buf, self.voiced, self.silence, self.pre = None, 0, 0, []
+        self.configure()
 
 
 class Listener:
@@ -329,9 +338,22 @@ class Listener:
             if self._stream is None:
                 import sounddevice as sd
 
-                self._stream = sd.InputStream(samplerate=RATE, channels=1, dtype="float32", blocksize=FRAME,
-                                              callback=lambda data, *_: self._frames.put(data[:, 0].copy()))
+                device = settings["mic_device"] or None  # "" = Windows default input (NX-VOZ-002)
+                try:
+                    self._stream = sd.InputStream(samplerate=RATE, channels=1, dtype="float32", blocksize=FRAME,
+                                                  device=device,
+                                                  callback=lambda data, *_: self._frames.put(data[:, 0].copy()))
+                except Exception:  # chosen mic unplugged/renamed: fall back to the default one
+                    self._stream = sd.InputStream(samplerate=RATE, channels=1, dtype="float32", blocksize=FRAME,
+                                                  callback=lambda data, *_: self._frames.put(data[:, 0].copy()))
                 self._stream.start()
+
+    def reopen(self):
+        """Settings > Microphone changed: restart the capture on the new device if it was open."""
+        was_open = self._stream is not None
+        self._close()
+        if was_open:
+            self._open()
 
     def _close(self):
         with self._lock:

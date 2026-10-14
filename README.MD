@@ -97,7 +97,17 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 - "Inicia um pomodoro"
 - "Na próxima vez que eu abrir, me lembra de continuar o projeto do app" → no próximo início: *"Olá, Alex, vamos continuar o projeto do app?"*
 
-Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia.
+Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia, `Ctrl+,` Configurações, `Ctrl+Shift+N` nova conversa, `Ctrl+H` conversas, `Ctrl+J` notificações, `Ctrl+T` transcrição.
+
+### Notificações e lembretes (v0.10)
+
+Com o NEXUS aberto (pode estar minimizado), compromissos e tarefas com prazo são avisados com as antecedências escolhidas em *Configurações → Notificações* (padrão: 1 h, 10 min e na hora): pelo **sino** da barra superior, por **notificação do Windows**, **som** e **voz** (também no modo texto). Há **horário silencioso** (só o sino) e um **resumo do dia** opcional, falado no horário escolhido.
+
+### Configurações (v0.10)
+
+Oito seções: Geral, **Inteligência** (provedor, chave de API, modelo, criatividade, contexto, testar conexão), Voz do NEXUS (voz, efeito, velocidade, volume), **Microfone** (dispositivo, modelo do Whisper, sensibilidade, pausa), Notificações, Integrações, Interface (HUD, legendas, animações) e Dados.
+
+**Provedores de IA:** Ollama e LM Studio rodam no seu computador. OpenAI, Anthropic (Claude), Google Gemini, OpenRouter, Groq, DeepSeek, Mistral ou qualquer servidor compatível com a API da OpenAI também funcionam com uma chave de API; nesse caso as mensagens e o contexto saem do computador. Use modelos com suporte a ferramentas (*tool calling*), senão o NEXUS não consegue salvar lembretes e dados.
 
 ### Interface minimalista (v0.3)
 
@@ -235,4 +245,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.9.0 (protótipo)**.
+Versão atual: **v0.10.0 (protótipo)**.

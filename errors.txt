@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 2.0  ·  Date: 2026-10-14  ·  App version: 0.9.0
+ Document version: 2.1  ·  Date: 2026-10-14  ·  App version: 0.10.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -74,6 +74,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-023  Live data invented or refused (weather, news, exchange rates)
       NX-LLM-024  Quiz/mock exam: answers stored, graded wrong or never graded
       NX-LLM-025  "I didn't understand" without an explanation (e.g. joke repeated)
+      NX-LLM-026  Cloud provider: "no connection", key rejected or model doesn't use tools
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -101,6 +102,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-DAT-008  "Shall we continue...?" greeting doesn't show / shows only once
       NX-DAT-009  Old conversation missing from the list or without title/description
       NX-DAT-010  Answer uses a topic from another conversation
+      NX-DAT-011  Reminder not spoken / not shown / came only once
  UI   NX-UI-001   Fonts differ from the landing page (offline)
       NX-UI-002   Window doesn't open: WebView2 missing
       NX-UI-003   Window opens blank or stuck at boot
@@ -110,6 +112,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-UI-007   Knowledge tab cannot scroll
       NX-UI-008   Text not selectable / no copy / conversation hidden in audio mode
       NX-UI-009   Interrupt/Repeat buttons clickable with nothing to do
+      NX-UI-010   Windows notification doesn't appear
  INT  NX-INT-001  Landing page has no real onboarding form yet
       NX-INT-002  Browser blocks the landing page request to 127.0.0.1
       NX-INT-003  Port 47800 busy: local bridge disabled
@@ -488,6 +491,22 @@ QUICK DIAGNOSTICS (run these before investigating)
                forbidding the same sentence. The spoken intro is now "No
                problem, let me explain it another way".
 
+[NX-LLM-026] Cloud provider: "no connection", key rejected or model doesn't use tools
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Symptom    : In Settings > Intelligence, "Test connection" shows "No
+               connection: 401/403", or the model answers but saves nothing.
+  Cause      : (1) Missing, wrong or out-of-credit API key. (2) Address edited
+               by hand. (3) The chosen model doesn't support tool calling, and
+               without it NEXUS can't save reminders or data. (4) Some
+               providers don't list models (/models); the test then says the
+               model "is not in the list" even though it works.
+  Solution   : Pick the provider from the list (the address is filled in),
+               paste the key, click Test connection and choose a model from
+               the list. Use models that support tools.
+  Privacy    : With cloud providers, messages, memories and context data leave
+               the computer (yellow warning on screen). The key is stored as
+               text in settings.json in the data folder.
+
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS
 ================================================================================
@@ -506,7 +525,7 @@ QUICK DIAGNOSTICS (run these before investigating)
                error appears in the chat; switch to "base" in Settings.
 
 [NX-VOZ-002] Wrong microphone selected (e.g. DroidCam)
-  Severity   : HIGH             Status: PENDING            Observed: YES
+  Severity   : HIGH             Status: FIXED (v0.10)      Observed: YES
   Symptom    : NEXUS doesn't react to speech or records silence.
   Cause      : NEXUS uses Windows' DEFAULT input device. On the reference PC
                the default was "Microphone (DroidCam Audio)", a virtual
@@ -515,6 +534,12 @@ QUICK DIAGNOSTICS (run these before investigating)
                microphone as default and restart NEXUS.
   Improvement: Add device selection to NEXUS Settings
                (sounddevice.query_devices).
+  Fix        : (v0.10) Settings > Microphone > Input device lists the
+               microphones (without the virtual "Sound Mapper") and switches
+               immediately, no restart. If the chosen one is unplugged, NEXUS
+               falls back to the Windows default. If your microphone is not in
+               the list, Windows doesn't see it: check that it is connected
+               and enabled in Windows Settings > Sound.
 
 [NX-VOZ-003] Wake word "Nexus" not recognized / false triggers
   Severity   : MEDIUM           Status: FIXED (v0.8)       Observed: YES
@@ -774,6 +799,21 @@ QUICK DIAGNOSTICS (run these before investigating)
                After 2 h without messages, the next message already opens a
                new conversation (same rule as v0.5, NX-LLM-019).
 
+[NX-DAT-011] Reminder not spoken / not shown / came only once
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : (1) Reminders only work while NEXUS is open (it may be
+               minimized). (2) During quiet hours they only go to the
+               notification center (bell). (3) "Speak reminders" is off or the
+               AI voice is muted. (4) Each lead time fires once; if NEXUS
+               opened late, only the closest one is announced. (5) Lead times
+               already past when the appointment was created don't fire (an
+               event in 30 min won't say "in 1 hour"). (6) Items more than 1
+               hour late are dropped. (7) "Remind me to drink water at 3 pm"
+               only fires at the time.
+  Solution   : Settings > Notifications: choose the lead times and use "Test
+               notification". The bell on the top bar lists everything that
+               was announced.
+
 ================================================================================
  UI — DESKTOP INTERFACE
 ================================================================================
@@ -870,6 +910,16 @@ QUICK DIAGNOSTICS (run these before investigating)
   Fix        : Interrupt is only active while NEXUS listens, thinks or speaks;
                Repeat only once there is an answer. Disabled buttons are
                dimmed and not clickable.
+
+[NX-UI-010] Windows notification doesn't appear
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : NEXUS uses Windows notifications through PowerShell (the
+               installer will register its own name). Do Not Disturb / Focus
+               Assist, PowerShell notifications turned off or company policies
+               block it.
+  Solution   : Windows Settings > System > Notifications: turn off Do Not
+               Disturb and allow "Windows PowerShell". The alert still happens
+               inside NEXUS (sound, voice and bell) without the Windows one.
 
 ================================================================================
  INT — LANDING PAGE INTEGRATION

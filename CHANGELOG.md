@@ -8,6 +8,45 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.10.0 — Protótipo · 2026-10-14
+
+**Notificações e lembretes automáticos, Configurações completas e qualquer provedor de IA.**
+
+### Notificações e ações automáticas (com o NEXUS aberto, inclusive minimizado)
+- **Lembretes com várias antecedências**: escolha entre 1 dia, 2 h, 1 h, 30, 15, 10 e 5 min (padrão: 1 h, 10 min e na
+  hora). Vale para compromissos e tarefas com prazo. O aviso diz o tempo real que falta ("em 30 minutos" se o NEXUS
+  abriu atrasado) e não avisa "em 1 hora" sobre algo criado 30 minutos antes. "Me lembra de beber água às 15h"
+  continua avisando só na hora.
+- **Central de notificações** (sino na barra superior, com contador): tudo que foi avisado fica listado.
+- **Notificações do Windows**, **som de aviso** e **voz** (os lembretes são falados também no modo texto).
+- **Horário silencioso** (ex.: 22:00 → 07:00): sem voz nem pop-up, só na central.
+- **Resumo do dia** opcional (ex.: 08:00): o NEXUS fala seus compromissos e tarefas de hoje, uma vez por dia.
+
+### Configurações completas (8 seções)
+- **Geral**: idioma, falar a saudação, abrir em tela cheia, memória automática, título automático das conversas,
+  quantas trocas a IA lembra.
+- **Inteligência**: provedor (Ollama, LM Studio, OpenAI, Anthropic, Gemini, OpenRouter, Groq, DeepSeek, Mistral ou
+  personalizado), endereço preenchido sozinho, **chave de API**, modelo, criatividade, contexto, modo e
+  **Testar conexão**. Aviso em amarelo quando o provedor é na nuvem (os dados saem do computador).
+- **Voz do NEXUS**: voz, efeito, velocidade, **volume**, testar.
+- **Microfone**: **escolher o dispositivo** (NX-VOZ-002 resolvido, troca na hora), modelo do Whisper,
+  **sensibilidade** e **pausa que encerra a fala**, palavra de ativação.
+- **Notificações**, **Integrações**, **Interface** (HUD, legendas, reduzir animações, centralizar o aro) e
+  **Dados** (abrir a pasta, relatar erro, limpar conversa, porta da ponte).
+
+### UX/UI
+- Atalhos: `Ctrl+,` Configurações · `Ctrl+Shift+N` nova conversa · `Ctrl+H` conversas · `Ctrl+J` notificações ·
+  `Ctrl+T` transcrição.
+- Configurações com navegação lateral, valores dos controles deslizantes visíveis e rodapé fixo com Salvar.
+
+### Testes desta versão
+- 105/105 testes unitários (12 novos: antecedências, tempo real restante, sem aviso retroativo, uma vez por
+  antecedência, horário silencioso, central, resumo do dia, provedores).
+- 26/26 verificações de conversa com qwen3:8b.
+- Notificação do Windows testada neste PC.
+
+---
+
 ## v0.9.0 — Protótipo · 2026-10-14
 
 **Conversas com histórico e descrição, HUD novo, ícones do conhecimento e aro arrastável.**
@@ -321,14 +360,7 @@ NX-VOZ-016, NX-ENV-007).
 
 ## Próximas versões (planejamento)
 
-### v0.10.0 — Protótipo (próxima) · notificações e configurações
-- **Sistema de notificações** e **ações automáticas** com o app aberto: lembretes falados com antecedência
-  configurável (ex.: 1 h, 15 min e na hora), notificações do Windows e central de notificações.
-- **Configurações completas**, organizadas por seções, com o máximo de opções ajustáveis.
-- **Provedores de IA**: presets (Ollama, LM Studio, OpenAI, OpenRouter, Groq, Gemini...), chave de API e teste
-  de conexão. Hoje já funciona qualquer API compatível com OpenAI, mas a chave não aparece na tela.
-
-### v0.11.0 — Protótipo · recursos novos
+### v0.11.0 — Protótipo (próxima) · recursos novos
 - **Projetos** na lateral direita: a IA consulta e atualiza o projeto ativo com o usuário.
 - **Sistema de habilidades estilo Solo Leveling**: nível do NEXUS e de cada habilidade, subindo com o uso; minimalista.
 

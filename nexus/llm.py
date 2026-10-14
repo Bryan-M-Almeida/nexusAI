@@ -16,8 +16,29 @@ class LLMOffline(Exception):
     pass
 
 
+# Settings > AI provider (v0.10). Every one speaks the OpenAI chat-completions format; Ollama also gets its
+# native API. "local" = nothing leaves the computer; cloud providers need an API key and receive the messages.
+PRESETS = [
+    {"id": "ollama", "name": "Ollama", "url": "http://127.0.0.1:11434/v1", "local": True, "key": False},
+    {"id": "lmstudio", "name": "LM Studio", "url": "http://127.0.0.1:1234/v1", "local": True, "key": False},
+    {"id": "openai", "name": "OpenAI", "url": "https://api.openai.com/v1", "local": False, "key": True},
+    {"id": "anthropic", "name": "Anthropic (Claude)", "url": "https://api.anthropic.com/v1", "local": False, "key": True},
+    {"id": "gemini", "name": "Google Gemini", "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+     "local": False, "key": True},
+    {"id": "openrouter", "name": "OpenRouter", "url": "https://openrouter.ai/api/v1", "local": False, "key": True},
+    {"id": "groq", "name": "Groq", "url": "https://api.groq.com/openai/v1", "local": False, "key": True},
+    {"id": "deepseek", "name": "DeepSeek", "url": "https://api.deepseek.com/v1", "local": False, "key": True},
+    {"id": "mistral", "name": "Mistral", "url": "https://api.mistral.ai/v1", "local": False, "key": True},
+    {"id": "custom", "name": "Custom (OpenAI-compatible)", "url": "", "local": None, "key": True},
+]
+
+
 def _headers():
-    return {"Authorization": f"Bearer {settings['llm_api_key']}"}
+    key = settings["llm_api_key"]
+    headers = {"Authorization": f"Bearer {key}"}
+    if "anthropic.com" in settings["llm_base_url"]:  # its /models endpoint wants the native headers
+        headers |= {"x-api-key": key, "anthropic-version": "2023-06-01"}
+    return headers
 
 
 def _base():
@@ -40,7 +61,7 @@ def status() -> dict:
     try:
         r = httpx.get(f"{_base()}/models", headers=_headers(), timeout=3)
         r.raise_for_status()
-        models = [m["id"] for m in r.json().get("data", [])]
+        models = [m["id"].removeprefix("models/") for m in r.json().get("data", [])]  # Gemini: "models/<id>"
     except Exception as exc:
         return {"online": False, "model": settings["llm_model"], "models": [], "error": str(exc)}
     wanted = settings["llm_model"]

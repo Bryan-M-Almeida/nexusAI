@@ -360,7 +360,7 @@ class Assistant:
                 and not memory.temporary and memory.states_fact(text)):
             threading.Thread(target=self._extract_memories, args=(text, reply), daemon=True).start()
         cid = memory.current_conversation()
-        if reply and not interrupted and cid and not memory.temporary:
+        if reply and not interrupted and cid and not memory.temporary and settings["auto_title"]:
             threading.Thread(target=self._title_conversation, args=(cid,), daemon=True).start()
 
     def _title_conversation(self, cid: int):
