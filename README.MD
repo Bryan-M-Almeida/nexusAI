@@ -233,4 +233,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.8.0 (protótipo)**.
+Versão atual: **v0.8.1 (protótipo)**.

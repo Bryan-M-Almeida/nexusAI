@@ -8,6 +8,18 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.8.1 — Protótipo · 2026-10-14
+
+**Correção: abas do Painel sem rolagem.**
+
+### Corrigido
+- **Aba Saber (e Memória, Dados, Log) não rolava** (NX-UI-007, reaberto): a correção da v0.7 nunca funcionou. A regra
+  `.tab-body { overflow-y: auto }` perdia para `.panel.grow { overflow: hidden }`, que tem prioridade maior no CSS;
+  a verificação da v0.7 mediu o layout, mas não rolou a aba. Agora `.panel.tab-body` rola e foi verificado rolando com
+  a roda do mouse até o último documento.
+
+---
+
 ## v0.8.0 — Protótipo · 2026-10-14
 
 **Voz que entende e para de ouvir na hora certa, conversa visível no modo áudio e correções da conversa real.**

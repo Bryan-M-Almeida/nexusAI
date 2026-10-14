@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 1.8  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.8.0
+ Versión del documento: 1.9  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.8.1
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -840,13 +840,22 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                completa después, junto con la lista de modelos y voces.
 
 [NX-UI-007] La pestaña Saber (conocimiento) no tiene desplazamiento
-  Gravedad   : MEDIA            Estado: CORREGIDO (v0.7)   Observado: SÍ
+  Gravedad   : MEDIA            Estado: CORREGIDO (v0.8.1)   Observado: SÍ
   Causa      : Las 21 categorías en bloques ocupaban 672 px en un panel que
                recortaba el exceso (overflow: hidden); la lista de documentos
                quedaba con 0 px y los botones Importar/Enseñar quedaban ocultos.
   Corrección : Toda la pestaña se desplaza y las categorías pasaron a ser
                etiquetas compactas (152 px). Reproducido y verificado en el
                modo simulado con 21 categorías.
+  Reabierto  : (v0.8.1) El usuario lo reportó de nuevo. La regla de la v0.7
+               (.tab-body { overflow-y: auto }) perdía frente a .panel.grow
+               { overflow: hidden }, que tiene mayor prioridad en CSS (dos
+               selectores de clase contra uno), así que la pestaña nunca se
+               desplazó. La verificación de la v0.7 midió el diseño, pero no
+               desplazó la pestaña.
+  Corrección : .panel.tab-body { overflow-y: auto } (misma prioridad, va
+               después). Verificado desplazando con la rueda del ratón hasta
+               el último documento. Vale para Memoria, Saber, Datos y Log.
 
 [NX-UI-008] Texto no seleccionable / sin copiar / conversación invisible en modo audio
   Gravedad   : MEDIA            Estado: CORREGIDO (v0.8)   Observado: SÍ

@@ -263,7 +263,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .tabs button.on { color: var(--text); border-bottom-color: var(--red); }
 /* Tab bodies scroll as a whole: with 21 categories the stats grid used to push the documents list to 0 px
    inside an overflow:hidden panel, so nothing in the Knowledge tab could be reached (v0.7 fix). */
-.tab-body { overflow-y: auto; }
+.panel.tab-body { overflow-y: auto; overscroll-behavior: contain; }  /* .panel.grow sets overflow:hidden: needs equal specificity (v0.9 fix) */
 .tab-body .list { flex: none; overflow: visible; }
 .kb-stats { display: flex; flex-wrap: wrap; gap: 5px; }
 .kb-stat { display: inline-flex; align-items: baseline; gap: 6px; border: 1px solid var(--line); padding: 3px 8px; font-size: 12.5px; }
