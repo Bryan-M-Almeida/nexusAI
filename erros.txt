@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 1.1  ·  Data: 2026-10-13  ·  Versão do app: 0.2.0
+ Versão do documento: 1.2  ·  Data: 2026-10-13  ·  Versão do app: 0.3.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -64,6 +64,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-015  Modo de raciocínio (thinking) deixa o qwen3 lento
       NX-LLM-016  Memória automática salva fatos redundantes ou genéricos
       NX-LLM-017  Argumentos inventados pelo modelo em ferramentas
+      NX-LLM-018  IA resolve "repete"/"explica melhor" conversando, sem a ferramenta
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -75,6 +76,9 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-VOZ-009  "Silenciar" só interrompe ao fim da frase atual
       NX-VOZ-010  Voz masculina soa andrógina em alguns idiomas
       NX-VOZ-011  Efeito de voz "J.A.R.V.I.S"/"Robô" soa abafado ou metálico demais
+      NX-VOZ-012  Comandos durante a fala falham com caixas de som
+      NX-VOZ-013  Frase dita enquanto o NEXUS fala é ignorada
+      NX-VOZ-014  Modo "apenas áudio" responde a conversas ao redor / TV
  DAT  NX-DAT-001  Base de conhecimento não encontra um assunto existente
       NX-DAT-002  PDF importado sem texto ("Não consegui extrair texto")
       NX-DAT-003  "Data inválida" ao criar evento/tarefa
@@ -87,6 +91,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-UI-002   Janela não abre: WebView2 ausente
       NX-UI-003   Janela abre em branco ou travada no boot
       NX-UI-004   Interface fora de escala em telas pequenas
+      NX-UI-005   Não encontro os botões / a tela só mostra o aro
  INT  NX-INT-001  Landing ainda não possui formulário de onboarding real
       NX-INT-002  Navegador bloqueia o envio da landing para 127.0.0.1
       NX-INT-003  Porta 47800 ocupada: ponte local desativada
@@ -320,6 +325,20 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                valores nulos antes de executar.
 
 
+[NX-LLM-018] IA resolve "repete"/"explica melhor" conversando, sem a ferramenta
+  Severidade : BAIXA            Status: CONHECIDO          Observado: SIM
+  Sintoma    : Para pedidos longos ("pode repetir o que acabou de falar?",
+               "não captei nada, explica mais simples"), o qwen3:8b responde
+               direto, sem chamar conversation_control.
+  Impacto    : Nos testes o resultado foi correto (repetiu / reexplicou de
+               forma mais simples / confirmou que ia ficar quieto). Ações que
+               precisam agir no áudio (pausar, parar, continuar, repetir) são
+               tratadas pelo detector local (nexus/control.py), que é
+               instantâneo e não depende do modelo.
+  Dicas      : Comandos curtos ou que COMEÇAM com "espera aí", "segura aí",
+               "para de falar", "chega"... são sempre reconhecidos. Para novas
+               expressões, edite PATTERNS/LEADING em nexus/control.py.
+
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE
 ================================================================================
@@ -374,9 +393,12 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
 [NX-VOZ-005] NEXUS ouve a própria voz (eco)
   Severidade : MÉDIA            Status: MITIGADO           Observado: PREVISTO
   Causa      : Caixas de som captadas pelo microfone durante a fala.
-  Mitigação  : No modo de escuta contínua, o áudio é ignorado enquanto o
-               NEXUS fala, mais 250 ms de margem.
-  Dicas      : Use fone de ouvido; desative "Falar respostas" se necessário.
+  Mitigação  : Desde a v0.3, enquanto o NEXUS fala o microfone continua
+               ativo, mas só aceita comandos de controle curtos ("pausa",
+               "para", "espera aí...") de até 4 s; o resto é ignorado (ver
+               NX-VOZ-013). Ao terminar de falar há 250 ms de margem.
+  Dicas      : Use fone de ouvido; desative a voz da IA pela dock se
+               necessário.
 
 [NX-VOZ-006] Sem voz em espanhol / voz no idioma errado
   Severidade : MÉDIA            Status: PENDENTE           Observado: SIM
@@ -431,6 +453,31 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Dicas      : Use "J.A.R.V.I.S" (sutil) no dia a dia e "Robô" só para efeito.
                "Natural" desliga o processamento. Para ajustar, edite os
                parâmetros em apply_effect() (nexus/tts.py) e use "Testar voz".
+
+[NX-VOZ-012] Comandos durante a fala falham com caixas de som
+  Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
+  Sintoma    : "Pausa" dito enquanto o NEXUS fala não é reconhecido.
+  Causa      : Sem cancelamento de eco, o microfone capta a voz do NEXUS
+               junto com a do usuário e o Whisper transcreve a mistura.
+  Solução    : Use fone de ouvido; ou use os botões da dock (interromper) e
+               Esc. Melhoria futura: cancelamento de eco (AEC).
+
+[NX-VOZ-013] Frase dita enquanto o NEXUS fala é ignorada
+  Severidade : BAIXA            Status: CONHECIDO          Observado: SIM
+  Comportamento esperado: durante a fala, só comandos de controle são
+               aceitos (pausar, parar, repetir, não entendi...). Isso evita
+               que o NEXUS responda a si mesmo pelo eco.
+  Contorno   : Diga "pausa" ou "para" e depois faça a pergunta, ou espere o
+               fim da fala. Pausado, o microfone volta a aceitar qualquer
+               frase.
+
+[NX-VOZ-014] Modo "apenas áudio" responde a conversas ao redor / TV
+  Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : Desde a v0.3 o modo áudio escuta continuamente sem exigir a
+               palavra "Nexus".
+  Solução    : Ative "Só responder quando eu disser Nexus" em Configurações,
+               mute o microfone pela dock quando não estiver usando, ou use o
+               modo "apenas mensagens".
 
 ================================================================================
  DAT — DADOS, MEMÓRIA E CONHECIMENTO
@@ -539,6 +586,17 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                (tamanho mínimo da janela).
   Dicas      : Use o zoom do Windows em 100-125% ou maximize a janela.
 
+
+[NX-UI-005] Não encontro os botões / a tela só mostra o aro
+  Severidade : BAIXA            Status: CONHECIDO          Observado: SIM
+  Comportamento esperado (v0.3): a interface é minimalista. As barras
+               aparecem ao levar o mouse ao TOPO (status, idioma, Painel,
+               Configurações) ou à BASE da janela (ícones de modo, microfone,
+               voz da IA, interromper, repetir). Ao abrir o app elas aparecem
+               por 3,5 s para facilitar a descoberta.
+  Dicas      : Agenda, tarefas, memória e conhecimento ficam no botão Painel
+               (barra superior). Esc fecha janelas abertas; sem janelas
+               abertas, interrompe a fala.
 
 ================================================================================
  INT — INTEGRAÇÃO COM A LANDING PAGE

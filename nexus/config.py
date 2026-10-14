@@ -41,7 +41,9 @@ DEFAULTS = {
     "stt_model": "small",         # faster-whisper size: tiny | base | small | medium
     "language": "auto",           # auto (from profile) | pt | en | es
     "wake_word": "nexus",
-    "wake_mode": False,           # always listening for the wake word
+    "ui_mode": "audio",           # audio (ring only, voice conversation) | text (messages only)
+    "mic_muted": False,           # in audio mode the mic listens continuously unless muted
+    "require_wake_word": False,   # only accept utterances that start with "Nexus"
     "bridge_port": 47800,         # local endpoint the landing page form can POST the profile to
     "history_turns": 12,
 }

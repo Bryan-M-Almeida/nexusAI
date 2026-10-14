@@ -30,6 +30,8 @@ Rules:
 - Questions about agenda, schedule, commitments or pending items: answer from BOTH the "Upcoming
   appointments" and "Pending to-do tasks" context sections; appointments are commitments too. List every item.
 - Never show internal ids (#12) to the user; ids are only for tool calls.
+- Requests about your own speech -> call `conversation_control`: repeat what you said ("repeat"), the user didn't
+  understand ("clearer"), wait/hold on ("pause"), go on ("resume"), be quiet ("stop").
 - For factual questions (first aid, philosophy, finance, programming, health, productivity...) prefer the knowledge base;
   cite the source name briefly. In medical emergencies always tell them to call emergency services first (Brazil: SAMU 192 / Bombeiros 193; US: 911; Spain/EU: 112).
 - Never invent stored data: read it with tools."""
@@ -126,10 +128,17 @@ def _history_messages():
     return [{"role": m["role"], "content": m["content"]} for m in memory.history(settings["history_turns"])]
 
 
+def last_reply() -> str:
+    row = db.one("SELECT content FROM messages WHERE role = 'assistant' AND content != '' ORDER BY id DESC LIMIT 1")
+    return row["content"] if row else ""
+
+
 class Assistant:
-    def __init__(self, emit):
+    def __init__(self, emit, control_hook=lambda action: None):
         self.emit = emit  # emit(event: str, payload) -> pushes to the UI
+        self.control_hook = control_hook  # executes pause/resume/stop on the speaker
         self.lock = threading.Lock()
+        self.cancel = threading.Event()
 
     def ask(self, text: str, spoken: bool = False):
         """Handle one user message (blocking; call from a worker thread)."""
@@ -137,24 +146,35 @@ class Assistant:
         if not text:
             return
         with self.lock:
+            self.cancel.clear()
             self._ask(text, spoken)
+
+    def interrupt(self):
+        """Stop the generation in progress (closing the stream also stops Ollama)."""
+        self.cancel.set()
 
     def _ask(self, text, spoken):
         # Context travels inside the current user turn (many chat templates drop extra system messages);
         # history keeps only the raw text, so the cached prompt prefix stays valid on the next turn.
         messages = [{"role": "system", "content": build_system()}, *_history_messages(),
                     {"role": "user", "content": f"<context>\n{build_context(text)}\n</context>\n\n{text}"}]
+        previous = last_reply()
         memory.add_message("user", text)
-        reply, changed, nudged = "", False, False
+        reply, changed, nudged, finished, round_text = "", False, False, False, ""
         try:
             for _ in range(MAX_TOOL_ROUNDS):
                 round_text, calls = "", None
                 for kind, value in llm.stream_chat(messages, tools.SCHEMAS):
+                    if self.cancel.is_set():
+                        break
                     if kind == "token":
                         round_text += value
                         self.emit("token", value)
                     elif kind == "tool_calls":
                         calls = value
+                if self.cancel.is_set():
+                    reply = round_text
+                    break
                 if not calls:
                     nudge = None if nudged else _needs_tool(round_text, changed)
                     if nudge:  # the model claimed/deferred an action without calling a tool: ask again once
@@ -176,21 +196,43 @@ class Assistant:
                         args = json.loads(c["arguments"] or "{}")
                     except json.JSONDecodeError:
                         args = {}
-                    result = tools.execute(c["name"], args)
-                    changed |= c["name"] in tools.MUTATING
                     self.emit("tool", {"name": c["name"], "args": args})
+                    if c["name"] == "conversation_control":
+                        result, final = self._control(str(args.get("action", "")), previous)
+                        if final is not None:  # pause/stop/resume/repeat end the turn without another model round
+                            reply, finished = final, True
+                    else:
+                        result = tools.execute(c["name"], args)
+                        changed |= c["name"] in tools.MUTATING
                     messages.append({"role": "tool", "tool_call_id": c["id"], "name": c["name"],
                                      "content": json.dumps(result, ensure_ascii=False, default=str)[:6000]})
+                if finished:
+                    break
         except llm.LLMOffline as exc:
             self.emit("error", {"message": t("llm_offline"), "detail": str(exc)})
             return
-        reply = (reply or round_text).strip()
-        memory.add_message("assistant", reply)
-        self.emit("done", {"text": reply, "speak": True})
+        interrupted = self.cancel.is_set()
+        reply = (reply or ("" if finished or interrupted else round_text)).strip()
+        if reply:
+            memory.add_message("assistant", reply)
+        self.emit("done", {"text": reply, "speak": bool(reply) and not interrupted, "interrupted": interrupted})
         if changed:
             self.emit("refresh", None)
-        if settings["auto_memory"]:
+        if settings["auto_memory"] and reply and not finished:
             threading.Thread(target=self._extract_memories, args=(text, reply), daemon=True).start()
+
+    def _control(self, action: str, previous: str):
+        """conversation_control chosen by the model. Returns (tool result, final reply or None)."""
+        if action in ("pause", "resume", "stop"):
+            self.control_hook(action)
+            return {"ok": True}, ""
+        if action == "repeat":
+            return {"ok": True}, f"{t('repeat_intro')} {previous}" if previous else t("nothing_to_repeat")
+        if action == "clearer":
+            return {"instruction": "Explain your previous answer again, more clearly and simply, with short "
+                                   "sentences. Start with: " + t("clearer_intro"),
+                    "previous_answer": previous}, None
+        return {"error": f"unknown action {action}"}, None
 
     def _extract_memories(self, user_text, reply):
         """Background pass that saves durable facts the model didn't explicitly store."""

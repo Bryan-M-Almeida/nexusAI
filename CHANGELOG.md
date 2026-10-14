@@ -8,6 +8,39 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.3.0 — Protótipo · 2026-10-13
+
+**Interface minimalista e controle da conversa.**
+
+### Novo
+- **Tela limpa: só o aro NEXUS.** O aro **expande** com a voz da IA (envelope do áudio sincronizado com a
+  reprodução) e **contrai** com a voz do usuário (nível do microfone ~16×/s). Respira levemente em repouso.
+- **Barra superior** (mouse no topo): versão, status, relógio, idioma, **Painel** e Configurações.
+- **Dock de ícones** (mouse embaixo): apenas mensagens · apenas áudio · mutar/desmutar microfone ·
+  mutar/desmutar IA · interromper · repetir. As duas barras aparecem por 3,5 s ao iniciar, para o usuário descobri-las.
+- **Painel** em gaveta: perfil, agenda, tarefas, memória, conhecimento, dados e log (antes ocupavam a tela).
+- **Modo apenas áudio**: conversa contínua por voz, sem palavra de ativação (opcional em Configurações:
+  "Só responder quando eu disser Nexus"). **Modo apenas mensagens**: chat, IA sem voz.
+- **Controle por voz/texto** (`nexus/control.py`), em PT/EN/ES, instantâneo e **funcionando enquanto o NEXUS fala**:
+  pausar, continuar, parar, repetir, "não entendi" (reexplica mais claro).
+- **Repetir** (botão): "Acho que não entendeu, vou repetir." + a mesma resposta; "não entendi" depois disso
+  gera uma explicação mais clara.
+- **Interromper** cancela também a resposta que a IA ainda está gerando.
+- Pausa retoma do início da frase interrompida.
+- Ferramenta `conversation_control` para modelos que decidirem usá-la.
+
+### Mudou
+- O download do modelo de voz só acontece quando o usuário ativa o microfone (nunca sozinho no boot).
+- `Ctrl+Espaço` (push-to-talk) funciona nos dois modos; `Esc` interrompe.
+
+### Conhecido
+- NX-LLM-018: o qwen3:8b resolve pedidos longos ("pode repetir?", "explica mais simples") conversando,
+  sem chamar `conversation_control`; o resultado nos testes foi correto.
+- NX-VOZ-012: com caixas de som, o NEXUS pode se ouvir; comandos durante a fala são mais confiáveis com fone.
+- NX-VOZ-013: durante a fala, só comandos de controle são aceitos; outras frases são ignoradas (proteção contra eco).
+
+---
+
 ## v0.2.0 — Protótipo · 2026-10-13
 
 **Saudação e voz.**
@@ -56,15 +89,8 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ## Próximas versões (planejamento)
 
-### v0.3.0 — Protótipo (próxima)
-Interface minimalista, definida pelo usuário:
-- Tela limpa: apenas o **aro NEXUS animado**.
-- O aro **se expande** enquanto a IA fala e **se contrai** enquanto o usuário fala.
-- Menu discreto: mouse no topo abre uma **barra superior**; mouse embaixo mostra **ícones de ação**:
-  apenas mensagens · apenas áudio · mutar/desmutar microfone · mutar/desmutar IA · interromper · repetir.
-- **Repetir**: a IA diz "Acho que não entendeu, vou repetir" e repete **de forma mais clara** se o usuário
-  confirmar que não entendeu; se ele só pedir para repetir, repete a mesma fala.
-- A IA decide pelo que o usuário fala: **repetir, pausar, prosseguir** (controle de conversa por voz).
+### v0.4.0 — Protótipo (próxima)
+A definir com o usuário.
 
 ### Versões seguintes (a definir com o usuário)
 Candidatos já levantados: formulário real na landing (NX-INT-001), seleção de microfone (NX-VOZ-002),

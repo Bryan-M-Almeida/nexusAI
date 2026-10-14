@@ -95,7 +95,29 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 - "Inicia um pomodoro"
 - "Na próxima vez que eu abrir, me lembra de continuar o projeto do app" → no próximo início: *"Olá, Alex, vamos continuar o projeto do app?"*
 
-Atalhos: `Ctrl+Espaço` fala, `Esc` silencia (corta o áudio na hora).
+Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas).
+
+### Interface minimalista (v0.3)
+
+A tela mostra só o **aro NEXUS**: ele se **expande** enquanto a IA fala (seguindo o volume da voz) e se **contrai** enquanto você fala.
+
+- **Mouse no topo** → barra superior: versão, status da IA/voz, relógio, idioma, **Painel** (agenda, tarefas, memória, conhecimento, dados, log) e Configurações.
+- **Mouse embaixo** → ícones: **apenas mensagens** · **apenas áudio** · **mutar/desmutar microfone** · **mutar/desmutar IA** · **interromper** · **repetir**.
+- **Apenas áudio**: conversa contínua por voz, sem precisar dizer "Nexus" (dá para exigir a palavra em Configurações).
+- **Apenas mensagens**: o aro sobe, aparece o chat e a IA não fala.
+- **Repetir** (botão): "Acho que não entendeu, vou repetir." + a mesma resposta. Se você disser que **não entendeu**, ela explica de novo de forma mais clara.
+
+### Controle da conversa por voz
+
+| Você diz (PT / EN / ES) | O NEXUS |
+|---|---|
+| "pausa", "espera aí…", "segura aí que…", "hold on…", "espera un momento…" | pausa a fala (retoma do início da frase) |
+| "continua", "pode continuar", "go on", "sigue" | continua de onde parou |
+| "para", "chega", "para de falar", "stop", "basta" | para de falar e cancela a resposta |
+| "repete", "o que você disse?", "say that again", "repite" | "Claro, vou repetir." + a mesma resposta |
+| "não entendi", "explica melhor", "I didn't understand", "no entendí" | "Acho que não entendeu…" e reexplica mais claro |
+
+Esses comandos são reconhecidos **localmente** (instantâneo) e funcionam **mesmo enquanto o NEXUS fala**. Para frases mais elaboradas ("hã? fala de novo com outras palavras"), a IA decide pela conversa. Com caixas de som, use fone de ouvido para o NEXUS não se ouvir.
 
 ### Saudação
 
@@ -145,7 +167,8 @@ nexus/
   tools.py      ações: tarefas, agenda, lembretes, notas, dados, memória, conhecimento
   memory.py     fatos sobre o usuário, histórico e log de ações
   knowledge.py  base de conhecimento (SQLite FTS5) e importação de arquivos
-  voice.py      Whisper (ouvir), palavra de ativação e fila de fala
+  voice.py      Whisper (ouvir, conversa contínua), fila de fala com pausa/retomada/repetição
+  control.py    comandos de conversa por voz/texto (repetir, explicar melhor, pausar, continuar, parar)
   tts.py        motor de voz: vozes SAPI/OneCore, gênero, efeitos J.A.R.V.I.S/robô
   scheduler.py  lembretes em tempo real
   bridge.py     endpoint local para o formulário da landing
@@ -159,4 +182,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.2.0 (protótipo)**.
+Versão atual: **v0.3.0 (protótipo)**.

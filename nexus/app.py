@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import webview
 
-from . import assistant, bridge, knowledge, llm, memory, profile, scheduler, tools
+from . import __version__, assistant, bridge, control, i18n, knowledge, llm, memory, profile, scheduler, tools
 from .config import WEB_DIR, settings
 from .db import db
 from .i18n import LANGS, lang
@@ -33,17 +33,23 @@ class Api:
     """Every public method is callable from JS as window.pywebview.api.<name>()."""
 
     def __init__(self):
-        self._brain = assistant.Assistant(emit)
         from .voice import Listener, Speaker
 
-        self._speaker = Speaker(lambda s: emit("voice", s))
-        self._listener = Listener(self._on_voice_text, lambda s: emit("voice", s), self._speaker)
+        self._brain = assistant.Assistant(self._on_brain_event, control_hook=self._speech_control)
+        self._speaker = Speaker(lambda s: emit("voice", s), lambda payload: emit("speak_env", payload))
+        self._listener = Listener(self._on_voice_text, lambda s: emit("voice", s), self._speaker,
+                                  on_level=lambda level: emit("mic_level", level))
         scheduler.start(self._on_alert)
         bridge.start(settings["bridge_port"], self._on_profile)
 
     def _on_alert(self, alert):
         emit("alert", alert)
-        self._speaker.say(alert["text"])
+        self._speaker.say(alert["text"], remember=False)
+
+    def _on_brain_event(self, event, payload):
+        emit(event, payload)
+        if event == "done" and payload.get("speak"):
+            self._speaker.say(payload["text"])
 
     # -- lifecycle -----------------------------------------------------------
     def ui_ready(self):
@@ -67,27 +73,106 @@ class Api:
         st = llm.status()
         step("ai", st["online"] and st.get("model_ready", False), st["model"])
         step("voice", self._listener.model_state != "error", f"{settings['stt_model']} · {self._listener.model_state}")
-        if settings["wake_mode"]:
-            self._listener.set_wake_mode(True)
-        return {"profile": db.get_profile(), "lang": lang(), "llm": st, "settings": dict(settings)}
+        self._sync_listening()
+        return {"profile": db.get_profile(), "lang": lang(), "llm": st, "settings": dict(settings),
+                "stt": self._listener.model_state, "version": __version__}
 
     def greet(self):
         text = assistant.greeting()
         self._speaker.say(text)
         return text
 
+    # -- modes and dock buttons ------------------------------------------------
+    def _sync_listening(self):
+        """Audio mode with the mic unmuted = continuous conversation; otherwise the mic is closed."""
+        self._listener.set_live(settings["ui_mode"] == "audio" and not settings["mic_muted"])
+
+    def set_mode(self, mode):
+        settings.apply({"ui_mode": "text" if mode == "text" else "audio"})
+        if settings["ui_mode"] == "text":
+            self._speaker.stop()
+        self._sync_listening()
+        return self.state()
+
+    def set_mic(self, muted):
+        settings.apply({"mic_muted": bool(muted)})
+        if not muted:
+            self._listener.ensure_model()  # first use downloads the Whisper model
+        self._sync_listening()
+        return self.state()
+
+    def set_ai_voice(self, enabled):
+        settings.apply({"voice_enabled": bool(enabled)})
+        if not enabled:
+            self._speaker.stop()
+        return self.state()
+
+    def state(self):
+        return {"ui_mode": settings["ui_mode"], "mic_muted": settings["mic_muted"],
+                "voice_enabled": settings["voice_enabled"], "stt": self._listener.model_state,
+                "stt_error": self._listener.model_error}
+
+    def interrupt(self):
+        """Dock "interrupt" / Esc: stop speaking and cancel the answer being generated."""
+        self._speaker.stop()
+        self._brain.interrupt()
+        emit("control", {"action": "stop"})
+
+    def repeat(self):
+        """Dock "repeat": "I don't think you understood, I'll repeat." + the same last answer."""
+        text = assistant.last_reply()
+        if not text:
+            return {"intro": i18n.t("nothing_to_repeat"), "text": ""}
+        self._speaker.stop()
+        self._speaker.say(i18n.t("repeat_button"), remember=False)
+        self._speaker.say(text)
+        return {"intro": i18n.t("repeat_button"), "text": text}
+
     # -- conversation ----------------------------------------------------------
+    def _speech_control(self, action):
+        """pause / resume / stop on the voice (also used by the model's conversation_control tool)."""
+        if action == "pause":
+            self._speaker.pause()
+        elif action == "resume":
+            self._speaker.resume()
+        elif action == "stop":
+            self._speaker.stop()
+            self._brain.interrupt()
+        emit("control", {"action": action})
+
+    def _handle_control(self, action):
+        """Short commands recognised locally: act instantly, no model round trip."""
+        if action in ("pause", "resume", "stop"):
+            self._speech_control(action)
+            return
+        previous = assistant.last_reply()
+        if not previous:
+            emit("control", {"action": action, "intro": i18n.t("nothing_to_repeat"), "text": ""})
+            self._speaker.say(i18n.t("nothing_to_repeat"), remember=False)
+            return
+        self._speaker.stop()
+        if action == "repeat":
+            emit("control", {"action": "repeat", "intro": i18n.t("repeat_intro"), "text": previous})
+            self._speaker.say(i18n.t("repeat_intro"), remember=False)
+            self._speaker.say(previous)
+        else:  # clearer: say so right away, then let the model rephrase
+            emit("control", {"action": "clearer", "intro": i18n.t("clearer_intro")})
+            self._speaker.say(i18n.t("clearer_intro"), remember=False)
+            threading.Thread(target=self._brain.ask, args=(i18n.t("clearer_request"),), daemon=True).start()
+
     def send(self, text, spoken=False):
+        action = control.detect(text)
+        if action:
+            self._handle_control(action)
+            return {"control": action}
         threading.Thread(target=self._brain.ask, args=(text, spoken), daemon=True).start()
+        return {"control": None}
 
     def history(self):
         return memory.history(settings["history_turns"])
 
     def clear_history(self):
         memory.clear_history()
-
-    def speak(self, text):
-        self._speaker.say(text)
 
     def stop_speaking(self):
         self._speaker.stop()
@@ -96,9 +181,9 @@ class Api:
         return {"voices": self._speaker.list_voices(), "error": self._speaker.error}
 
     def test_voice(self, text):
-        """Speak a sample with the current voice settings, even if "speak replies" is off."""
+        """Speak a sample with the current voice settings, even if the AI voice is muted."""
         self._speaker.stop()
-        self._speaker.say(text, force=True)
+        self._speaker.say(text, force=True, remember=False)
 
     def push_to_talk(self):
         if not self._listener.ensure_model():  # first use downloads the Whisper model
@@ -106,13 +191,14 @@ class Api:
         self._listener.push_to_talk()
         return {"ok": True}
 
-    def set_wake_mode(self, enabled):
-        settings.apply({"wake_mode": enabled})
-        self._listener.set_wake_mode(bool(enabled))
-
-    def _on_voice_text(self, text):
-        emit("heard", text)
-        self.send(text, spoken=True)
+    def _on_voice_text(self, text, during_speech=False):
+        action = control.detect(text)
+        if action:
+            emit("heard", {"text": text, "control": action})
+            self._handle_control(action)
+        elif not during_speech:  # while NEXUS talks only control commands count (echo protection)
+            emit("heard", {"text": text})
+            threading.Thread(target=self._brain.ask, args=(text, True), daemon=True).start()
 
     # -- profile ---------------------------------------------------------------
     def _on_profile(self, prof):

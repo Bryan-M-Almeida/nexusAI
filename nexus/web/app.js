@@ -70,6 +70,7 @@ function applyLang(lang) {
   document.documentElement.lang = { pt: "pt-BR", en: "en", es: "es" }[L];
   $$("[data-i18n]").forEach((el) => (el.textContent = T(el.dataset.i18n)));
   $$("[data-i18n-ph]").forEach((el) => (el.placeholder = T(el.dataset.i18nPh)));
+  $$("[data-i18n-title]").forEach((el) => (el.title = T(el.dataset.i18nTitle)));
   $$("#langSwitch button").forEach((b) => b.classList.toggle("on", b.dataset.lang === L));
   $("#bridgeHint").textContent = T("bridgeHint", { port: settings.bridge_port || 47800 });
   setVoiceState(voiceState);
@@ -88,7 +89,10 @@ window.nexus = {
       case "error": return onError(p);
       case "refresh": return loadDashboard();
       case "voice": return setVoiceState(p);
-      case "heard": return addMsg("user", p, true);
+      case "heard": return onHeard(p);
+      case "speak_env": return ringSpeak(p);
+      case "mic_level": return (ringMicTarget = Math.max(ringMicTarget, p));
+      case "control": return onControl(p);
       case "alert": return onAlert(p);
       case "profile": return onProfile(p);
     }
@@ -121,8 +125,8 @@ async function start() {
   profile = st.profile;
   applyLang(st.lang);
   setAi(st.llm);
-  $("#voiceToggle").checked = settings.voice_enabled;
-  $("#wakeToggle").checked = settings.wake_mode;
+  $("#version").textContent = "v" + st.version;
+  applyState({ ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: st.stt });
   await new Promise((r) => setTimeout(r, Math.max(0, BOOT_MIN_MS - (Date.now() - t0))));
   $("#boot").classList.add("leaving");
   $("#app").hidden = false;
@@ -132,8 +136,11 @@ async function start() {
   for (const m of await api().history()) addMsg(m.role === "user" ? "user" : "nexus", m.content);
   const hello = await api().greet();
   addMsg("nexus", hello);
+  caption(hello, 7000);
   if (!profile) openOnboarding();
-  if (!st.llm.online || !st.llm.model_ready) addMsg("system", aiHelp(st.llm));
+  if (!st.llm.online || !st.llm.model_ready) notice(aiHelp(st.llm));
+  else if (state.ui_mode === "audio" && !state.mic_muted && st.stt === "missing") notice(T("voiceFirstUse"));
+  flashBars();
 }
 
 function aiHelp(llm) {
@@ -183,18 +190,33 @@ function onTool(p) {
 
 function onDone(p) {
   const s = ensureStream();
+  if (!p.text) { s.el.remove(); streaming = null; setVoiceState("idle"); return; }  // pause/stop handled by the model
   s.el.querySelector(".txt").classList.remove("caret");
-  s.el.querySelector(".txt").innerHTML = md(p.text);
+  s.el.querySelector(".txt").innerHTML = md(p.text) + (p.interrupted ? " <span class=\"muted\">…</span>" : "");
   streaming = null;
-  setVoiceState(settings.wake_mode ? "standby" : "idle");
-  if (p.text && $("#voiceToggle").checked) api().speak(p.text);
+  if (!(state.ui_mode === "audio" && state.voice_enabled && p.speak)) setVoiceState("idle");
 }
 
 function onError(p) {
   if (streaming) { streaming.el.remove(); streaming = null; }
   addMsg("system", p.message).classList.add("error");
+  notice(p.message);
   setVoiceState("idle");
   api().get_settings().then((r) => setAi(r.llm));
+}
+
+function onHeard(p) {
+  addMsg("user", p.text, true);
+  if (p.control) setVoiceState("idle");
+  caption("“" + p.text + "”", 3500);
+}
+
+function onControl(p) {
+  const label = T("ctl_" + p.action);
+  if (p.text) addMsg("nexus", (p.intro ? p.intro + "\n\n" : "") + p.text);
+  else if (p.intro) addMsg("system", p.intro);
+  caption(label, 2500);
+  if (p.action === "stop" && streaming) onDone({ text: streaming.text, interrupted: true });
 }
 
 function onAlert(a) {
@@ -207,22 +229,132 @@ function onAlert(a) {
   loadDashboard();
 }
 
-function send(text) {
+async function send(text) {
   text = text.trim();
   if (!text) return;
-  api().stop_speaking();
   addMsg("user", text);
-  api().send(text, false);
+  const r = await api().send(text, false);
+  if (r && r.control) setVoiceState("idle");
 }
 
-/* ------------------------------------------------------------------ voice */
-function setVoiceState(state) {
-  voiceState = state;
-  if (state === "idle" && settings.wake_mode) state = "standby";
-  $("#core").dataset.state = state;
-  $("#coreLabel").textContent = T("st_" + state) || "";
-  $("#btnMic").classList.toggle("live", state === "listening" || state === "awake");
-  $("#chipVoice").classList.toggle("on", state !== "idle" || settings.wake_mode);
+/* ------------------------------------------------------------------ voice state */
+let state = { ui_mode: "audio", mic_muted: false, voice_enabled: true, stt: "ready" };
+
+function setVoiceState(st) {
+  voiceState = st;
+  let shown = st;
+  if (st === "idle" && state.ui_mode === "audio") shown = state.mic_muted ? "muted" : state.stt === "ready" ? "standby" : "idle";
+  $("#core").dataset.state = shown;
+  const label = $("#coreLabel");
+  label.textContent = T("st_" + shown) || "";
+  label.className = "core-label " + (["listening", "awake"].includes(shown) ? "red" : ["speaking", "thinking"].includes(shown) ? "blue" : "");
+  $("#chipVoice").classList.toggle("on", state.ui_mode === "audio" && !state.mic_muted && state.stt === "ready");
+}
+
+function applyState(st) {
+  state = { ...state, ...st };
+  $("#app").dataset.mode = state.ui_mode;
+  $("#btnModeText").classList.toggle("on", state.ui_mode === "text");
+  $("#btnModeAudio").classList.toggle("on", state.ui_mode === "audio");
+  $("#btnMic").classList.toggle("off", state.mic_muted);
+  $("#btnAiVoice").classList.toggle("off", !state.voice_enabled);
+  $("#btnMic").disabled = $("#btnAiVoice").disabled = state.ui_mode === "text";
+  if (state.ui_mode === "text") setTimeout(() => $("#prompt").focus(), 300);
+  setVoiceState(voiceState === "speaking" ? "speaking" : "idle");
+}
+
+/* ------------------------------------------------------------------ ring: grows with NEXUS's voice, shrinks with the user's */
+let ringEnv = null, ringEnvStart = 0, ringEnvDt = 0.04, ringMicTarget = 0, ringAi = 0, ringMic = 0;
+
+function ringSpeak(p) {
+  ringEnv = p.env;
+  ringEnvDt = p.dt;
+  ringEnvStart = performance.now();
+}
+
+function ringFrame(now) {
+  let aiTarget = 0;
+  if (ringEnv && voiceState === "speaking") {
+    const i = Math.floor((now - ringEnvStart) / 1000 / ringEnvDt);
+    aiTarget = i < ringEnv.length ? ringEnv[i] : 0;
+  }
+  ringAi += (aiTarget - ringAi) * 0.3;
+  ringMic += (ringMicTarget - ringMic) * 0.3;
+  ringMicTarget *= 0.9;  // mic levels arrive ~16x/s; decay between updates
+  const breathe = 0.008 * Math.sin(now / 1400);
+  const ring = $("#ring");
+  ring.style.setProperty("--s", (1 + breathe + 0.14 * ringAi - 0.12 * ringMic).toFixed(4));
+  ring.style.setProperty("--ai", ringAi.toFixed(3));
+  ring.style.setProperty("--mic", ringMic.toFixed(3));
+  requestAnimationFrame(ringFrame);
+}
+
+/* ------------------------------------------------------------------ captions & notices (audio mode has no chat) */
+let captionTimer;
+function caption(text, ms = 3000) {
+  if (state.ui_mode !== "audio" || !text) return;
+  const el = $("#caption");
+  el.textContent = text.length > 160 ? text.slice(0, 157) + "…" : text;
+  el.classList.add("show");
+  clearTimeout(captionTimer);
+  captionTimer = setTimeout(() => el.classList.remove("show"), ms);
+}
+
+function notice(text) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = `<b>NEXUS</b>${esc(text)}`;
+  $("#toasts").appendChild(el);
+  setTimeout(() => el.remove(), 12000);
+}
+
+/* ------------------------------------------------------------------ edge bars: top bar and dock appear near the screen edges */
+const EDGE_TOP = 64, EDGE_BOTTOM = 110;
+let topTimer, dockTimer;
+function showBar(el, timerName, on) {
+  clearTimeout(timerName === "top" ? topTimer : dockTimer);
+  if (on) return el.classList.add("show");
+  const t = setTimeout(() => el.classList.remove("show"), 900);
+  if (timerName === "top") topTimer = t; else dockTimer = t;
+}
+
+function trackEdges(e) {
+  const overTop = e.clientY < EDGE_TOP || $("#topbar").matches(":hover");
+  const overDock = e.clientY > innerHeight - EDGE_BOTTOM || $("#dock").matches(":hover");
+  showBar($("#topbar"), "top", overTop);
+  showBar($("#dock"), "dock", overDock);
+}
+
+function flashBars() {  // show both bars briefly once, so the user discovers them
+  $("#topbar").classList.add("show"); $("#dock").classList.add("show");
+  setTimeout(() => { showBar($("#topbar"), "top", false); showBar($("#dock"), "dock", false); }, 3500);
+}
+
+async function dock(action) {
+  if (action === "text" || action === "audio") applyState(await api().set_mode(action));
+  else if (action === "mic") {
+    const st = await api().set_mic(!state.mic_muted);
+    applyState(st);
+    if (!st.mic_muted && st.stt !== "ready") notice(T("voiceLoading"));
+  } else if (action === "ai") applyState(await api().set_ai_voice(!state.voice_enabled));
+  else if (action === "interrupt") { api().interrupt(); setVoiceState("idle"); }
+  else if (action === "repeat") {
+    const r = await api().repeat();
+    if (r.text) addMsg("nexus", r.intro + "\n\n" + r.text); else addMsg("system", r.intro);
+    caption(r.intro, 2500);
+  }
+  const tip = { text: "modeText", audio: "modeAudio", mic: state.mic_muted ? "micOff" : "micOn", ai: state.voice_enabled ? "aiOn" : "aiOff",
+    interrupt: "interrupt", repeat: "repeat" }[action];
+  showTip(T(tip));
+}
+
+let tipTimer;
+function showTip(text) {
+  const el = $("#dockTip");
+  el.textContent = text;
+  el.classList.add("show");
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => el.classList.remove("show"), 1600);
 }
 
 /* ------------------------------------------------------------------ dashboard */
@@ -343,16 +475,23 @@ async function testVoice() {
 /* ------------------------------------------------------------------ wiring */
 function wire() {
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); send($("#prompt").value); $("#prompt").value = ""; });
-  $("#btnMic").onclick = async () => {
-    const r = await api().push_to_talk();
-    if (!r.ok) addMsg("system", T("voiceLoading") + (r.error && r.error !== "loading" ? ` (${r.error})` : ""));
-  };
-  $("#btnStop").onclick = () => api().stop_speaking();
-  $("#wakeToggle").onchange = (e) => { settings.wake_mode = e.target.checked; api().set_wake_mode(e.target.checked); setVoiceState("idle"); };
-  $("#voiceToggle").onchange = (e) => { settings.voice_enabled = e.target.checked; api().save_settings({ voice_enabled: e.target.checked }); };
-  document.addEventListener("keydown", (e) => {
-    if (e.ctrlKey && e.code === "Space") { e.preventDefault(); $("#btnMic").click(); }
-    if (e.key === "Escape") { api().stop_speaking(); $$(".modal").forEach((m) => (m.hidden = true)); }
+  const dockButtons = { btnModeText: "text", btnModeAudio: "audio", btnMic: "mic", btnAiVoice: "ai", btnInterrupt: "interrupt", btnRepeat: "repeat" };
+  for (const [id, action] of Object.entries(dockButtons)) {
+    $("#" + id).onclick = () => dock(action);
+    $("#" + id).onmouseenter = (e) => showTip(e.currentTarget.title);
+  }
+  document.addEventListener("mousemove", trackEdges);
+  $("#btnPanel").onclick = () => { loadDashboard(); $("#panelDrawer").hidden = false; };
+  document.addEventListener("keydown", async (e) => {
+    if (e.ctrlKey && e.code === "Space") {  // push-to-talk works in both modes
+      e.preventDefault();
+      const r = await api().push_to_talk();
+      if (!r.ok) notice(T("voiceLoading") + (r.error && r.error !== "loading" ? ` (${r.error})` : ""));
+    }
+    if (e.key === "Escape") {
+      const open = $$(".modal:not([hidden]), .drawer:not([hidden])");
+      if (open.length) open.forEach((m) => (m.hidden = true)); else dock("interrupt");
+    }
   });
 
   $("#taskForm").addEventListener("submit", async (e) => {
@@ -431,7 +570,7 @@ function wire() {
   });
   $("#btnReimport").onclick = () => { $("#settings").hidden = true; openOnboarding(); };
   $("#btnClearChat").onclick = async () => { await api().clear_history(); $("#chat").innerHTML = ""; $("#settings").hidden = true; };
-  $$("[data-close]").forEach((b) => (b.onclick = () => (b.closest(".modal").hidden = true)));
+  $$("[data-close]").forEach((b) => (b.onclick = () => (b.closest(".modal, .drawer").hidden = true)));
 
   setInterval(() => ($("#clock").textContent = new Date().toLocaleTimeString(document.documentElement.lang, { hour: "2-digit", minute: "2-digit" })), 1000);
 }
@@ -452,6 +591,7 @@ $$(".wordmark").forEach((el) => (el.innerHTML = wordmarkHTML()));
 requestAnimationFrame(() => $("#boot .wordmark").classList.add("is-on"));
 applyLang("pt");
 wire();
+requestAnimationFrame(ringFrame);
 
 if (window.pywebview && window.pywebview.api) start();
 else window.addEventListener("pywebviewready", start);

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 1.1  ·  Date: 2026-10-13  ·  App version: 0.2.0
+ Document version: 1.2  ·  Date: 2026-10-13  ·  App version: 0.3.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -66,6 +66,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-015  Thinking mode makes qwen3 slow
       NX-LLM-016  Automatic memory stores redundant or generic facts
       NX-LLM-017  Model invents tool arguments
+      NX-LLM-018  AI handles "repeat"/"explain better" by talking, without the tool
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -77,6 +78,9 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-VOZ-009  "Mute" only stops at the end of the current sentence
       NX-VOZ-010  Male voice sounds androgynous in some languages
       NX-VOZ-011  "J.A.R.V.I.S"/"Robot" voice effect sounds muffled or too metallic
+      NX-VOZ-012  Commands during speech fail with loudspeakers
+      NX-VOZ-013  Sentence said while NEXUS speaks is ignored
+      NX-VOZ-014  "Audio only" mode answers nearby conversations / TV
  DAT  NX-DAT-001  Knowledge base doesn't find an existing topic
       NX-DAT-002  Imported PDF has no text ("Could not extract text")
       NX-DAT-003  "Invalid date" when creating an event/task
@@ -89,6 +93,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-UI-002   Window doesn't open: WebView2 missing
       NX-UI-003   Window opens blank or stuck at boot
       NX-UI-004   Interface out of scale on small screens
+      NX-UI-005   I can't find the buttons / the screen only shows the ring
  INT  NX-INT-001  Landing page has no real onboarding form yet
       NX-INT-002  Browser blocks the landing page request to 127.0.0.1
       NX-INT-003  Port 47800 busy: local bridge disabled
@@ -320,6 +325,21 @@ QUICK DIAGNOSTICS (run these before investigating)
                and null values before running.
 
 
+[NX-LLM-018] AI handles "repeat"/"explain better" by talking, without the tool
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Symptom    : For long requests ("can you repeat what you just said?",
+               "I didn't get anything, explain it more simply"), qwen3:8b
+               answers directly without calling conversation_control.
+  Impact     : In the tests the result was correct (it repeated /
+               re-explained more simply / confirmed it would stay quiet).
+               Actions that must act on audio (pause, stop, resume, repeat)
+               are handled by the local detector (nexus/control.py), which is
+               instant and doesn't depend on the model.
+  Tips       : Short commands, or ones that START with "hold on", "wait a
+               second", "stop talking", "be quiet"... are always recognized.
+               For new expressions, edit PATTERNS/LEADING in
+               nexus/control.py.
+
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS
 ================================================================================
@@ -373,9 +393,11 @@ QUICK DIAGNOSTICS (run these before investigating)
 [NX-VOZ-005] NEXUS hears its own voice (echo)
   Severity   : MEDIUM           Status: MITIGATED          Observed: EXPECTED
   Cause      : Speakers picked up by the microphone while NEXUS talks.
-  Mitigation : In always-listening mode, audio is ignored while NEXUS
-               speaks, plus a 250 ms margin.
-  Tips       : Use headphones; disable "Speak replies" if needed.
+  Mitigation : Since v0.3, while NEXUS speaks the microphone stays on but
+               only accepts short control commands ("pause", "stop", "hold
+               on...") up to 4 s long; everything else is ignored (see
+               NX-VOZ-013). There is a 250 ms margin after speech ends.
+  Tips       : Use headphones; mute the AI voice from the dock if needed.
 
 [NX-VOZ-006] No Spanish voice / voice in the wrong language
   Severity   : MEDIUM           Status: PENDING            Observed: YES
@@ -431,6 +453,30 @@ QUICK DIAGNOSTICS (run these before investigating)
                show. "Natural" disables processing. To tune it, edit the
                parameters in apply_effect() (nexus/tts.py) and use "Test
                voice".
+
+[NX-VOZ-012] Commands during speech fail with loudspeakers
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Symptom    : "Pause" said while NEXUS speaks is not recognized.
+  Cause      : Without echo cancellation, the microphone captures NEXUS's
+               voice together with the user's and Whisper transcribes the mix.
+  Solution   : Use headphones; or use the dock buttons (interrupt) and Esc.
+               Future improvement: acoustic echo cancellation (AEC).
+
+[NX-VOZ-013] Sentence said while NEXUS speaks is ignored
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Expected behavior: while speaking, only control commands are accepted
+               (pause, stop, repeat, I didn't understand...). This prevents
+               NEXUS from answering itself through the echo.
+  Workaround : Say "pause" or "stop" and then ask, or wait for the speech to
+               end. While paused, the microphone accepts any sentence again.
+
+[NX-VOZ-014] "Audio only" mode answers nearby conversations / TV
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : Since v0.3 audio mode listens continuously without requiring
+               the word "Nexus".
+  Solution   : Enable "Only answer when I say Nexus" in Settings, mute the
+               microphone from the dock when not in use, or use "messages
+               only" mode.
 
 ================================================================================
  DAT — DATA, MEMORY AND KNOWLEDGE
@@ -540,6 +586,17 @@ QUICK DIAGNOSTICS (run these before investigating)
                size).
   Tips       : Use Windows scaling at 100-125% or maximize the window.
 
+
+[NX-UI-005] I can't find the buttons / the screen only shows the ring
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Expected behavior (v0.3): the interface is minimalist. The bars appear
+               when the mouse reaches the TOP (status, language, Panel,
+               Settings) or the BOTTOM of the window (mode, microphone, AI
+               voice, interrupt and repeat icons). When the app opens they are
+               shown for 3.5 s so the user can discover them.
+  Tips       : Schedule, tasks, memory and knowledge live under the Panel
+               button (top bar). Esc closes open windows; with none open, it
+               interrupts the speech.
 
 ================================================================================
  INT — LANDING PAGE INTEGRATION

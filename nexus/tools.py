@@ -174,6 +174,11 @@ def remind_next_session(topic):
     return {"ok": True, "id": nid}
 
 
+def conversation_control(action):
+    # Executed by Assistant._control (it needs the speaker and the previous answer).
+    return {"error": "handled by the assistant"}
+
+
 def update_profile(field, value):
     profile.update_field(field, value)
     return {"ok": True}
@@ -233,6 +238,11 @@ SCHEMAS = [
         {"topic": {"type": "string", "description": "short noun phrase with article, in the user's language, "
                                                      "e.g. 'o projeto do app de finanças' / 'the finance app project'"}},
         ["topic"]),
+    _fn("conversation_control",
+        "Control your own speech when the user asks about the conversation itself: 'repeat' (say the last answer "
+        "again), 'clearer' (user didn't understand -> explain again more clearly), 'pause', 'resume' (continue "
+        "speaking), 'stop' (be quiet).",
+        {"action": {"type": "string", "enum": ["repeat", "clearer", "pause", "resume", "stop"]}}, ["action"]),
     _fn("update_profile", "Update a field of the user's profile (name, profession, routine, interests, goals, language).",
         {"field": S, "value": S}, ["field", "value"]),
     _fn("get_datetime", "Get the current local date and time."),
