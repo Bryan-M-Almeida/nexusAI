@@ -313,11 +313,31 @@ async function openSettings() {
     if (el.type === "checkbox") el.checked = !!v; else el.value = v;
   }
   $("#modelList").innerHTML = r.llm.models.map((m) => `<option value="${esc(m)}">`).join("");
+  voices = r.voices || [];
+  renderVoiceInfo();
   $("#aiStatus").innerHTML = r.llm.online && r.llm.model_ready
     ? `<span class="ok">● ${esc(T("aiOk"))}</span> — ${esc(r.llm.model)}`
     : `<span class="bad">● ${esc(aiHelp(r.llm))}</span>`;
   setAi(r.llm);
   $("#settings").hidden = false;
+}
+
+let voices = [];
+function renderVoiceInfo() {
+  const f = $("#settingsForm");
+  const gender = f.elements.voice_gender.value;
+  const list = voices.map((v) => `${v.name.replace("Microsoft ", "")} (${v.lang || "?"}, ${T(v.gender)})`).join(" · ");
+  const missing = !voices.some((v) => v.lang === L && v.gender === gender);
+  $("#voiceInfo").innerHTML = `${esc(T("installedVoices"))}: ${esc(list || "—")}`
+    + (missing ? `<br><span class="warn">${esc(T("voiceMissing", { gender: T(gender), lang: L.toUpperCase() }))}</span>` : "");
+}
+
+async function testVoice() {
+  const f = $("#settingsForm");
+  const changes = { voice_gender: f.elements.voice_gender.value, voice_effect: f.elements.voice_effect.value,
+    tts_speed: f.elements.tts_speed.value };
+  settings = (await api().save_settings(changes)).settings;
+  api().test_voice(T("voiceSample", { name: profile ? profile.name.split(" ")[0] : "" }));
 }
 
 /* ------------------------------------------------------------------ wiring */
@@ -397,6 +417,8 @@ function wire() {
   $("#btnProfileSkip").onclick = () => ($("#onboarding").hidden = true);
 
   $("#btnSettings").onclick = openSettings;
+  $("#btnTestVoice").onclick = testVoice;
+  $("#settingsForm").elements.voice_gender.onchange = renderVoiceInfo;
   $("#settingsForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target, changes = {};

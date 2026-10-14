@@ -41,12 +41,6 @@ def _upcoming(days=7):
                              (start + timedelta(days=days)).isoformat(timespec="minutes"))
 
 
-def _agenda_today():
-    start = datetime.now().replace(hour=0, minute=0).isoformat(timespec="minutes")
-    end = datetime.now().replace(hour=23, minute=59).isoformat(timespec="minutes")
-    return tools.list_events(start, end)
-
-
 def _pending_tasks():
     return tools.list_tasks("pending")
 
@@ -220,22 +214,29 @@ class Assistant:
             self.emit("refresh", None)
 
 
-def briefing() -> str:
-    """Short spoken greeting with today's agenda (no LLM needed, so it is instant at boot)."""
+def greeting() -> str:
+    """Opening line, instant (no LLM):
+    - no profile yet          -> NEXUS introduces itself and asks for the profile
+    - first time with profile -> full introduction using the user's name
+    - user asked to be reminded next time (remind_next_session) -> "shall we continue <topic>?"
+    - otherwise               -> "Hello <name>, what do we have for today?"
+    Greetings that the user may answer ("yes") are stored in the history so the model has context."""
     prof = db.get_profile()
     if not prof:
-        return t("no_profile")
-    hour = datetime.now().hour
-    hello = t("morning") if hour < 12 else t("afternoon") if hour < 18 else t("evening")
-    lines = [t("greet", hello=hello, name=prof["name"].split()[0])]
-    agenda = _agenda_today()
-    if agenda:
-        items = ", ".join(f"{e['title']} {e['start'][11:16]}" for e in agenda[:4])
-        lines.append(t("agenda_today", n=len(agenda), items=items))
+        return t("intro_anon")
+    name = prof["name"].split()[0]
+    if db.get_state("introduced") != "1":
+        db.set_state("introduced", "1")
+        text = t("intro", name=name)
     else:
-        lines.append(t("agenda_free"))
-    pending = _pending_tasks()
-    if pending:
-        late = sum(1 for x in pending if x["due"] and x["due"] < datetime.now().isoformat())
-        lines.append(t("tasks_pending", n=len(pending), late=late))
-    return " ".join(lines)
+        notes = db.all("SELECT id, topic FROM session_notes WHERE delivered IS NULL ORDER BY id")
+        if notes:
+            topics = [n["topic"] for n in notes]
+            joined = topics[0] if len(topics) == 1 else f"{', '.join(topics[:-1])} {t('and')} {topics[-1]}"
+            text = t("continue", name=name, topics=joined)
+            db.execute(f"UPDATE session_notes SET delivered = ? WHERE id IN ({','.join('?' * len(notes))})",
+                       (datetime.now().isoformat(timespec="seconds"), *[n["id"] for n in notes]))
+        else:
+            text = t("hello", name=name)
+    memory.add_message("assistant", text)
+    return text

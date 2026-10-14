@@ -10,7 +10,6 @@ Set-Location $PSScriptRoot
     --collect-all faster_whisper `
     --collect-all ctranslate2 `
     --collect-submodules webview `
-    --hidden-import pyttsx3.drivers.sapi5 `
     --collect-submodules comtypes `
     run_nexus.py
 

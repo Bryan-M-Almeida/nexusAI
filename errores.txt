@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 1.0  ·  Fecha: 2026-10-13  ·  Versión de la app: 0.1.0
+ Versión del documento: 1.1  ·  Fecha: 2026-10-13  ·  Versión de la app: 0.2.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -76,6 +76,8 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-VOZ-007  La síntesis de voz deja de funcionar al cabo de un tiempo
       NX-VOZ-008  Transcripción lenta
       NX-VOZ-009  "Silenciar" solo interrumpe al final de la frase actual
+      NX-VOZ-010  La voz masculina suena andrógina en algunos idiomas
+      NX-VOZ-011  El efecto de voz "J.A.R.V.I.S"/"Robot" suena apagado o demasiado metálico
  DAT  NX-DAT-001  La base de conocimiento no encuentra un tema existente
       NX-DAT-002  PDF importado sin texto ("No pude extraer texto")
       NX-DAT-003  "Fecha inválida" al crear un evento/tarea
@@ -83,6 +85,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-DAT-005  Archivo nexus.db en uso / base de datos bloqueada
       NX-DAT-006  Libros iniciales reindexados o duplicados
       NX-DAT-007  Un archivo de la carpeta inbox no se vuelve a importar
+      NX-DAT-008  El saludo "¿continuamos con...?" no aparece / aparece solo una vez
  UI   NX-UI-001   Fuentes distintas de la landing (sin internet)
       NX-UI-002   La ventana no abre: falta WebView2
       NX-UI-003   La ventana se abre en blanco o se bloquea en el arranque
@@ -404,21 +407,21 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Gravedad   : MEDIA            Estado: PENDIENTE          Observado: SÍ
   Síntoma    : Respuestas en español leídas con la voz en portugués/inglés.
   Causa      : Solo se usan las voces SAPI instaladas. El PC de referencia
-               solo tiene "Microsoft Maria" (pt-BR) y "Microsoft Zira"
-               (en-US).
+               tiene Maria (pt-BR, femenina), Daniel (pt-BR, masculina,
+               OneCore) y Zira (en-US, femenina); ninguna en español.
   Solución   : Configuración de Windows > Hora e idioma > Voz > Agregar
-               voces > Español. Reinicia NEXUS.
-  Nota       : Algunas voces "naturales" de Windows 11 no están expuestas a
-               la API SAPI5 que usa pyttsx3 y pueden no aparecer.
+               voces > Español. Reinicia NEXUS. Las voces instaladas aparecen
+               en la Configuración de NEXUS, debajo de "Probar voz".
+  Nota       : Desde la v0.2 NEXUS lee las voces "Desktop" y "OneCore" de
+               Windows (antes, con pyttsx3, solo aparecían las "Desktop").
 
 [NX-VOZ-007] La síntesis de voz deja de funcionar al cabo de un tiempo
-  Gravedad   : MEDIA            Estado: CONOCIDO           Observado: PREVISTO
+  Gravedad   : MEDIA            Estado: CORREGIDO          Observado: PREVISTO
   Causa      : Problema conocido de pyttsx3 con llamadas repetidas a
                runAndWait() en algunos sistemas.
-  Solución provisional: Reinicia NEXUS. La voz se ejecuta en un hilo dedicado
-               para reducir el riesgo.
-  Mejora     : Sustituirlo por un motor de TTS dedicado (también necesario
-               para la voz robótica estilo J.A.R.V.I.S de la hoja de ruta).
+  Corrección : pyttsx3 se sustituyó por un motor propio (nexus/tts.py): SAPI
+               genera el audio en memoria y sounddevice lo reproduce. Si la voz
+               falla, el error queda en Speaker.error y la app continúa.
 
 [NX-VOZ-008] Transcripción lenta
   Gravedad   : BAJA             Estado: CONOCIDO           Observado: PREVISTO
@@ -428,11 +431,31 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                más precisión. Las frases cortas se transcriben más rápido.
 
 [NX-VOZ-009] "Silenciar" solo interrumpe al final de la frase actual
-  Gravedad   : BAJA             Estado: CONOCIDO           Observado: PREVISTO
-  Causa      : La voz se genera frase a frase; la interrupción ocurre entre
-               frases.
-  Consejos   : Esc o "silenciar" detienen antes de la siguiente frase.
+  Gravedad   : BAJA             Estado: CORREGIDO          Observado: PREVISTO
+  Causa      : Con pyttsx3 la interrupción solo ocurría entre frases.
+  Corrección : Con el motor nuevo, Esc / "silenciar" llaman a
+               sounddevice.stop() y cortan el audio de inmediato.
 
+[NX-VOZ-010] La voz masculina suena andrógina en algunos idiomas
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: SÍ
+  Síntoma    : Con "Voz: masculina" en inglés, el habla suena entre masculina
+               y femenina.
+  Causa      : No hay voz masculina instalada para ese idioma (el PC de
+               referencia solo tiene Zira en inglés). NEXUS usa la voz
+               disponible con el tono más grave (pitch -8, ~190 Hz -> ~150 Hz).
+  Solución   : Instala una voz masculina del idioma (p. ej. "Microsoft David"
+               o "Microsoft Mark" para inglés) en Configuración de Windows >
+               Hora e idioma > Voz. La Configuración de NEXUS avisa cuando el
+               género elegido no existe para el idioma actual.
+
+[NX-VOZ-011] El efecto de voz "J.A.R.V.I.S"/"Robot" suena apagado o demasiado metálico
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : Los efectos (modulación en anillo, filtro metálico, banda de
+               frecuencias limitada y eco corto) varían mucho según el
+               altavoz; los altavoces de portátil realzan el sonido metálico.
+  Consejos   : Usa "J.A.R.V.I.S" (sutil) a diario y "Robot" solo como efecto.
+               "Natural" desactiva el procesamiento. Para ajustarlo, edita los
+               parámetros de apply_effect() (nexus/tts.py) y usa "Probar voz".
 
 ================================================================================
  DAT — DATOS, MEMORIA Y CONOCIMIENTO
@@ -493,6 +516,20 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Solución   : Quita la extensión ".learned" para importarlo de nuevo en el
                próximo arranque, o usa el botón "Importar archivos".
 
+[NX-DAT-008] El saludo "¿continuamos con...?" no aparece / aparece solo una vez
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: SÍ
+  Comportamiento esperado: NEXUS solo dice "Hola {nombre}, ¿continuamos con
+               {tema}?" si el usuario PIDIÓ que se lo recordara en el próximo
+               inicio (herramienta remind_next_session). El aviso se consume al
+               decirlo; en los inicios siguientes vuelve "¿qué tenemos para
+               hoy?". La presentación completa solo ocurre la primera vez
+               (indicador "introduced" en la tabla state).
+  Si no aparece: revisa en el panel LOG la acción "Lembrar ao abrir: ...";
+               si no existe, el modelo no llamó a la herramienta (NX-LLM-003):
+               pídelo de forma explícita, p. ej. "la próxima vez que abra
+               NEXUS, recuérdame continuar el proyecto X".
+  Para ver de nuevo la presentación: borra la fila "introduced" de la tabla
+               state (o usa un NEXUS_HOME nuevo).
 
 ================================================================================
  UI — INTERFAZ DE ESCRITORIO
@@ -608,9 +645,9 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
 
 [NX-ENV-005] El ejecutable se abre y se cierra / módulo no encontrado
   Gravedad   : ALTA             Estado: CORREGIDO          Observado: PREVISTO
-  Causa      : PyInstaller no detecta importaciones dinámicas (controladores
-               de pyttsx3, comtypes, datos de faster-whisper).
-  Corrección : build.ps1 incluye los --collect-all, --hidden-import y
+  Causa      : PyInstaller no detecta importaciones dinámicas (interfaces COM
+               de comtypes usadas por la voz SAPI, datos de faster-whisper).
+  Corrección : build.ps1 incluye los --collect-all, --collect-submodules y
                --add-data necesarios. Compilación probada: arranca, indexa la
                base y abre el puente local.
   Consejos   : Al añadir una dependencia, compila y ejecuta

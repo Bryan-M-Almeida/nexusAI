@@ -85,6 +85,16 @@ CREATE TABLE IF NOT EXISTS kb_docs (
     created TEXT NOT NULL,
     updated TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS session_notes (
+    id INTEGER PRIMARY KEY,
+    topic TEXT NOT NULL,
+    created TEXT NOT NULL,
+    delivered TEXT
+);
 CREATE VIRTUAL TABLE IF NOT EXISTS kb_chunks USING fts5(
     heading, content, category UNINDEXED, doc_id UNINDEXED,
     tokenize='unicode61 remove_diacritics 2'
@@ -121,6 +131,15 @@ class DB:
 
     def log_action(self, kind: str, summary: str):
         self.execute("INSERT INTO actions(ts, kind, summary) VALUES (?,?,?)", (now(), kind, summary))
+
+    # -- small key/value state (e.g. whether NEXUS already introduced itself) ----
+    def get_state(self, key: str, default=None):
+        row = self.one("SELECT value FROM state WHERE key = ?", (key,))
+        return row["value"] if row else default
+
+    def set_state(self, key: str, value: str):
+        self.execute("INSERT INTO state(key, value) VALUES (?, ?) "
+                     "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
 
     # -- profile ---------------------------------------------------------
     def get_profile(self) -> dict | None:

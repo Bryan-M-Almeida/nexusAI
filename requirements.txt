@@ -3,5 +3,5 @@ httpx==0.28.1
 faster-whisper==1.2.1
 sounddevice==0.5.6
 numpy==2.5.4
-pyttsx3==2.99
+comtypes==1.4.17
 pypdf==6.20.1

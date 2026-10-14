@@ -93,10 +93,26 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 - "Como faço massagem cardíaca?" (responde pela base de primeiros socorros)
 - "Aprenda que a academia abre às 6h e fecha às 22h" / "What do the Stoics say about anxiety?"
 - "Inicia um pomodoro"
+- "Na próxima vez que eu abrir, me lembra de continuar o projeto do app" → no próximo início: *"Olá, Alex, vamos continuar o projeto do app?"*
 
-Atalhos: `Ctrl+Espaço` fala, `Esc` silencia.
+Atalhos: `Ctrl+Espaço` fala, `Esc` silencia (corta o áudio na hora).
 
-No primeiro uso da voz, o modelo Whisper escolhido é baixado (tiny ≈ 75 MB, base ≈ 145 MB, small ≈ 480 MB). A fala usa as vozes instaladas no Windows: Maria (pt-BR) e Zira (en-US) já vêm instaladas. **Para espanhol**, instale uma voz em *Configurações → Hora e idioma → Fala → Adicionar vozes*.
+### Saudação
+
+| Situação | O NEXUS diz |
+|---|---|
+| Ainda sem perfil | "Olá, eu sou NEXUS, seu assistente virtual…" e pede o perfil |
+| Primeira vez com perfil | Apresentação completa, usando o nome do usuário |
+| Usuário já conhecido | "Olá {nome}, o que teremos para hoje?" |
+| Usuário pediu para ser lembrado no próximo início | "Olá {nome}, vamos continuar {assunto}?" (só uma vez) |
+
+### Voz do NEXUS
+
+Em *Configurações*: **voz masculina ou feminina**, **efeito** (`J.A.R.V.I.S` sutil, `Robô` forte ou `Natural`), velocidade e o botão **Testar voz**.
+
+- Usa as vozes SAPI do Windows, inclusive as "OneCore" (ex.: **Microsoft Daniel**, masculina em pt-BR). Vozes encontradas no PC de teste: Maria (pt, fem.), Daniel (pt, masc.), Zira (en, fem.).
+- Se o gênero escolhido não existir no idioma, o NEXUS usa a outra voz com o tom ajustado e avisa na tela. Instale mais vozes (ex.: David/Mark em inglês, qualquer voz em **espanhol**) em *Configurações do Windows → Hora e idioma → Fala → Adicionar vozes*.
+- No primeiro uso do microfone, o modelo Whisper escolhido é baixado (tiny ≈ 75 MB, base ≈ 145 MB, small ≈ 480 MB).
 
 ## Onde ficam os dados
 
@@ -111,17 +127,26 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 Gera `dist\NEXUS\NEXUS.exe`. Basta copiar a pasta `dist\NEXUS` para outro PC (o Ollama é instalado separadamente).
 
+Para validar uma release (voz, IA, base de conhecimento, microfone) sem abrir a janela:
+
+```powershell
+dist\NEXUS\NEXUS.exe --selftest
+```
+
+O relatório é gravado em `selftest.json` na pasta de dados.
+
 ## Estrutura
 
 ```
 nexus/
   app.py        janela desktop + API chamada pela interface
-  assistant.py  cérebro: contexto, laço de ferramentas, memória automática, briefing
+  assistant.py  cérebro: contexto, laço de ferramentas, memória automática, saudação
   llm.py        cliente OpenAI-compatível (Ollama / LM Studio) com streaming
   tools.py      ações: tarefas, agenda, lembretes, notas, dados, memória, conhecimento
   memory.py     fatos sobre o usuário, histórico e log de ações
   knowledge.py  base de conhecimento (SQLite FTS5) e importação de arquivos
-  voice.py      Whisper (ouvir) + SAPI (falar), palavra de ativação
+  voice.py      Whisper (ouvir), palavra de ativação e fila de fala
+  tts.py        motor de voz: vozes SAPI/OneCore, gênero, efeitos J.A.R.V.I.S/robô
   scheduler.py  lembretes em tempo real
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
@@ -130,9 +155,8 @@ nexus/
   web/          interface (HTML/CSS/JS); abra web/index.html?mock no navegador para editar o visual sem o Python
 ```
 
-## Roadmap
+## Versões
 
-- Integrações de rede: clima, calendário (Google/Outlook), notícias, e-mail
-- Busca semântica com embeddings (nomic-embed-text via Ollama)
-- Instalador (Inno Setup) e início automático com o Windows
-- Casa inteligente (Home Assistant / MQTT)
+O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
+
+Versão atual: **v0.2.0 (protótipo)**.

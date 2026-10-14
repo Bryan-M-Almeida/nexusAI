@@ -1,4 +1,4 @@
-"""Offline voice: faster-whisper speech-to-text + Windows SAPI text-to-speech (pyttsx3)."""
+"""Offline voice: faster-whisper speech-to-text + Windows SAPI text-to-speech with effects (tts.py)."""
 import queue
 import re
 import threading
@@ -7,12 +7,11 @@ import time
 import numpy as np
 
 from .config import settings
-from .i18n import lang
+from .i18n import LANGS, detect, lang
 
 RATE = 16000
 FRAME = 480  # 30 ms
 WAKE_RE = re.compile(r"\b(n[eé]?[xk]+[ uo]*[sz]|nexos|nexo|next us|nex us|néxus)\b[\s,.!?:;-]*", re.IGNORECASE)
-VOICE_HINTS = {"pt": ("portugu", "brazil", "maria"), "en": ("english", "zira", "david"), "es": ("spanish", "españ", "helena", "sabina", "laura")}
 
 
 def clean_for_speech(text: str) -> str:
@@ -23,18 +22,22 @@ def clean_for_speech(text: str) -> str:
 
 
 class Speaker:
-    """Speaks sentence by sentence on its own thread so it can be interrupted."""
+    """Speaks sentence by sentence on its own thread; stop() cuts the audio immediately."""
 
     def __init__(self, on_state):
         self.on_state = on_state
         self.q: queue.Queue = queue.Queue()
         self.speaking = threading.Event()
         self.interrupt = threading.Event()
+        self.voices: list[dict] = []
+        self.error: str | None = None
+        self._ready = threading.Event()
         threading.Thread(target=self._run, daemon=True, name="tts").start()
 
-    def say(self, text: str):
+    def say(self, text: str, force: bool = False):
+        """Queue text. The voice follows the text's language (pt/en/es), else the app language."""
         text = clean_for_speech(text)
-        if text and settings["voice_enabled"]:
+        if text and (settings["voice_enabled"] or force):
             self.interrupt.clear()
             self.q.put(text)
 
@@ -42,30 +45,41 @@ class Speaker:
         self.interrupt.set()
         while not self.q.empty():
             self.q.get_nowait()
+        import sounddevice as sd
 
-    def _pick_voice(self, engine):
-        hints = VOICE_HINTS[lang()]
-        for v in engine.getProperty("voices"):
-            if any(h in v.name.lower() for h in hints):
-                return v.id
-        return None
+        sd.stop()
+
+    def list_voices(self) -> list[dict]:
+        self._ready.wait(5)
+        return self.voices
 
     def _run(self):
-        import pyttsx3
+        import sounddevice as sd
 
-        engine = pyttsx3.init()
+        from . import tts
+
+        try:
+            engine = tts.Engine()
+        except Exception as exc:  # no SAPI (non-Windows) -> app keeps working silently
+            self.error = str(exc)
+            self._ready.set()
+            return
+        self.voices = [v.as_dict() for v in engine.voices]
+        self._ready.set()
         while True:
             text = self.q.get()
-            if voice_id := self._pick_voice(engine):
-                engine.setProperty("voice", voice_id)
-            engine.setProperty("rate", settings["tts_rate"])
+            voice, pitch = engine.pick(detect(text) or lang(), settings["voice_gender"])
             self.speaking.set()
             self.on_state("speaking")
-            for sentence in re.split(r"(?<=[.!?])\s+", text):
-                if self.interrupt.is_set():
-                    break
-                engine.say(sentence)
-                engine.runAndWait()
+            try:
+                for sentence in tts.split_sentences(text):
+                    if self.interrupt.is_set():
+                        break
+                    audio = engine.render(sentence, voice, pitch, settings["tts_speed"])
+                    sd.play(tts.apply_effect(audio, settings["voice_effect"]), tts.RATE)
+                    sd.wait()
+            except Exception as exc:
+                self.error = str(exc)
             if self.q.empty():
                 time.sleep(0.25)  # let the room echo die before the mic reopens
                 self.speaking.clear()
@@ -185,7 +199,7 @@ class Listener:
                 self.mode = "off"
                 self._close()
         self.on_state("transcribing")
-        language = settings["language"] if settings["language"] in VOICE_HINTS else None
+        language = settings["language"] if settings["language"] in LANGS else None
         segments, _ = self.model.transcribe(audio, language=language, beam_size=1, vad_filter=False,
                                             condition_on_previous_text=False)
         text = " ".join(s.text for s in segments).strip()

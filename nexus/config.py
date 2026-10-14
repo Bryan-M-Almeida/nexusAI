@@ -35,7 +35,9 @@ DEFAULTS = {
     "llm_temperature": 0.3,
     "auto_memory": True,          # extract facts about the user after each exchange
     "voice_enabled": True,        # speak replies
-    "tts_rate": 185,
+    "voice_gender": "male",       # male | female (falls back to the other voice with shifted pitch)
+    "voice_effect": "jarvis",     # jarvis (subtle synthetic) | robot (strong) | none
+    "tts_speed": 0,               # SAPI speed -10..10
     "stt_model": "small",         # faster-whisper size: tiny | base | small | medium
     "language": "auto",           # auto (from profile) | pt | en | es
     "wake_word": "nexus",

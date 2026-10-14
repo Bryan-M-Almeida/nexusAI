@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 1.0  ·  Data: 2026-10-13  ·  Versão do app: 0.1.0
+ Versão do documento: 1.1  ·  Data: 2026-10-13  ·  Versão do app: 0.2.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -73,6 +73,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-VOZ-007  Síntese de voz para de funcionar após algum tempo
       NX-VOZ-008  Transcrição demorada
       NX-VOZ-009  "Silenciar" só interrompe ao fim da frase atual
+      NX-VOZ-010  Voz masculina soa andrógina em alguns idiomas
+      NX-VOZ-011  Efeito de voz "J.A.R.V.I.S"/"Robô" soa abafado ou metálico demais
  DAT  NX-DAT-001  Base de conhecimento não encontra um assunto existente
       NX-DAT-002  PDF importado sem texto ("Não consegui extrair texto")
       NX-DAT-003  "Data inválida" ao criar evento/tarefa
@@ -80,6 +82,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-DAT-005  Arquivo nexus.db em uso / banco bloqueado
       NX-DAT-006  Livros iniciais reindexados ou duplicados
       NX-DAT-007  Arquivo da pasta inbox não é reimportado
+      NX-DAT-008  Saudação "vamos continuar...?" não aparece / aparece só uma vez
  UI   NX-UI-001   Fontes diferentes da landing (sem internet)
       NX-UI-002   Janela não abre: WebView2 ausente
       NX-UI-003   Janela abre em branco ou travada no boot
@@ -378,21 +381,22 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
 [NX-VOZ-006] Sem voz em espanhol / voz no idioma errado
   Severidade : MÉDIA            Status: PENDENTE           Observado: SIM
   Sintoma    : Respostas em espanhol lidas com a voz em português/inglês.
-  Causa      : Só as vozes SAPI instaladas são usadas. O PC de referência
-               tem apenas "Microsoft Maria" (pt-BR) e "Microsoft Zira" (en-US).
+  Causa      : Só as vozes SAPI instaladas são usadas. O PC de referência tem
+               Maria (pt-BR, feminina), Daniel (pt-BR, masculina, OneCore) e
+               Zira (en-US, feminina); nenhuma em espanhol.
   Solução    : Configurações do Windows > Hora e idioma > Fala > Adicionar
-               vozes > Español. Reinicie o NEXUS.
-  Observação : Algumas vozes "naturais" do Windows 11 não são expostas à API
-               SAPI5 usada pelo pyttsx3 e podem não aparecer.
+               vozes > Español. Reinicie o NEXUS. As vozes instaladas aparecem
+               em Configurações do NEXUS, abaixo de "Testar voz".
+  Observação : Desde a v0.2 o NEXUS lê as vozes "Desktop" e as "OneCore" do
+               Windows (antes, via pyttsx3, só as "Desktop" apareciam).
 
 [NX-VOZ-007] Síntese de voz para de funcionar após algum tempo
-  Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
+  Severidade : MÉDIA            Status: CORRIGIDO          Observado: PREVISTO
   Causa      : Problema conhecido do pyttsx3 com chamadas repetidas de
                runAndWait() em alguns sistemas.
-  Contorno   : Reinicie o NEXUS. A fala roda em uma thread dedicada para
-               reduzir o risco.
-  Melhoria   : Substituir por um motor de TTS dedicado (também necessário
-               para a voz robótica estilo J.A.R.V.I.S, que está no roadmap).
+  Correção   : O pyttsx3 foi substituído por um motor próprio (nexus/tts.py):
+               SAPI renderiza o áudio em memória e o sounddevice toca. Se a fala
+               falhar, o erro fica em Speaker.error e o app continua.
 
 [NX-VOZ-008] Transcrição demorada
   Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
@@ -402,11 +406,31 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                para mais precisão. Frases curtas são transcritas mais rápido.
 
 [NX-VOZ-009] "Silenciar" só interrompe ao fim da frase atual
-  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
-  Causa      : A fala é feita frase por frase; a interrupção ocorre entre
-               frases.
-  Dicas      : Esc ou "silenciar" param antes da próxima frase.
+  Severidade : BAIXA            Status: CORRIGIDO          Observado: PREVISTO
+  Causa      : Com o pyttsx3 a interrupção só ocorria entre frases.
+  Correção   : Com o motor novo, Esc / "silenciar" chamam sounddevice.stop() e
+               cortam o áudio imediatamente.
 
+[NX-VOZ-010] Voz masculina soa andrógina em alguns idiomas
+  Severidade : BAIXA            Status: CONHECIDO          Observado: SIM
+  Sintoma    : Com "Voz: masculina" em inglês, a fala soa entre masculina e
+               feminina.
+  Causa      : Não há voz masculina instalada para o idioma (no PC de
+               referência só existe a Zira em inglês). O NEXUS usa a voz
+               disponível com o tom rebaixado (pitch -8, ~190 Hz -> ~150 Hz).
+  Solução    : Instale uma voz masculina do idioma (ex.: "Microsoft David" ou
+               "Microsoft Mark" para inglês) em Configurações do Windows > Hora
+               e idioma > Fala. A tela de Configurações do NEXUS avisa quando o
+               gênero escolhido não existe no idioma atual.
+
+[NX-VOZ-011] Efeito de voz "J.A.R.V.I.S"/"Robô" soa abafado ou metálico demais
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : Os efeitos (anel de modulação, filtro metálico, faixa de
+               frequência limitada e eco curto) variam muito conforme o
+               alto-falante; caixas de notebook realçam o som metálico.
+  Dicas      : Use "J.A.R.V.I.S" (sutil) no dia a dia e "Robô" só para efeito.
+               "Natural" desliga o processamento. Para ajustar, edite os
+               parâmetros em apply_effect() (nexus/tts.py) e use "Testar voz".
 
 ================================================================================
  DAT — DADOS, MEMÓRIA E CONHECIMENTO
@@ -466,6 +490,20 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Solução    : Remova a extensão ".learned" para importá-lo de novo no
                próximo boot, ou use o botão "Importar arquivos".
 
+[NX-DAT-008] Saudação "vamos continuar...?" não aparece / aparece só uma vez
+  Severidade : BAIXA            Status: CONHECIDO          Observado: SIM
+  Comportamento esperado: O NEXUS só diz "Olá {nome}, vamos continuar
+               {assunto}?" se o usuário PEDIU para ser lembrado no próximo
+               início (ferramenta remind_next_session). O lembrete é consumido
+               ao ser dito; nos inícios seguintes volta "o que teremos para
+               hoje?". A apresentação completa ocorre só na primeira vez
+               (estado "introduced" na tabela state).
+  Se não aparecer: confira no painel LOG a ação "Lembrar ao abrir: ..."; se
+               ela não existe, o modelo não chamou a ferramenta (NX-LLM-003):
+               peça de forma explícita, ex.: "na próxima vez que eu abrir, me
+               lembra de continuar o projeto X".
+  Para rever a apresentação: apague a linha "introduced" da tabela state
+               (ou use um novo NEXUS_HOME).
 
 ================================================================================
  UI — INTERFACE DESKTOP
@@ -576,9 +614,9 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
 
 [NX-ENV-005] Executável abre e fecha / módulo não encontrado
   Severidade : ALTA             Status: CORRIGIDO          Observado: PREVISTO
-  Causa      : O PyInstaller não detecta imports dinâmicos (drivers do
-               pyttsx3, comtypes, dados do faster-whisper).
-  Correção   : build.ps1 inclui --collect-all, --hidden-import e --add-data
+  Causa      : O PyInstaller não detecta imports dinâmicos (interfaces COM do
+               comtypes usadas pela voz SAPI, dados do faster-whisper).
+  Correção   : build.ps1 inclui --collect-all, --collect-submodules e --add-data
                necessários. Build testado: inicia, indexa a base e abre a
                ponte local.
   Dicas      : Ao adicionar uma dependência nova, gere o build e rode

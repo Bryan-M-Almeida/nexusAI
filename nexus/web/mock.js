@@ -9,8 +9,10 @@ if (!window.pywebview && location.search.includes("mock")) {
     interests: ["AI", "games", "coffee"], goals: ["Ship NEXUS"], profile: "developer", tone: "técnico e direto",
     modules: ["código", "agenda", "foco/pomodoro"], language: "pt-BR" };
   const settings = { llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
-    tts_rate: 185, auto_memory: true, voice_enabled: true, wake_mode: false, bridge_port: 47800 };
+    voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, auto_memory: true, voice_enabled: true, wake_mode: false, bridge_port: 47800 };
   const llm = { online: true, model_ready: true, model: "qwen3:8b", models: ["qwen3:8b"] };
+  const VOICES = [{ name: "Microsoft Maria", gender: "female", lang: "pt" }, { name: "Microsoft Zira", gender: "female", lang: "en" },
+    { name: "Microsoft Daniel", gender: "male", lang: "pt" }];
   const emit = (e, p, ms) => setTimeout(() => window.nexus.on(e, p), ms);
   window.pywebview = { api: {
     ui_ready: async () => {},
@@ -39,7 +41,8 @@ if (!window.pywebview && location.search.includes("mock")) {
     },
     speak: async () => { emit("voice", "speaking", 50); emit("voice", "idle", 2500); },
     stop_speaking: async () => {}, push_to_talk: async () => { emit("voice", "listening", 10); emit("voice", "idle", 3000); return { ok: true }; },
-    set_wake_mode: async () => {}, get_settings: async () => ({ settings, llm, langs: ["pt", "en", "es"], lang: "pt" }),
+    set_wake_mode: async () => {}, get_settings: async () => ({ settings, llm, langs: ["pt", "en", "es"], lang: "pt", voices: VOICES }),
+    test_voice: async () => { emit("voice", "speaking", 50); emit("voice", "idle", 2500); },
     save_settings: async (c) => { Object.assign(settings, c); return { settings, llm, lang: c.language && c.language !== "auto" ? c.language : "pt" }; },
     search_knowledge: async () => [], collection: async () => [], import_knowledge_files: async () => [],
     add_task: async () => ({}), complete_task: async () => ({}), delete_task: async () => ({}), delete_event: async () => ({}),

@@ -167,6 +167,13 @@ def learn_knowledge(title, content, category="aprendido"):
     return {"ok": True, **knowledge.learn(title, content, category)}
 
 
+def remind_next_session(topic):
+    topic = str(topic).strip().rstrip("?.!")
+    nid = db.execute("INSERT INTO session_notes(topic, created) VALUES (?, ?)", (topic, now())).lastrowid
+    db.log_action("memória", f"Lembrar ao abrir: {topic}")
+    return {"ok": True, "id": nid}
+
+
 def update_profile(field, value):
     profile.update_field(field, value)
     return {"ok": True}
@@ -220,6 +227,12 @@ SCHEMAS = [
         {"query": S, "category": S}, ["query"]),
     _fn("learn_knowledge", "Store new knowledge the user teaches or asks to learn. Same title updates it.",
         {"title": S, "content": S, "category": S}, ["title", "content"]),
+    _fn("remind_next_session",
+        "ONLY when the user explicitly asks to be reminded of something the next time they open/start NEXUS "
+        "(e.g. 'next time I open, remind me to continue the app project'). NEXUS will greet them with it.",
+        {"topic": {"type": "string", "description": "short noun phrase with article, in the user's language, "
+                                                     "e.g. 'o projeto do app de finanças' / 'the finance app project'"}},
+        ["topic"]),
     _fn("update_profile", "Update a field of the user's profile (name, profession, routine, interests, goals, language).",
         {"field": S, "value": S}, ["field", "value"]),
     _fn("get_datetime", "Get the current local date and time."),
@@ -228,7 +241,8 @@ SCHEMAS = [
 REGISTRY = {s["function"]["name"]: globals()[s["function"]["name"]] for s in SCHEMAS}
 # Tools that change data the UI shows -> UI panels refresh after them.
 MUTATING = {"add_task", "complete_task", "delete_task", "add_event", "set_reminder", "delete_event",
-            "save_note", "record_data", "delete_record", "remember", "forget", "learn_knowledge", "update_profile"}
+            "save_note", "record_data", "delete_record", "remember", "forget", "learn_knowledge", "update_profile",
+            "remind_next_session"}
 
 
 def execute(name: str, args: dict):

@@ -1,6 +1,7 @@
 """Desktop window (pywebview) and the API exposed to the interface."""
 import json
 import os
+import sys
 import threading
 from datetime import datetime, timedelta
 
@@ -71,7 +72,7 @@ class Api:
         return {"profile": db.get_profile(), "lang": lang(), "llm": st, "settings": dict(settings)}
 
     def greet(self):
-        text = assistant.briefing()
+        text = assistant.greeting()
         self._speaker.say(text)
         return text
 
@@ -90,6 +91,14 @@ class Api:
 
     def stop_speaking(self):
         self._speaker.stop()
+
+    def list_voices(self):
+        return {"voices": self._speaker.list_voices(), "error": self._speaker.error}
+
+    def test_voice(self, text):
+        """Speak a sample with the current voice settings, even if "speak replies" is off."""
+        self._speaker.stop()
+        self._speaker.say(text, force=True)
 
     def push_to_talk(self):
         if not self._listener.ensure_model():  # first use downloads the Whisper model
@@ -185,7 +194,8 @@ class Api:
 
     # -- settings --------------------------------------------------------------
     def get_settings(self):
-        return {"settings": dict(settings), "llm": llm.status(), "langs": LANGS, "lang": lang()}
+        return {"settings": dict(settings), "llm": llm.status(), "langs": LANGS, "lang": lang(),
+                "voices": self._speaker.voices}
 
     def save_settings(self, changes):
         restart_stt = changes.get("stt_model", settings["stt_model"]) != settings["stt_model"]
@@ -195,8 +205,42 @@ class Api:
         return self.get_settings()
 
 
+def selftest() -> dict:
+    """Headless release check (NEXUS.exe --selftest): writes selftest.json in the data folder."""
+    from . import __version__, tts
+    from .config import DATA_DIR
+
+    report = {"version": __version__}
+    try:
+        engine = tts.Engine()
+        voice, pitch = engine.pick(lang(), settings["voice_gender"])
+        audio = tts.apply_effect(engine.render("NEXUS online.", voice, pitch), settings["voice_effect"])
+        report["tts"] = {"ok": len(audio) > 0, "voices": [v.as_dict() for v in engine.voices],
+                         "seconds": round(len(audio) / tts.RATE, 2)}
+    except Exception as exc:
+        report["tts"] = {"ok": False, "error": repr(exc)}
+    try:
+        knowledge.load_seed()
+        report["knowledge_docs"] = len(knowledge.documents())
+    except Exception as exc:
+        report["knowledge_docs"] = repr(exc)
+    report["llm"] = llm.status()
+    try:
+        import faster_whisper  # noqa: F401
+        import sounddevice as sd
+
+        report["stt"] = {"ok": True, "input_device": sd.query_devices(kind="input")["name"]}
+    except Exception as exc:
+        report["stt"] = {"ok": False, "error": repr(exc)}
+    (DATA_DIR / "selftest.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), "utf-8")
+    return report
+
+
 def main():
     global _window
+    if "--selftest" in sys.argv:
+        selftest()
+        return
     api = Api()
     _window = webview.create_window(
         "N.E.X.U.S", str(WEB_DIR / "index.html"), js_api=api,
