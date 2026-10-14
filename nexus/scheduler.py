@@ -28,9 +28,14 @@ def _check(alert):
 
 
 def start(alert):
+    from . import integrations
+    from .config import settings
+
     def loop():
         while True:
             try:
+                if settings["integrations"] and integrations.calendar_due():  # ICS calendar feed, every 30 min
+                    integrations.sync_calendar()
                 _check(alert)
             except Exception as exc:
                 db.log_action("erro", f"Agendador: {exc}")

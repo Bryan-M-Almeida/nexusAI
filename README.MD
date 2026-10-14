@@ -36,7 +36,9 @@ powershell -ExecutionPolicy Bypass -File setup.ps1
 3. **Placas AMD**: as versões atuais do Ollama (testado na 0.40.3) já usam o backend **Vulkan** automaticamente quando o ROCm não está disponível. Na RX 6600 XT ele foi detectado sem nenhuma configuração. Confira com `ollama ps`: a coluna PROCESSOR deve mostrar `100% GPU`. Atualizar o driver AMD Adrenalin tende a melhorar o desempenho.
 4. Alternativa: **LM Studio** (usa Vulkan em AMD). Ative o servidor local e, nas configurações do NEXUS, use `http://localhost:1234/v1`, com Context Length de 8192 ou mais.
 
-Modelo padrão: `qwen3:8b`. Nos testes, foi o único que chamou todas as ferramentas corretamente; o `qwen2.5:7b` fingia registrar gastos, memórias e aprendizados. Para PCs mais fracos: `qwen3:4b` (menos preciso). Tempo de resposta medido na RX 6600 XT: 11 a 25 s.
+Modelo padrão: `qwen3:8b`. Nos testes, foi o único que chamou todas as ferramentas corretamente; o `qwen2.5:7b` fingia registrar gastos, memórias e aprendizados. Para PCs mais fracos: `qwen3:4b` (menos preciso).
+
+**Tempo de resposta (v0.6, RX 6600 XT):** 1ª mensagem ~1 s (a IA é carregada durante a animação de abertura), mensagens simples 1–4 s, com consulta online (clima, notícias) 11–14 s. No modo áudio a fala começa já na primeira frase. O limite é o processamento de prompt da placa via Vulkan (~60–150 tokens/s); atualizar o driver AMD Adrenalin é a melhoria mais provável. Benchmark: `tests\bench_latency.py --warm`.
 
 Problemas e soluções: veja [erros.txt](erros.txt) (English: [errors.txt](errors.txt) · Español: [errores.txt](errores.txt)).
 
@@ -119,6 +121,20 @@ A tela mostra só o **aro NEXUS**: ele se **expande** enquanto a IA fala (seguin
 
 Esses comandos são reconhecidos **localmente** (instantâneo) e funcionam **mesmo enquanto o NEXUS fala**. Para frases mais elaboradas ("hã? fala de novo com outras palavras"), a IA decide pela conversa. Com caixas de som, use fone de ouvido para o NEXUS não se ouvir.
 
+### Integrações online (v0.6)
+
+Sem cadastro nem chave de API. Ative/desative em *Configurações → Integrações*.
+
+| Pergunte | Serviço |
+|---|---|
+| "Vai chover amanhã?", "How's the weather in Lisbon?" | Clima — Open-Meteo (defina *Sua cidade*) |
+| "Quais as notícias de tecnologia?" | Notícias — Google Notícias (RSS) |
+| "Quanto dá 100 dólares em reais?" | Câmbio — Frankfurter (taxas de referência do Banco Central Europeu) |
+| "Quem foi Ada Lovelace?" | Wikipédia |
+| "Atualiza minha agenda" | Calendário — link ICS do Google Agenda/Outlook (somente leitura, sincroniza a cada 30 min) |
+
+O texto da pergunta (cidade, tema, termo de busca) é enviado a esses serviços. Dados ao vivo nunca são inventados: se a IA tentar responder sem consultar, o NEXUS exige a consulta.
+
 ### Modo emergência (v0.5)
 
 Se você descrever uma emergência — "preciso fazer RCP", "ele não está respirando", "meu filho está engasgado",
@@ -155,7 +171,8 @@ Os testes **sempre** usam uma pasta de dados temporária, então nunca tocam nos
 
 ```powershell
 .\.venv\Scripts\python tests\test_units.py          # segundos, sem IA
-.\.venv\Scripts\python tests\conversation_eval.py   # alguns minutos, precisa do Ollama
+.\.venv\Scripts\python tests\conversation_eval.py   # alguns minutos, precisa do Ollama e de internet
+.\.venv\Scripts\python tests\bench_latency.py --warm # tempos de resposta
 ```
 
 ## Gerar o executável
@@ -187,6 +204,7 @@ nexus/
   voice.py      Whisper (ouvir, conversa contínua), fila de fala com pausa/retomada/repetição
   control.py    comandos de conversa por voz/texto (repetir, explicar melhor, pausar, continuar, parar)
   emergency.py  modo emergência: protocolo de primeiros socorros instantâneo e literal do manual
+  integrations.py clima, notícias, câmbio, Wikipédia e calendário ICS (sem chaves de API)
   tts.py        motor de voz: vozes SAPI/OneCore, gênero, efeitos J.A.R.V.I.S/robô
   scheduler.py  lembretes em tempo real
   bridge.py     endpoint local para o formulário da landing
@@ -200,4 +218,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.5.0 (protótipo)**.
+Versão atual: **v0.6.0 (protótipo)**.

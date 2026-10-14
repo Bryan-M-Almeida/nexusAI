@@ -31,6 +31,8 @@ Rules:
 - Questions about agenda, schedule, commitments or pending items: answer from BOTH the "Upcoming
   appointments" and "Pending to-do tasks" context sections; appointments are commitments too. List every item.
 - Never show internal ids (#12) to the user; ids are only for tool calls.
+- LIVE DATA (weather, news, exchange rates, the user's calendar) is unknown to you: ALWAYS call the tool
+  (get_weather, get_news, convert_currency, sync_calendar). Never say it is unavailable before trying, never invent it.
 - Short or elliptical follow-ups ("and for a woman?", "tell me the exact values", "why?") refer to YOUR LAST ANSWER
   and the user's last question, never to older topics, memories or the action log.
 - Numbers and facts: give the typical average and the usual range. If there is no single exact value (body
@@ -63,8 +65,22 @@ def build_system() -> str:
     ])
 
 
+# Every context token costs ~12 ms of prompt processing on the reference GPU (~80 tok/s), so each block is only
+# sent when the message needs it (v0.6: ~370 -> ~130 tokens for a typical message).
+TIME_WORDS = re.compile(
+    r"\b(hoje|amanh[aã]|ontem|semana|m[eê]s|dia|hora|horas|minutos?|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|"
+    r"domingo|agenda|lembr\w*|marc\w*|agend\w*|reuni\w*|compromiss\w*|evento|prazo|tarefa\w*|pendente\w*|"
+    r"today|tomorrow|yesterday|week|month|day|hours?|minutes?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+    r"schedule\w*|remind\w*|meeting|appointment|event|deadline|tasks?|to-?do|pending|"
+    r"hoy|ma[nñ]ana|ayer|lunes|martes|mi[eé]rcoles|jueves|viernes|recu[eé]rd\w*|cita|reuni[oó]n|tareas?|pendientes?|"
+    r"\d{1,2}\s?h\b|\d{1,2}:\d{2})\b", re.IGNORECASE)
+ABOUT_ME = re.compile(r"\b(sobre mim|me conhece|sabe de mim|about me|know me|sobre m[ií]|me conoces|lembra de mim|"
+                      r"meu nome|my name|mi nombre)\b", re.IGNORECASE)
+KB_CHARS = 650
+
+
 def build_context(user_text: str, emergency_topic: str | None = None) -> str:
-    """Per-message context, sent right before the user's message."""
+    """Per-message context, sent right before the user's message. Only what this message needs."""
     now = datetime.now()
     msg_lang = detect(user_text)
     wd = WEEKDAYS[msg_lang or lang()]  # weekday names already in the reply language: small models mistranslate them
@@ -72,13 +88,15 @@ def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     def day(d: datetime) -> str:
         return f"{wd[d.weekday()]} {d.date()}"
 
-    parts = [
-        f"## Now\n{day(now)} {now.strftime('%H:%M')}",
-        "Calendar: " + "; ".join(day(now + timedelta(days=d)) for d in range(8)),
-    ]
-    mems = {m["id"]: m for m in memory.recall(user_text)}
-    for m in memory.recent_memories(6):
-        mems.setdefault(m["id"], m)
+    timely = bool(TIME_WORDS.search(user_text))
+    parts = [f"## Now\n{day(now)} {now.strftime('%H:%M')}"]
+    if timely:
+        parts.append("Calendar: " + "; ".join(day(now + timedelta(days=d)) for d in range(1, 8)))
+    # Memories: the ones related to this message; everything we know only when asked about the user.
+    mems = {m["id"]: m for m in memory.recall(user_text, limit=4)}
+    if ABOUT_ME.search(user_text):
+        for m in memory.recent_memories(12):
+            mems.setdefault(m["id"], m)
     if mems:
         parts.append("\n## What you remember about the user\n" + "\n".join(
             f"- [#{m['id']}] {m['content']}" for m in list(mems.values())[:12]))
@@ -87,36 +105,45 @@ def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     recent = max(memory.session_start(), (now - timedelta(minutes=ACTIONS_WINDOW_MIN)).isoformat(timespec="seconds"))
     actions = memory.recent_actions(5, since=recent)
     if actions:
-        parts.append("\n## Log of your recent actions (history only, NOT appointments)\n" + "\n".join(f"- {a['ts'][:16]} {a['summary']}" for a in actions))
-    upcoming, pending = _upcoming(), _pending_tasks()
-    parts.append("\n## Upcoming appointments / commitments (next 7 days)\n" + (
-        "\n".join(f"- #{e['id']} {day(datetime.fromisoformat(e['start']))} {e['start'][11:16]} {e['title']}"
-                  for e in upcoming) or "- nothing scheduled"))
-    parts.append("## Pending to-do tasks\n" + (
-        "\n".join(f"- #{x['id']} {x['title']}" + (f" (due {x['due']})" if x["due"] else "") for x in pending[:10])
-        or "- none"))
-    # Only inject knowledge that clearly matches (BM25: more negative = better). Every token here costs
-    # prompt-processing time on each turn; the model can still call search_knowledge on its own.
+        parts.append("\n## Log of your recent actions (history only, NOT appointments)\n" + "\n".join(
+            f"- {a['ts'][11:16]} {a['summary']}" for a in actions))
+    if timely:
+        upcoming, pending = _upcoming(), _pending_tasks()
+        parts.append("\n## Upcoming appointments / commitments (next 7 days)\n" + (
+            "\n".join(f"- #{e['id']} {day(datetime.fromisoformat(e['start']))} {e['start'][11:16]} {e['title']}"
+                      for e in upcoming) or "- nothing scheduled"))
+        parts.append("## Pending to-do tasks\n" + (
+            "\n".join(f"- #{x['id']} {x['title']}" + (f" (due {x['due']})" if x["due"] else "") for x in pending[:10])
+            or "- none"))
     # Short follow-ups ("and for a woman?") carry no keywords: search with the previous question too.
     kb_query = user_text
     if len(user_text.split()) < 6:
         previous_user = next((m["content"] for m in reversed(memory.history(3)) if m["role"] == "user"), "")
         kb_query = f"{previous_user} {user_text}"
-    hits = [h for h in knowledge.search(kb_query, limit=3) if h["score"] <= KB_MIN_SCORE]
-    hits = [h for h in hits if h["score"] <= hits[0]["score"] * 0.6][:2] if hits else []
+    is_action = any(rx.search(user_text) for rx, _, _ in INTENTS)  # "remind me to drink water" needs no book
+    hits = [] if is_action else [h for h in knowledge.search(kb_query, limit=3) if h["score"] <= KB_MIN_SCORE]
+    hits = [h for h in hits if h["score"] <= hits[0]["score"] * 0.8][:2] if hits else []  # 2nd only if nearly as relevant
     if emergency_topic:  # first-aid follow-up: the exact manual section is always present (NX-LLM-021)
         sec = emergency.section(emergency_topic, msg_lang or lang())
         if sec:
             parts.append(f"\n## {emergency.RULE}\n[{sec['heading']}]\n{sec['content']}")
     elif hits:
-        parts.append("\n## Possibly relevant knowledge (local base)\n" + "\n\n".join(
-            f"[{h['title']} › {h['heading']}]\n{h['content'][:900]}" for h in hits))
+        parts.append("\n## Relevant knowledge (local base)\n" + "\n\n".join(
+            f"[{h['title']} › {h['heading']}]\n{_clip(h['content'], KB_CHARS)}" for h in hits))
     if msg_lang:
         name = {"pt": "Brazilian Portuguese", "en": "English", "es": "Spanish"}[msg_lang]
-        parts.append(f"\n## Language\nThe user's message is in {name}. Reply ONLY in {name}.")
-    parts.append("\nIf the message below asks you to store, log, remember, learn, schedule or look up "
-                 "something, call the matching tool before answering. Answer the message below the context.")
+        parts.append(f"\nReply ONLY in {name}.")
+    parts.append("Requests to store, log, remember, learn, schedule or look up something need the matching tool call.")
     return "\n".join(parts)
+
+
+def _clip(text: str, limit: int) -> str:
+    """Cut at a line/sentence boundary so a knowledge excerpt never ends mid-instruction."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    end = max(cut.rfind("\n"), cut.rfind(". "))
+    return cut[: end + 1] if end > limit // 2 else cut
 
 
 # Replies that claim a stored action, or defer a lookup, are only valid after a tool call.
@@ -146,7 +173,23 @@ INTENTS = [
 ]
 
 
+# Live data the model cannot know: answering without the tool means refusing ("not available") or, worse,
+# inventing headlines/rates (seen in v0.6 tests). Matched anywhere in the message.
+LIVE = [
+    (re.compile(r"\b(chov\w*|chuva\w*|clima|previs[aã]o do tempo|temperatura|faz(endo)? (frio|calor)|guarda-chuva|"
+                r"weather|rain\w*|forecast|temperature|umbrella|llov\w*|lluvia|pron[oó]stico|hace (fr[ií]o|calor))\b", re.I),
+     {"get_weather"}, "get_weather"),
+    (re.compile(r"\b(not[ií]cias?|manchetes?|news|headlines?|noticias?|titulares)\b", re.I), {"get_news"}, "get_news"),
+    (re.compile(r"\b(c[aâ]mbio|cota[cç][aã]o|d[oó]lar(es)?|euros?|libras?|exchange rate|currency|tipo de cambio|"
+                r"em reais|in dollars|en pesos)\b", re.I), {"convert_currency"}, "convert_currency"),
+]
+
+
 def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None = None) -> str | None:
+    for rx, expected, tool in LIVE:
+        if rx.search(user_text) and not (called or set()) & expected and settings["integrations"]:
+            return (f"This needs LIVE data that you do not know. Call `{tool}` now; never say it is unavailable and "
+                    f"never invent headlines, rates or forecasts. Then answer briefly from the tool result.")
     for rx, expected, tool in INTENTS:
         if rx.search(user_text) and not (called or set()) & expected:
             return (f"The user explicitly asked you to store this, but you did NOT call any tool, so nothing was saved. "
@@ -163,6 +206,12 @@ def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None
 
 def _history_messages():
     return [{"role": m["role"], "content": m["content"]} for m in memory.history(settings["history_turns"])]
+
+
+def warm_up() -> dict:
+    """Run during the boot animation: load the model and cache the fixed prompt prefix (system + tools)."""
+    return llm.prefill([{"role": "system", "content": build_system()}, *_history_messages(),
+                        {"role": "user", "content": "ok"}], tools.SCHEMAS)
 
 
 def last_reply() -> str:
@@ -268,7 +317,8 @@ class Assistant:
         self.emit("done", {"text": reply, "speak": bool(reply) and not interrupted, "interrupted": interrupted})
         if changed:
             self.emit("refresh", None)
-        if settings["auto_memory"] and reply and not finished and not topic and memory.states_fact(text):
+        if (settings["auto_memory"] and reply and not finished and not topic and "remember" not in called
+                and memory.states_fact(text)):  # the model already stored it: no second LLM pass
             threading.Thread(target=self._extract_memories, args=(text, reply), daemon=True).start()
 
     def _control(self, action: str, previous: str):

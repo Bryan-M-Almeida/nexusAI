@@ -1,8 +1,10 @@
 """Desktop window (pywebview) and the API exposed to the interface."""
 import json
 import os
+import re
 import sys
 import threading
+import time
 from datetime import datetime, timedelta
 
 import webview
@@ -10,8 +12,9 @@ import webview
 from . import __version__, assistant, bridge, control, i18n, knowledge, llm, memory, profile, scheduler, tools
 from .config import WEB_DIR, settings
 from .db import db
-from .i18n import LANGS, lang
+from .i18n import LANGS, detect, lang
 
+SENTENCE_END = re.compile(r"(?<=[.!?;:])\s+|\n+")
 _window: webview.Window | None = None
 _pending: list[str] = []
 _ui_ready = threading.Event()
@@ -41,15 +44,46 @@ class Api:
                                   on_level=lambda level: emit("mic_level", level))
         scheduler.start(self._on_alert)
         bridge.start(settings["bridge_port"], self._on_profile)
+        self._tts_buf, self._tts_streamed, self._reply_lang = "", False, None
+        self.ai_state = "cold"  # cold | warming | ready | offline
 
     def _on_alert(self, alert):
         emit("alert", alert)
         self._speaker.say(alert["text"], remember=False)
 
     def _on_brain_event(self, event, payload):
+        """Forward to the UI and speak while the answer is still being generated (sentence by sentence)."""
         emit(event, payload)
-        if event == "done" and payload.get("speak"):
-            self._speaker.say(payload["text"])
+        if event == "token":
+            if not self._brain.cancel.is_set():
+                self._tts_buf += payload
+                self._speak_ready_sentences()
+        elif event == "reset":  # text before a tool call is narration, not the answer
+            self._tts_buf = ""
+        elif event == "done":
+            if payload.get("speak"):
+                if self._tts_streamed:
+                    self._speak_ready_sentences(final=True)
+                else:  # e.g. the emergency protocol: no tokens were streamed
+                    self._speaker.say(payload["text"], lang_code=self._reply_lang)
+                self._speaker.last_text = payload["text"]
+            self._tts_buf, self._tts_streamed = "", False
+
+    def _speak_ready_sentences(self, final=False):
+        """Queue complete sentences (>= 30 chars, so "1." of a list is not spoken alone) as soon as they exist."""
+        buf = self._tts_buf
+        if final:
+            chunk, rest = buf, ""
+        else:
+            cut = 0
+            for m in SENTENCE_END.finditer(buf):
+                if m.start() - cut >= 30:
+                    cut = m.end()
+            chunk, rest = buf[:cut], buf[cut:]
+        if chunk.strip():
+            self._speaker.say(chunk, remember=False, lang_code=self._reply_lang)
+            self._tts_streamed = True
+        self._tts_buf = rest
 
     # -- lifecycle -----------------------------------------------------------
     def ui_ready(self):
@@ -72,10 +106,28 @@ class Api:
         step("knowledge", bool(kb), f"{sum(k['chunks'] for k in kb)}" + (f" +{len(learned)}" if learned or seeded else ""))
         st = llm.status()
         step("ai", st["online"] and st.get("model_ready", False), st["model"])
+        if st["online"] and st.get("model_ready"):
+            threading.Thread(target=self._warm_up, daemon=True, name="warm-up").start()
+        else:
+            self.ai_state = "offline"
         step("voice", self._listener.model_state != "error", f"{settings['stt_model']} · {self._listener.model_state}")
         self._sync_listening()
         return {"profile": db.get_profile(), "lang": lang(), "llm": st, "settings": dict(settings),
                 "stt": self._listener.model_state, "version": __version__}
+
+    def _warm_up(self):
+        """Load the model and cache the fixed prompt while the boot animation plays (v0.6: 1st reply 30 s -> ~1 s)."""
+        self.ai_state = "warming"
+        emit("ai_state", {"state": "warming"})
+        t0 = time.time()
+        try:
+            assistant.warm_up()
+            self.ai_state = "ready"
+        except Exception as exc:
+            self.ai_state = "offline"
+            emit("ai_state", {"state": "offline", "error": str(exc)})
+            return
+        emit("ai_state", {"state": "ready", "seconds": round(time.time() - t0, 1)})
 
     def greet(self):
         text = assistant.greeting()
@@ -165,6 +217,7 @@ class Api:
         if action:
             self._handle_control(action)
             return {"control": action}
+        self._reply_lang = detect(text) or lang()
         threading.Thread(target=self._brain.ask, args=(text, spoken), daemon=True).start()
         return {"control": None}
 
@@ -198,6 +251,7 @@ class Api:
             self._handle_control(action)
         elif not during_speech:  # while NEXUS talks only control commands count (echo protection)
             emit("heard", {"text": text})
+            self._reply_lang = detect(text) or lang()
             threading.Thread(target=self._brain.ask, args=(text, True), daemon=True).start()
 
     # -- profile ---------------------------------------------------------------
@@ -285,7 +339,10 @@ class Api:
 
     def save_settings(self, changes):
         restart_stt = changes.get("stt_model", settings["stt_model"]) != settings["stt_model"]
+        new_calendar = changes.get("calendar_ics_url", settings["calendar_ics_url"]) != settings["calendar_ics_url"]
         settings.apply(changes)
+        if new_calendar and settings["calendar_ics_url"].strip():
+            threading.Thread(target=lambda: (tools.sync_calendar(), emit("refresh")), daemon=True).start()
         if restart_stt:
             self._listener.reload_model()
         return self.get_settings()
@@ -333,3 +390,4 @@ def main():
         width=1360, height=860, min_size=(980, 660), background_color="#030508",
     )
     webview.start(debug=bool(os.environ.get("NEXUS_DEBUG")))
+    llm.unload()  # window closed: give the VRAM back to games and other apps

@@ -114,6 +114,14 @@ class DB:
         self.lock = threading.RLock()
         with self.lock:
             self.conn.executescript(SCHEMA)
+            self._migrate()
+
+    def _migrate(self):
+        """Columns added after v0.1 (databases created by older versions get them on start)."""
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(events)")}
+        if "external_id" not in cols:  # v0.6: events imported from a calendar feed (ICS UID)
+            self.conn.execute("ALTER TABLE events ADD COLUMN external_id TEXT")
+            self.conn.commit()
 
     def execute(self, sql, params=()) -> sqlite3.Cursor:
         with self.lock:

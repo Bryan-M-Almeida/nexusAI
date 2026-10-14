@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 1.5  ·  Data: 2026-10-13  ·  Versão do app: 0.5.0
+ Versão do documento: 1.6  ·  Data: 2026-10-13  ·  Versão do app: 0.6.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -56,7 +56,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-007  Dias da semana traduzidos incorretamente
       NX-LLM-008  Narração intermediária e blocos JSON vazando na resposta
       NX-LLM-009  Template do modelo descarta mensagens de sistema extras
-      NX-LLM-010  Respostas lentas (10 a 25 segundos)
+      NX-LLM-010  Respostas lentas
       NX-LLM-011  Primeira resposta após abrir o app é muito lenta
       NX-LLM-012  Comportamento inconsistente entre execuções
       NX-LLM-013  Aviso "AMD driver is too old" no log do Ollama
@@ -69,6 +69,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-020  Valores imprecisos ou contraditórios em perguntas factuais
       NX-LLM-021  Instruções de primeiros socorros erradas e perigosas
       NX-LLM-022  Modo emergência ativado sem emergência (falso alarme)
+      NX-LLM-023  Dados ao vivo inventados ou recusados (clima, notícias, câmbio)
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -102,6 +103,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-INT-002  Navegador bloqueia o envio da landing para 127.0.0.1
       NX-INT-003  Porta 47800 ocupada: ponte local desativada
       NX-INT-004  "O JSON precisa ter ao menos o campo 'name'"
+      NX-INT-005  Integração online não responde (clima, notícias, câmbio, Wikipédia)
+      NX-INT-006  Calendário ICS: eventos faltando ou em horário diferente
  ENV  NX-ENV-001  requirements.txt ignorado pelo Git
       NX-ENV-002  setup.ps1 / build.ps1 bloqueados pela política do PowerShell
       NX-ENV-003  Dependências sem suporte na versão do Python
@@ -109,6 +112,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-ENV-005  Executável abre e fecha / módulo não encontrado
       NX-ENV-006  Porta 11434 ocupada ou dois Ollama rodando
       NX-ENV-007  Dados de teste apareceram nos dados reais do usuário
+      NX-ENV-008  Cada chamada à IA demorava ~2 s a mais ("localhost" no Windows)
 
 
 ================================================================================
@@ -243,37 +247,33 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Dicas      : Ao testar um modelo novo, confira o template com
                "ollama show <modelo> --template".
 
-[NX-LLM-010] Respostas lentas (10 a 25 segundos)
-  Severidade : MÉDIA            Status: MITIGADO           Observado: SIM
-  Sintoma    : Cada resposta leva de 10 a 25 s no hardware de referência;
-               respostas longas (ex.: primeiros socorros) até ~25 s.
-  Causa      : O processamento do prompt na RX 6600 XT via Vulkan ficou em
-               ~100-220 tokens/s. Cada mensagem envia ~300-1.200 tokens novos
-               (contexto + pergunta). Chamadas de ferramenta exigem uma
-               segunda rodada do modelo.
-  Correções  : - Prompt dividido em parte fixa (regras, perfil, ferramentas),
-                 que fica no cache do Ollama, e contexto por mensagem. Medido:
-                 prompt idêntico caiu de 12,5 s para 0,6 s.
-               - Trechos de conhecimento só entram no contexto quando a busca
-                 é realmente relevante (BM25 <= -7.5, máx. 2 trechos).
-               - keep_alive de 30 min mantém o modelo carregado na VRAM.
-  Dicas      : 1. Atualize o driver AMD Adrenalin (ver NX-LLM-013): é a
-                  melhoria mais provável de desempenho.
-               2. Modelo menor para PCs mais fracos: ollama pull qwen3:4b e
-                  troque em Configurações (menos preciso com ferramentas).
-               3. Reduza history_turns (padrão 12) em data\settings.json.
-               4. Teste OLLAMA_FLASH_ATTENTION=1 (variável de ambiente,
-                  reinicie o Ollama) e compare os tempos.
-               5. Feche jogos/apps que usam a GPU.
+[NX-LLM-010] Respostas lentas
+  Severidade : MÉDIA            Status: MITIGADO (v0.6)    Observado: SIM
+  Sintoma    : Até a v0.5, 10 a 25 s por resposta (média 14,9 s até a 1ª
+               palavra; 30 s na 1ª mensagem).
+  Causa      : Processamento do prompt na RX 6600 XT via Vulkan: ~60-150
+               tokens/s (medido). Cada mensagem enviava ~370 tokens novos de
+               contexto, e cada chamada ao Ollama esperava ~2 s a mais por
+               causa do "localhost" (NX-ENV-008).
+  Correções  : v0.6 - IA carregada na abertura (NX-LLM-011), 127.0.0.1 no lugar
+               de localhost, contexto enxuto (só o que a mensagem precisa,
+               média ~210 tokens), fala em streaming no modo áudio e modelo
+               mantido na memória da placa. Medido: média 4,5 s até a 1ª
+               palavra (era 14,9 s); com consulta online, 11-14 s.
+  Dicas      : 1. Atualize o driver AMD Adrenalin (ver NX-LLM-013).
+               2. Modelo menor: ollama pull qwen3:4b (menos preciso).
+               3. Meça com tests\bench_latency.py --warm.
 
 [NX-LLM-011] Primeira resposta após abrir o app é muito lenta
-  Severidade : BAIXA            Status: CONHECIDO          Observado: SIM
-  Sintoma    : A primeira mensagem demora 15-35 s; as seguintes são mais
-               rápidas.
-  Causa      : Carregamento do modelo (~5 GB) na VRAM e processamento inicial
-               de todo o prompt fixo.
-  Contorno   : Aguarde a primeira resposta. Melhoria planejada: "aquecer" o
-               modelo durante a animação de boot com uma requisição vazia.
+  Severidade : BAIXA            Status: CORRIGIDO (v0.6)   Observado: SIM
+  Sintoma    : A primeira mensagem levava ~30 s (7 s carregando o modelo +
+               20 s processando a parte fixa do prompt).
+  Correção   : Durante a animação de abertura o NEXUS carrega o modelo e
+               processa a parte fixa do prompt (assistant.warm_up). O chip IA
+               fica âmbar enquanto carrega e azul quando está pronto. Medido:
+               1ª mensagem em 1,3 s.
+  Limitação  : O carregamento leva ~25 s; se você falar antes de o chip ficar
+               azul, a primeira resposta espera o restante.
 
 [NX-LLM-012] Comportamento inconsistente entre execuções
   Severidade : MÉDIA            Status: CONHECIDO          Observado: SIM
@@ -424,6 +424,17 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Contorno   : Continue a conversa normalmente; o protocolo só é repetido
                depois de 10 minutos. Para novas exceções, ajuste _TECH ou
                TOPICS em nexus/emergency.py.
+
+[NX-LLM-023] Dados ao vivo inventados ou recusados (clima, notícias, câmbio)
+  Severidade : ALTA             Status: CORRIGIDO (v0.6)   Observado: SIM
+  Sintoma    : Nos testes da v0.6, sem a regra, "Quais as principais notícias
+               de hoje?" gerou manchetes INVENTADAS e "Vai chover hoje?" foi
+               respondido com "a previsão não está disponível", sem consultar.
+  Causa      : O modelo responde de memória em vez de chamar a ferramenta.
+  Correção   : Regra "dados ao vivo exigem a ferramenta" e rede de segurança
+               (assistant.LIVE): perguntas sobre clima, notícias ou câmbio sem a
+               ferramenta correspondente são devolvidas ao modelo exigindo a
+               consulta. Verificado em tests\conversation_eval.py.
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE
@@ -749,6 +760,28 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                vírgulas.
 
 
+[NX-INT-005] Integração online não responde (clima, notícias, câmbio, Wikipédia)
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Sintoma    : O NEXUS diz que o serviço está indisponível.
+  Causa      : Sem internet, serviço externo fora do ar ou integrações
+               desligadas em Configurações. Serviços: Open-Meteo, Google
+               Notícias (RSS), Frankfurter (BCE) e Wikipédia.
+  Dicas      : Verifique a conexão e Configurações > Integrações. Para o clima,
+               defina "Sua cidade". O câmbio usa taxas de referência diárias do
+               Banco Central Europeu (não é cotação de corretora). Privacidade:
+               o texto da consulta (cidade, tema) é enviado a esses serviços.
+
+[NX-INT-006] Calendário ICS: eventos faltando ou em horário diferente
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : Limitações do protótipo: eventos RECORRENTES (RRULE) não são
+               importados; horários com fuso (TZID) são tratados como hora
+               local; a importação é somente leitura e cobre os próximos 30
+               dias; sincroniza a cada 30 min.
+  Dicas      : Google Agenda: Configurações da agenda > Integrar agenda >
+               "Endereço secreto no formato iCal". Para sincronizar na hora,
+               diga "atualiza minha agenda". Não compartilhe esse link: ele dá
+               acesso de leitura à sua agenda.
+
 ================================================================================
  ENV — AMBIENTE, INSTALAÇÃO E BUILD
 ================================================================================
@@ -814,6 +847,18 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                (backup em data_backup_20261013-2101/).
   Dicas      : Nunca teste com a pasta real; para inspecionar dados reais,
                abra uma CÓPIA do nexus.db.
+
+[NX-ENV-008] Cada chamada à IA demorava ~2 s a mais ("localhost" no Windows)
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.6)   Observado: SIM
+  Causa      : No Windows, "localhost" resolve primeiro para o IPv6 (::1); o
+               Ollama escuta só em IPv4, e cada conexão esperava ~2 s antes de
+               tentar 127.0.0.1. Medido: 2,08 s com localhost x 0,008 s com
+               127.0.0.1. Cada resposta faz 1 a 4 chamadas.
+  Correção   : O padrão passou a ser http://127.0.0.1:11434/v1 e o cliente
+               troca "localhost" automaticamente (vale para configurações
+               antigas).
+  Dicas      : Use sempre 127.0.0.1 ao configurar servidores locais (LM
+               Studio: http://127.0.0.1:1234/v1).
 
 ================================================================================
  HISTÓRICO DE TESTES (2026-10-13)

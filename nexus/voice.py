@@ -49,7 +49,7 @@ class Speaker:
         threading.Thread(target=self._run, daemon=True, name="tts").start()
 
     # -- control -------------------------------------------------------------
-    def say(self, text: str, force: bool = False, remember: bool = True):
+    def say(self, text: str, force: bool = False, remember: bool = True, lang_code: str | None = None):
         """Queue text. The voice follows the text's language (pt/en/es), else the app language."""
         text = clean_for_speech(text)
         if not text or not (speech_allowed() or force):
@@ -57,7 +57,7 @@ class Speaker:
         if remember:
             self.last_text = text
         self.interrupt.clear()
-        self.q.put(text)
+        self.q.put((text, lang_code))
 
     def repeat(self, intro: str = ""):
         if not self.last_text:
@@ -123,8 +123,8 @@ class Speaker:
         self.voices = [v.as_dict() for v in engine.voices]
         self._ready.set()
         while True:
-            text = self.q.get()
-            code = detect(text) or lang()
+            text, code = self.q.get()
+            code = code or detect(text) or lang()  # streamed chunks carry the reply language: no voice flips
             voice, pitch = engine.pick(code, settings["voice_gender"])
             self.speaking.set()
             self.on_state("speaking")

@@ -26,8 +26,8 @@ INBOX_DIR = DATA_DIR / "inbox"  # drop .md/.txt/.pdf/.json here to be learned on
 INBOX_DIR.mkdir(exist_ok=True)
 
 DEFAULTS = {
-    # Any OpenAI-compatible server: Ollama (http://localhost:11434/v1) or LM Studio (http://localhost:1234/v1)
-    "llm_base_url": "http://localhost:11434/v1",
+    # Any OpenAI-compatible server: Ollama (http://127.0.0.1:11434/v1) or LM Studio (http://127.0.0.1:1234/v1)
+    "llm_base_url": "http://127.0.0.1:11434/v1",
     "llm_model": "qwen3:8b",          # best tool use that fits 8 GB VRAM (qwen2.5:7b skipped tool calls in tests)
     "llm_api_key": "ollama",
     "llm_provider": "auto",       # auto (Ollama native API when the URL is :11434) | ollama | openai
@@ -44,6 +44,9 @@ DEFAULTS = {
     "ui_mode": "audio",           # audio (ring only, voice conversation) | text (messages only)
     "mic_muted": False,           # in audio mode the mic listens continuously unless muted
     "require_wake_word": False,   # only accept utterances that start with "Nexus"
+    "integrations": True,         # weather, news, currency, Wikipedia, calendar (internet, no accounts/keys)
+    "home_city": "",              # default city for the weather
+    "calendar_ics_url": "",       # read-only calendar feed (Google Calendar "secret address in iCal format")
     "bridge_port": 47800,         # local endpoint the landing page form can POST the profile to
     "history_turns": 12,
 }

@@ -122,6 +122,7 @@ input, textarea, select { font: inherit; color: var(--text); }
   font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; color: var(--muted); }
 .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); box-shadow: 0 0 8px var(--red); animation: blink .9s steps(2) infinite; }
 .chip.on .dot { background: var(--blue-bright); box-shadow: 0 0 8px var(--blue-bright); animation: blink 2.4s ease-in-out infinite; }
+.chip.warm .dot { background: #f2b33d; box-shadow: 0 0 8px #f2b33d; animation: blink .6s ease-in-out infinite; }
 .top-actions { display: flex; gap: 10px; align-items: center; }
 .lang-switch { display: flex; border: 1px solid var(--line); }
 .lang-switch button { background: none; border: 0; padding: 4px 9px; font-family: var(--f-mono); font-size: 11px; color: var(--muted); }

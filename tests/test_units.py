@@ -97,5 +97,39 @@ check("similar: same fact in other words", memory.similar("O usuário tem dois g
 check("similar: different facts sharing words", not memory.similar("Mora em São Paulo", "Trabalha em São Paulo"))
 check("similar: a negation is a correction", not memory.similar("Gosta de café", "Não gosta de café"))
 
+# -- calendar feed (ICS) import (v0.6) -----------------------------------------------------------------------
+from nexus import integrations  # noqa: E402
+from nexus.config import settings  # noqa: E402
+
+tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y%m%d")
+in_two = (datetime.now() + timedelta(days=2)).strftime("%Y%m%d")
+ICS = (f"BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:a1@google.com\r\nDTSTART;TZID=America/Sao_Paulo:{tomorrow}T143000\r\n"
+       f"DTEND;TZID=America/Sao_Paulo:{tomorrow}T153000\r\nSUMMARY:Reunião com o cliente\\, sala 2 com um título bem\r\n"
+       f"  longo dobrado\r\nLOCATION:Sala 2\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:b2@google.com\r\n"
+       f"DTSTART;VALUE=DATE:{in_two}\r\nSUMMARY:Feriado\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:c3@google.com\r\n"
+       f"DTSTART:{tomorrow}T090000Z\r\nRRULE:FREQ=WEEKLY\r\nSUMMARY:Daily\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+parsed = integrations.parse_ics(ICS)
+check("ICS: 3 events parsed, folded summary unfolded", len(parsed) == 3 and parsed[0]["summary"].endswith("título bem longo dobrado"),
+      str(parsed[:1]))
+
+
+class _Resp:
+    def __init__(self, text): self.text = text
+
+
+settings["calendar_ics_url"] = "https://example.invalid/basic.ics"
+integrations._get = lambda url, **p: _Resp(ICS)
+result = integrations.sync_calendar()
+imported = db.all("SELECT title, start FROM events WHERE external_id LIKE 'ics:%' ORDER BY start")
+check("ICS: imports single events, skips recurring", result.get("events") == 2 and result.get("recurring_skipped") == 1, str(result))
+check("ICS: local time kept (14:30)", any(e["start"].endswith("14:30") for e in imported), str(imported))
+integrations.sync_calendar()
+check("ICS: re-sync does not duplicate", db.one("SELECT COUNT(*) n FROM events WHERE external_id LIKE 'ics:%'")["n"] == 2)
+integrations._get = lambda url, **p: _Resp(ICS.replace("UID:b2@google.com", "UID:zz@google.com").replace("SUMMARY:Feriado", "SUMMARY:Outro"))
+integrations.sync_calendar()
+titles = [e["title"] for e in db.all("SELECT title FROM events WHERE external_id LIKE 'ics:%'")]
+check("ICS: event deleted at the source disappears", "Feriado" not in titles and "Outro" in titles, str(titles))
+settings["calendar_ics_url"] = ""
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

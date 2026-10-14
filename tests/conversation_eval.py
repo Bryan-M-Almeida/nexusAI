@@ -80,7 +80,21 @@ check("memória salva", any("manh" in m["content"].lower() for m in memory.all_m
 ask("Aprenda que o wifi do escritório se chama NEXUS-LAB.")
 check("conhecimento aprendido", any(d["source"].startswith("learned:") for d in knowledge.documents()))
 
-# 4) Languages
+# 4) Online integrations (v0.6): the model must pick the right tool (needs internet)
+settings["home_city"] = "São Paulo"
+tool_calls = []
+brain.emit = lambda event, payload: tool_calls.append(payload["name"]) if event == "tool" else None
+for question, tool in [("Vai chover hoje?", "get_weather"),
+                       ("Quanto dá 100 dólares em reais hoje?", "convert_currency"),
+                       ("Quais são as principais notícias de hoje?", "get_news")]:
+    tool_calls.clear()
+    answer = ask(question)
+    check(f"integração: '{question}' usa {tool} (dado ao vivo, nunca inventado)", tool in tool_calls,
+          f"ferramentas={tool_calls} resposta={answer}")
+ada = ask("Quem foi Ada Lovelace?")  # historical fact: own knowledge or Wikipedia are both fine
+check("Ada Lovelace: resposta correta (Babbage / século XIX)", bool(re.search(r"(Babbage|18[0-9]{2})", ada)), ada)
+
+# 5) Languages
 en = ask("What do the Stoics say about things outside our control? One sentence.")
 check("responde em inglês", bool(re.search(r"\b(the|control|what)\b", en.lower())) and " não " not in en, en)
 

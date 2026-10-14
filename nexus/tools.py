@@ -1,9 +1,11 @@
 """Actions the assistant can execute (OpenAI-style function calling)."""
+import functools
 import inspect
 import json
 from datetime import datetime, timedelta
 
-from . import knowledge, memory, profile
+from . import integrations, knowledge, memory, profile
+from .config import settings
 from .db import db, now
 
 
@@ -184,6 +186,23 @@ def update_profile(field, value):
     return {"ok": True}
 
 
+# ---------------------------------------------------------------- online integrations (v0.6)
+def _online(fn):
+    @functools.wraps(fn)  # keeps the real signature: execute() filters arguments with inspect.signature
+    def wrapper(**kwargs):
+        if not settings["integrations"]:
+            return {"error": "online integrations are disabled in Settings"}
+        return fn(**kwargs)
+    return wrapper
+
+
+get_weather = _online(integrations.get_weather)
+get_news = _online(integrations.get_news)
+convert_currency = _online(integrations.convert_currency)
+wikipedia = _online(integrations.wikipedia)
+sync_calendar = _online(integrations.sync_calendar)
+
+
 def get_datetime():
     d = datetime.now()
     return {"now": d.isoformat(timespec="minutes"), "weekday": d.strftime("%A")}
@@ -246,13 +265,21 @@ SCHEMAS = [
     _fn("update_profile", "Update a field of the user's profile (name, profession, routine, interests, goals, language).",
         {"field": S, "value": S}, ["field", "value"]),
     _fn("get_datetime", "Get the current local date and time."),
+    _fn("get_weather", "Current weather and forecast (internet). City defaults to the user's city.",
+        {"city": S, "days": {"type": "integer", "description": "1-7"}}),
+    _fn("get_news", "Latest news headlines (internet), optionally about a topic.", {"topic": S, "limit": I}),
+    _fn("convert_currency", "Convert money between currencies with today's reference rate (internet). ISO codes.",
+        {"amount": {"type": "number"}, "from_currency": S, "to_currency": S}, ["from_currency", "to_currency"]),
+    _fn("wikipedia", "Look up a person, place or concept on Wikipedia (internet) when the local base has nothing.",
+        {"query": S}, ["query"]),
+    _fn("sync_calendar", "Import the user's calendar (ICS link from Settings) into the schedule now."),
 ]
 
 REGISTRY = {s["function"]["name"]: globals()[s["function"]["name"]] for s in SCHEMAS}
 # Tools that change data the UI shows -> UI panels refresh after them.
 MUTATING = {"add_task", "complete_task", "delete_task", "add_event", "set_reminder", "delete_event",
             "save_note", "record_data", "delete_record", "remember", "forget", "learn_knowledge", "update_profile",
-            "remind_next_session"}
+            "remind_next_session", "sync_calendar"}
 
 
 def execute(name: str, args: dict):

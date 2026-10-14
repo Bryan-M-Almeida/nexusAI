@@ -8,6 +8,43 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.6.0 — Protótipo · 2026-10-14
+
+**Respostas ~3× mais rápidas, IA carregada na abertura e integrações online.**
+
+### Desempenho
+Medido com `tests/bench_latency.py` na RX 6600 XT (modelo descarregado no início, como ao abrir o app):
+
+| | v0.5 | v0.6 |
+|---|---|---|
+| 1ª mensagem até a 1ª palavra | 30,2 s | **1,3 s** |
+| Média até a 1ª palavra (6 mensagens típicas) | 14,9 s | **4,5 s** |
+| Média total | 17,8 s | **5,3 s** |
+
+- **IA carregada durante a animação de abertura** (`assistant.warm_up`): carrega o modelo e processa a parte fixa do
+  prompt (regras, perfil, ferramentas). Chip IA âmbar enquanto carrega, azul quando pronta.
+- **`localhost` → `127.0.0.1`** (NX-ENV-008): no Windows, `localhost` tentava IPv6 primeiro e cada chamada ao Ollama
+  esperava ~2 s (medido 2,08 s × 0,008 s). Corrigido também para quem já tinha `localhost` salvo.
+- **Contexto enxuto**: calendário/agenda/tarefas só quando a mensagem fala de tempo ou compromissos; memórias só as
+  relevantes; trechos da base menores e só se quase tão relevantes quanto o primeiro (média 371 → ~210 tokens).
+- **Fala em streaming**: no modo áudio, a primeira frase é falada assim que é gerada (~30% da resposta).
+- Modelo mantido na memória da placa enquanto o app está aberto e liberado ao fechar a janela.
+- A extração automática de memória não roda se a IA já salvou a memória naquela mensagem.
+
+### Integrações (sem cadastro nem chave de API)
+- **Clima** (Open-Meteo), **notícias** (Google Notícias RSS), **câmbio** (Frankfurter/BCE), **Wikipédia** e
+  **calendário** via link ICS (Google Agenda/Outlook; somente leitura, sincroniza a cada 30 min, com lembretes).
+- Configurações: liga/desliga, *Sua cidade* e *Link do calendário*.
+- **Dados ao vivo nunca inventados** (NX-LLM-023): nos testes, sem a regra, o modelo inventou manchetes e disse que a
+  previsão do tempo "não estava disponível". Agora, perguntas de clima/notícias/câmbio exigem a ferramenta.
+- E-mail ficou para depois: exige login na conta do usuário.
+
+### Testes desta versão
+- 53/53 testes unitários (inclui importação de calendário ICS); 18/18 verificações de conversa com qwen3:8b
+  (inclui clima, câmbio e notícias reais).
+
+---
+
 ## v0.5.0 — Protótipo · 2026-10-14
 
 **Modo emergência e memória automática confiável.** Motivada por uma conversa real sobre RCP (NX-LLM-021, NX-LLM-016).
@@ -159,11 +196,13 @@ NX-VOZ-016, NX-ENV-007).
 
 ## Próximas versões (planejamento)
 
-### v0.6.0 — Protótipo (próxima)
+### v0.7.0 — Protótipo (próxima)
 A definir com o usuário.
+
+### Versão final do protótipo
+- **Instalador** (Inno Setup) e início automático com o Windows — reservado pelo usuário para a versão final do protótipo.
 
 ### Versões seguintes (a definir com o usuário)
 Candidatos já levantados: formulário real na landing (NX-INT-001), seleção de microfone (NX-VOZ-002),
-fontes offline (NX-UI-001), aquecimento do modelo no boot (NX-LLM-011), integrações de rede (clima,
-calendário, notícias, e-mail), busca semântica com embeddings, instalador e início automático com o
-Windows, casa inteligente.
+fontes offline (NX-UI-001), e-mail e calendário com login (OAuth), cancelamento de eco, busca semântica com
+embeddings, casa inteligente.

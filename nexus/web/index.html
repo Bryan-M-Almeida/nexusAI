@@ -180,6 +180,11 @@
     <div class="voice-info mono" id="voiceInfo"></div>
     <button class="btn-ghost" type="button" id="btnTestVoice" data-i18n="testVoice">Testar voz</button>
     <label class="check"><input type="checkbox" name="require_wake_word"><span data-i18n="requireWake">Só responder quando eu disser "Nexus"</span></label>
+    <h3 class="sub mono" data-i18n="integrationsTitle">INTEGRAÇÕES</h3>
+    <label class="check"><input type="checkbox" name="integrations"><span data-i18n="integrationsOn">Integrações online (clima, notícias, câmbio, Wikipédia, calendário)</span></label>
+    <label><span data-i18n="homeCity">Sua cidade (clima)</span><input name="home_city" data-i18n-ph="homeCityPh"></label>
+    <label><span data-i18n="calendarIcs">Link do calendário (ICS)</span><input name="calendar_ics_url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics"></label>
+    <p class="muted small" data-i18n="calendarHelp">Google Agenda: Configurações da agenda → Integrar agenda → "Endereço secreto no formato iCal". Somente leitura.</p>
     <label class="check"><input type="checkbox" name="auto_memory"><span data-i18n="autoMemory">Memorizar fatos automaticamente</span></label>
     <div class="row-btns">
       <button class="btn-primary" type="submit" data-i18n="save">Salvar</button>

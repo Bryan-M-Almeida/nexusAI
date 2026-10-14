@@ -10,6 +10,7 @@ if (!window.pywebview && location.search.includes("mock")) {
     modules: ["código", "agenda", "foco/pomodoro"], language: "pt-BR" };
   const settings = { llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, auto_memory: true, voice_enabled: true, bridge_port: 47800,
+    integrations: true, home_city: "São Paulo", calendar_ics_url: "",
     ui_mode: "audio", mic_muted: false, require_wake_word: false };
   const llm = { online: true, model_ready: true, model: "qwen3:8b", models: ["qwen3:8b"] };
   const VOICES = [{ name: "Microsoft Maria", gender: "female", lang: "pt" }, { name: "Microsoft Zira", gender: "female", lang: "en" },

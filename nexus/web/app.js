@@ -93,6 +93,7 @@ window.nexus = {
       case "speak_env": return ringSpeak(p);
       case "mic_level": return (ringMicTarget = Math.max(ringMicTarget, p));
       case "control": return onControl(p);
+      case "ai_state": return setAiState(p);
       case "alert": return onAlert(p);
       case "profile": return onProfile(p);
     }
@@ -150,6 +151,14 @@ function aiHelp(llm) {
 function setAi(llm) {
   $("#chipAi").classList.toggle("on", !!(llm.online && llm.model_ready));
   $("#chipAi").title = llm.online ? llm.model : T("offline");
+}
+
+// Model loading during the boot animation (v0.6): amber while warming, blue when ready.
+function setAiState(p) {
+  const chip = $("#chipAi");
+  chip.classList.toggle("warm", p.state === "warming");
+  chip.classList.toggle("on", p.state === "ready");
+  chip.title = p.state === "warming" ? T("aiWarming") : p.state === "ready" ? T("aiReady", { s: p.seconds }) : T("offline");
 }
 
 /* ------------------------------------------------------------------ conversation */
