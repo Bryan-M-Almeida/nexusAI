@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 1.7  ·  Date: 2026-10-13  ·  App version: 0.7.0
+ Document version: 1.8  ·  Date: 2026-10-14  ·  App version: 0.8.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -72,6 +72,8 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-021  Wrong and dangerous first-aid instructions
       NX-LLM-022  Emergency mode triggered without an emergency (false alarm)
       NX-LLM-023  Live data invented or refused (weather, news, exchange rates)
+      NX-LLM-024  Quiz/mock exam: answers stored, graded wrong or never graded
+      NX-LLM-025  "I didn't understand" without an explanation (e.g. joke repeated)
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -88,6 +90,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-VOZ-014  "Audio only" mode answers nearby conversations / TV
       NX-VOZ-015  "Smoker's device" (electrolarynx) voice, hard to understand
       NX-VOZ-016  Name pronounced "NÊXUS" (or spelled "N, E, X, U, S")
+      NX-VOZ-017  Poor recognition: wrong words, wrong language, invented sentences
  DAT  NX-DAT-001  Knowledge base doesn't find an existing topic
       NX-DAT-002  Imported PDF has no text ("Could not extract text")
       NX-DAT-003  "Invalid date" when creating an event/task
@@ -103,6 +106,8 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-UI-005   I can't find the buttons / the screen only shows the ring
       NX-UI-006   Settings slow to open or needing several clicks
       NX-UI-007   Knowledge tab cannot scroll
+      NX-UI-008   Text not selectable / no copy / conversation hidden in audio mode
+      NX-UI-009   Interrupt/Repeat buttons clickable with nothing to do
  INT  NX-INT-001  Landing page has no real onboarding form yet
       NX-INT-002  Browser blocks the landing page request to 127.0.0.1
       NX-INT-003  Port 47800 busy: local bridge disabled
@@ -416,6 +421,14 @@ QUICK DIAGNOSTICS (run these before investigating)
                reply, "lower half of the sternum", "don't stop").
   Important  : NEXUS does not replace professional care. Always call
                emergency services and follow the dispatcher.
+  Update     : (v0.8) In the evaluation, even with the manual in the context,
+               the model answered "How long can a person stay in CPR?" with
+               "not more than 10 minutes... interrupt it". Emergency
+               follow-up answers are no longer shown while generated:
+               emergency.guard() checks them and, if they say to stop CPR or
+               mention a minute limit, replaces them with the manual's literal
+               line ("Don't stop until the person responds, professionals take
+               over, or you're exhausted").
 
 [NX-LLM-022] Emergency mode triggered without an emergency (false alarm)
   Severity   : LOW              Status: KNOWN              Observed: EXPECTED
@@ -428,6 +441,11 @@ QUICK DIAGNOSTICS (run these before investigating)
   Workaround : Just keep talking; the protocol is only repeated after 10
                minutes. For new exceptions, adjust _TECH or TOPICS in
                nexus/emergency.py.
+  Update     : (v0.8, seen in the evaluation) "Give me a first-aid mock
+               exam" opened the protocol. Study messages (mock exam, quiz,
+               test, questions, study, course...) no longer trigger
+               emergency mode unless they also sound urgent ("now", "help",
+               "not breathing"...): _STUDY / _URGENT.
 
 [NX-LLM-023] Live data invented or refused (weather, news, exchange rates)
   Severity   : HIGH             Status: FIXED (v0.6)       Observed: YES
@@ -439,6 +457,34 @@ QUICK DIAGNOSTICS (run these before investigating)
                (assistant.LIVE): weather, news or currency questions without
                the matching tool are sent back to the model demanding the
                lookup. Verified in tests\conversation_eval.py.
+
+[NX-LLM-024] Quiz/mock exam: answers stored, graded wrong or never graded
+  Severity   : HIGH             Status: FIXED (v0.8)       Observed: YES
+  Symptom    : In a mock exam (USMLE, 2026-10-14) NEXUS stored the answers
+               with record_data (keys out of order: questao_1, questao_10,
+               questao_2...), reported answers the user never gave, said
+               everything was right using false facts and asked "Shall we
+               start?" three times.
+  Cause      : With no quiz rule, the model treated each answer as data to
+               log and graded everything at the end, from memory.
+  Fix        : QUIZZES rule in the prompt: grade each answer immediately
+               (right or wrong, the correct answer and why), never use
+               record_data for answers, only say "correct" after checking,
+               ask "shall we start?" at most once. Verified in
+               tests\conversation_eval.py.
+  Tip        : For real exams, check answer keys in official sources; the
+               local 8B model can still get specific medical facts wrong.
+
+[NX-LLM-025] "I didn't understand" without an explanation (e.g. joke repeated)
+  Severity   : MEDIUM           Status: FIXED (v0.8)       Observed: YES
+  Symptom    : "I didn't get the joke" made NEXUS say "I don't think you
+               understood" and repeat the same joke in other words.
+  Cause      : The request sent to the model was generic ("explain more
+               clearly") and did not say WHAT the user didn't understand.
+  Fix        : The request now includes the user's words and asks for the
+               MEANING (for a joke: the wordplay and why it is funny),
+               forbidding the same sentence. The spoken intro is now "No
+               problem, let me explain it another way".
 
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS
@@ -469,7 +515,7 @@ QUICK DIAGNOSTICS (run these before investigating)
                (sounddevice.query_devices).
 
 [NX-VOZ-003] Wake word "Nexus" not recognized / false triggers
-  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Severity   : MEDIUM           Status: FIXED (v0.8)       Observed: YES
   Symptom    : Saying "Nexus" doesn't activate it; or NEXUS answers side
                conversations.
   Cause      : Whisper transcribes "Nexus" in various ways ("Néxus",
@@ -479,9 +525,13 @@ QUICK DIAGNOSTICS (run these before investigating)
                "small" model (more accurate than "base"/"tiny"). If a new
                variant shows up, add it to WAKE_RE. In noisy places prefer
                the microphone button or Ctrl+Space.
+  Fix        : (v0.8) WAKE_RE also covers "Nécsus", "Neksus", "Nexis",
+               "Nek us"; Whisper gets an initial vocabulary with "NEXUS" and
+               the user's name, and a fixed language. Measured with
+               tests\bench_voice.py: "Nexus" recognized 2/6 -> 6/6.
 
 [NX-VOZ-004] Recording doesn't start or doesn't stop (voice detection)
-  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Severity   : MEDIUM           Status: FIXED (v0.8)       Observed: YES
   Symptom    : State stays "LISTENING" forever, or speech is not captured.
   Cause      : Voice detection uses signal energy with a threshold adapted
                to ambient noise. Fans, music or a microphone gain that is too
@@ -489,6 +539,11 @@ QUICK DIAGNOSTICS (run these before investigating)
   Tips       : Recording ends after ~0.75 s of silence or 30 s maximum. Set
                the microphone volume in Windows to ~70-80%. Use a headset in
                noisy environments.
+  Fix        : (v0.8) The energy detector was replaced by Silero VAD (a
+               neural network that tells voice from noise, ~0.2 ms per frame,
+               already shipped with faster-whisper). Measured with fan noise:
+               energy closed 0/6 recordings (stayed "listening" up to 30 s);
+               Silero closed 6/6, right after speech ended (0.7 s pause).
 
 [NX-VOZ-005] NEXUS hears its own voice (echo)
   Severity   : MEDIUM           Status: MITIGATED          Observed: EXPECTED
@@ -602,6 +657,23 @@ QUICK DIAGNOSTICS (run these before investigating)
                shows N.E.X.U.S (tts.pronounce()).
   Tips       : For a new voice, try spellings and adjust _SPOKEN_NAME in
                nexus/tts.py; always check by ear.
+
+[NX-VOZ-017] Poor recognition: wrong words, wrong language, invented sentences
+  Severity   : HIGH             Status: FIXED (v0.8)       Observed: YES
+  Symptom    : Short sentences transcribed in another language or with wrong
+               words; with noise, sentences nobody said appeared ("Thank
+               you.", "Subtitles by the community...").
+  Cause      : Language on "auto" (Whisper guesses it from 1-2 s of audio),
+               greedy search (beam 1), low-gain microphones and noise
+               segments sent to Whisper.
+  Fix        : Fixed language (the one chosen in Settings or the profile's),
+               beam 5, initial vocabulary (NEXUS + name), volume
+               normalization with a gain cap (8x) and dropping segments
+               Whisper itself flags as "no speech". Measured with
+               tests\bench_voice.py (20 noisy sentences): word error rate
+               24.5% -> 12.1%, and faster (3.2 s -> 2.0 s per sentence).
+  Tip        : If you speak another language with NEXUS, choose it in
+               Settings > Language.
 
 ================================================================================
  DAT — DATA, MEMORY AND KNOWLEDGE
@@ -744,6 +816,26 @@ QUICK DIAGNOSTICS (run these before investigating)
   Fix        : The whole tab scrolls and categories became compact tags
                (152 px). Reproduced and verified in mock mode with 21
                categories.
+
+[NX-UI-008] Text not selectable / no copy / conversation hidden in audio mode
+  Severity   : MEDIUM           Status: FIXED (v0.8)       Observed: YES
+  Symptom    : Messages could not be selected or copied; in "audio only"
+               mode there was no way to read what NEXUS said.
+  Cause      : pywebview blocks text selection by default
+               (text_select=False); audio mode hid the conversation.
+  Fix        : text_select=True and selection enabled in messages and lists;
+               a "Copy" button on each message; a "Transcript" button on the
+               bottom bar shows the conversation on the right without leaving
+               audio mode (the choice is remembered); when closed, the reply
+               appears as a caption while it is generated.
+
+[NX-UI-009] Interrupt/Repeat buttons clickable with nothing to do
+  Severity   : LOW              Status: FIXED (v0.8)       Observed: YES
+  Symptom    : Clicking Interrupt with nothing going on, or Repeat before the
+               first answer, did nothing visible.
+  Fix        : Interrupt is only active while NEXUS listens, thinks or speaks;
+               Repeat only once there is an answer. Disabled buttons are
+               dimmed and not clickable.
 
 ================================================================================
  INT — LANDING PAGE INTEGRATION

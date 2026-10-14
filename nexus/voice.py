@@ -10,14 +10,18 @@ from .config import settings
 from .i18n import LANGS, detect, lang
 
 RATE = 16000
-FRAME = 480  # 30 ms
-WAKE_RE = re.compile(r"\b(n[eé]?[xk]+[ uo]*[sz]|nexos|nexo|next us|nex us|néxus)\b[\s,.!?:;-]*", re.IGNORECASE)
+FRAME = 512  # 32 ms: the window Silero VAD expects at 16 kHz
+FRAMES_PER_SECOND = RATE / FRAME
+# "Nexus" as Whisper tends to write it in pt/en/es: nexus, néxus, nécsus, neksus, nexos, nexis, next us, nex us...
+WAKE_RE = re.compile(r"\b(n[eéêiy]?[xk]+s?[ iuoe]*[sz]|n[eé]c?k?s[uo]s|nexo|next? us|nex us|nek us)\b[\s,.!?:;-]*",
+                     re.IGNORECASE)
 ENV_STEP = 0.04  # seconds per point of the speech envelope sent to the UI ring
 MAX_CONTROL_SECONDS = 4  # while NEXUS speaks, only short utterances ("pausa", "stop") are considered
 
 
 def clean_for_speech(text: str) -> str:
     text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+    text = re.sub(r"`[^`\n]+`", " ", text)  # inline code / file paths are shown, not read aloud
     text = re.sub(r"[*_`#>|]", "", text)
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     return re.sub(r"\s+", " ", text).strip()
@@ -154,8 +158,103 @@ class Speaker:
                 self.on_state("idle")
 
 
+def initial_prompt(name: str = "") -> str:
+    """Short text that biases Whisper toward the assistant's vocabulary (wake word, user name)."""
+    who = f" {name}" if name else ""
+    return {"pt": f"NEXUS, assistente de voz.{who}", "en": f"NEXUS, voice assistant.{who}",
+            "es": f"NEXUS, asistente de voz.{who}"}.get(lang(), f"NEXUS.{who}").strip()
+
+
+def normalize_audio(audio: np.ndarray, target: float = 0.5, max_gain: float = 8.0) -> np.ndarray:
+    """Peak-normalizes a quiet utterance (low-gain microphones), without amplifying pure noise too much."""
+    audio = audio - float(np.mean(audio))  # remove DC offset (cheap USB/HDA mics)
+    peak = float(np.abs(audio).max()) if len(audio) else 0.0
+    if peak <= 1e-4:
+        return audio.astype(np.float32)
+    return (audio * min(max_gain, target / peak)).astype(np.float32)
+
+
+class SpeechDetector:
+    """Streaming end-of-speech detector. Uses the Silero VAD bundled with faster-whisper (a neural
+    voice detector, ~0.2 ms per 32 ms frame) so fans and room noise no longer keep the recording open;
+    falls back to an adaptive energy threshold if the model can't be loaded.
+
+    feed(frame of 512 samples) -> None | "start" | "speech" | "end"; .audio holds the utterance after "end"."""
+
+    START_FRAMES = 3      # ~100 ms of voice opens a segment
+    PRE_ROLL = 10         # ~320 ms kept before the start (first syllable)
+    END_SILENCE = 0.7     # seconds of non-voice that close the segment
+    ON, OFF = 0.5, 0.35   # hysteresis on the speech probability
+    _session = None
+
+    def __init__(self, max_seconds: float = 30):
+        self.max_frames = int(max_seconds * FRAMES_PER_SECOND)
+        self.end_frames = int(self.END_SILENCE * FRAMES_PER_SECOND)
+        self.session = self._load()
+        self.reset()
+
+    @classmethod
+    def _load(cls):
+        if cls._session is None:
+            try:
+                from faster_whisper.vad import get_vad_model
+
+                cls._session = get_vad_model().session
+            except Exception:
+                cls._session = False
+        return cls._session or None
+
+    def reset(self):
+        self.h = np.zeros((1, 1, 128), dtype=np.float32)
+        self.c = np.zeros((1, 1, 128), dtype=np.float32)
+        self.context = np.zeros(64, dtype=np.float32)
+        self.floor, self.voiced, self.silence = 0.003, 0, 0
+        self.pre: list = []
+        self.buf: list | None = None
+        self.audio = None
+        self.prob = 0.0
+
+    def probability(self, frame: np.ndarray) -> float:
+        if self.session is None:  # energy fallback
+            rms = float(np.sqrt(np.mean(frame ** 2)))
+            if self.buf is None and rms <= max(self.floor * 3.0, 0.008):
+                self.floor = 0.95 * self.floor + 0.05 * rms
+            return 1.0 if rms > max(self.floor * 3.0, 0.008) else 0.0
+        x = np.concatenate([self.context, frame]).astype(np.float32)[None, :]
+        self.context = frame[-64:].astype(np.float32)
+        out, self.h, self.c = self.session.run(None, {"input": x, "h": self.h, "c": self.c})
+        return float(np.asarray(out).ravel()[0])
+
+    @property
+    def active(self) -> bool:
+        return self.buf is not None
+
+    def feed(self, frame: np.ndarray):
+        if len(frame) != FRAME:
+            return None
+        self.prob = p = self.probability(frame)
+        if self.buf is None:
+            self.pre = (self.pre + [frame])[-self.PRE_ROLL:]
+            self.voiced = self.voiced + 1 if p >= self.ON else 0
+            if self.voiced >= self.START_FRAMES:
+                self.buf, self.silence = list(self.pre), 0
+                return "start"
+            return None
+        self.buf.append(frame)
+        self.silence = 0 if p >= self.OFF else self.silence + 1
+        if self.silence >= self.end_frames or len(self.buf) >= self.max_frames:
+            audio = np.concatenate(self.buf)
+            self.reset_segment()
+            self.audio = audio
+            return "end"
+        return "speech"
+
+    def reset_segment(self):
+        self.buf, self.voiced, self.silence, self.pre = None, 0, 0, []
+
+
 class Listener:
-    """Microphone capture with an energy VAD; transcribes each utterance with Whisper.
+    """Microphone capture with a neural VAD (SpeechDetector); transcribes each utterance with Whisper.
 
     Modes: "off" | "ptt" (one utterance, then back) | "live" (continuous conversation).
     on_text(text, during_speech): during_speech=True means NEXUS was talking; the app then only
@@ -243,37 +342,34 @@ class Listener:
 
     # -- capture loop ------------------------------------------------------
     def _loop(self):
-        floor, voiced, silence, buf, pre, tick = 0.003, 0, 0, [], [], 0
+        det, during, tick = SpeechDetector(), False, 0
         while True:
             frame = self._frames.get()
             if self.mode == "off":
-                buf, voiced, silence = [], 0, 0
+                if det.active:
+                    det.reset_segment()
                 continue
             during_speech = self.speaker.speaking.is_set() and not self.speaker.paused.is_set()
-            rms = float(np.sqrt(np.mean(frame ** 2)))
-            threshold = max(floor * 3.0, 0.008)
-            speech = rms > threshold
-            if not buf:
-                floor = 0.95 * floor + 0.05 * rms if not speech else floor
-                pre = (pre + [frame])[-10:]  # 300 ms pre-roll
-                voiced = voiced + 1 if speech else 0
-                if voiced >= 3:
-                    buf, silence = list(pre), 0
-                continue
-            buf.append(frame)
-            if not during_speech:
+            if not det.active:
+                during = during_speech
+                det.max_frames = int((MAX_CONTROL_SECONDS if during else 30) * FRAMES_PER_SECOND)
+            event = det.feed(frame)
+            if event in ("start", "speech") and not during_speech:
                 tick += 1
                 if tick % 2 == 0:  # ~16 updates per second for the UI ring
+                    rms = float(np.sqrt(np.mean(frame ** 2)))
                     self.on_level(round(min(1.0, rms / 0.12), 2))
-            silence = 0 if speech else silence + 1
-            limit = MAX_CONTROL_SECONDS * 33 if during_speech else 30 * 33
-            if silence > 25 or len(buf) > limit:  # ~750 ms of silence or length limit
-                audio = np.concatenate(buf)
-                buf, voiced, pre = [], 0, []
+            if event == "end":
+                audio = det.audio
                 self.on_level(0)
-                too_long = during_speech and len(audio) >= MAX_CONTROL_SECONDS * RATE
+                too_long = during and len(audio) >= MAX_CONTROL_SECONDS * RATE
                 if len(audio) > RATE * 0.4 and not too_long:
-                    self._handle(audio, during_speech)
+                    self._handle(audio, during)
+
+    @staticmethod
+    def stt_language():
+        """Whisper guesses the language badly on short phrases: use the chosen one, else the app's."""
+        return settings["language"] if settings["language"] in LANGS else lang()
 
     def _handle(self, audio, during_speech):
         if not self.ready:
@@ -285,10 +381,17 @@ class Listener:
                 self._close()
         if not during_speech:
             self.on_state("transcribing")
-        language = settings["language"] if settings["language"] in LANGS else None
-        segments, _ = self.model.transcribe(audio, language=language, beam_size=1, vad_filter=False,
-                                            condition_on_previous_text=False)
-        text = " ".join(s.text for s in segments).strip()
+        from .db import db
+
+        try:
+            name = ((db.get_profile() or {}).get("name") or "").split()[0]
+        except Exception:
+            name = ""
+        segments, _ = self.model.transcribe(
+            normalize_audio(audio), language=self.stt_language(), beam_size=1 if during_speech else 5,
+            vad_filter=False, condition_on_previous_text=False, initial_prompt=initial_prompt(name))
+        # drop segments Whisper itself flags as non-speech (hallucinations on noise: "Obrigado.", "Legendas...")
+        text = " ".join(s.text for s in segments if s.no_speech_prob < 0.6 or s.avg_logprob > -0.6).strip()
         if not during_speech:
             self.on_state("standby" if self.mode == "live" else "idle")
         if not text:

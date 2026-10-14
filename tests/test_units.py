@@ -146,5 +146,43 @@ check("direct mode instruction in the context", "MODE DIRECT" in assistant.build
 settings["ai_mode"] = "assistant"
 check("assistant mode adds no instruction", "MODE DIRECT" not in assistant.build_context("O que é estoicismo?"))
 
+# -- voice pipeline and reports (v0.8) --------------------------------------------------------------------------
+from nexus import i18n, tools, voice  # noqa: E402
+
+for text in ("Nexus, que horas são", "Néxus abre a agenda", "Nécsus", "neksus", "Nexis ok", "next us please"):
+    check(f"wake word heard in {text!r}", bool(voice.WAKE_RE.search(text)))
+for text in ("o próximo passo", "anexo o arquivo", "nenhum problema"):
+    check(f"no wake word in {text!r}", not voice.WAKE_RE.search(text))
+det = voice.SpeechDetector()
+check("VAD: Silero model loaded", det.session is not None)
+rng = np.random.default_rng(1)
+events = [det.feed((rng.standard_normal(voice.FRAME) * 0.01).astype(np.float32)) for _ in range(150)]
+check("VAD: steady fan noise never opens a recording", not any(events), str(set(events)))
+quiet = (np.sin(np.arange(16000) / 5) * 0.1).astype(np.float32)
+check("gain: quiet speech normalized to ~0.5 peak", abs(np.abs(voice.normalize_audio(quiet)).max() - 0.5) < 0.01)
+check("gain: silence is not amplified", np.abs(voice.normalize_audio(np.zeros(1600, np.float32))).max() == 0)
+check("STT prompt carries NEXUS and the user name", "NEXUS" in voice.initial_prompt("Bryan") and "Bryan" in voice.initial_prompt("Bryan"))
+check("clearer request quotes what the user said", "a piada" in i18n.t("clearer_request", said="não entendi a piada"))
+check("report intent requires report_issue",
+      assistant._needs_tool("Pronto!", False, "salve essa conversa para relatar erros", set()) is not None
+      and assistant._needs_tool("Pronto!", True, "salve essa conversa para relatar erros", {"report_issue"}) is None)
+from nexus import emergency  # noqa: E402
+
+check("emergency: first-aid quiz is studying, not an emergency",
+      emergency.detect("Me faça um simulado de 2 perguntas sobre primeiros socorros") is None)
+check("emergency: study words + urgency still trigger", emergency.detect("estou estudando, meu amigo não respira agora") == "cpr")
+knowledge.load_seed()
+unsafe = "Não deixe em RCP por mais de 10 minutos sem ajuda; se não houver equipe, interrompa o procedimento."
+check("CPR guard: 'stop after N minutes' replaced by the manual line",
+      emergency.guard("cpr", unsafe, "pt").splitlines()[-1].startswith("Não pare até"))
+safe = "Continue até a equipe chegar, revezando a cada 2 minutos, 100 a 120 compressões por minuto."
+check("CPR guard: correct follow-up kept", emergency.guard("cpr", safe, "pt") == safe)
+check("speech skips inline code / file paths", "report.md" not in voice.clean_for_speech("Envie `C:/r/report.md` à equipe."))
+memory.add_message("user", "pergunta com erro")
+rep = tools.report_issue("teste")
+with open(rep["file"], encoding="utf-8") as f:
+    report_text = f.read()
+check("report file has the conversation", "pergunta com erro" in report_text and "## Conversation" in report_text)
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

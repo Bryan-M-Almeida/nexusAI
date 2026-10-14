@@ -5,8 +5,10 @@ import json
 from datetime import datetime, timedelta
 
 from . import integrations, knowledge, memory, profile
-from .config import settings
+from .config import DATA_DIR, settings
 from .db import db, now
+
+REPORTS_DIR = DATA_DIR / "reports"
 
 
 def _dt(value: str | None) -> str | None:
@@ -186,6 +188,27 @@ def update_profile(field, value):
     return {"ok": True}
 
 
+def report_issue(description=""):
+    """Save the current conversation (+ recent actions and settings) to a Markdown file the user can send to
+    the developers. Works in temporary chats too: the file is only written because the user asked."""
+    from . import __version__
+
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = REPORTS_DIR / f"nexus-report-{stamp}.md"
+    lines = [f"# NEXUS report {stamp}", "", f"- version: {__version__}", f"- model: {settings['llm_model']}",
+             f"- ai_mode: {settings['ai_mode']}", f"- language: {settings['language']}",
+             f"- temporary chat: {memory.temporary}", "", "## Description", "", str(description or "-"), "",
+             "## Conversation", ""]
+    for m in memory.history(200):
+        lines += [f"**{m['role']}** ({m.get('ts', '')[:16]}):", "", m["content"], ""]
+    lines += ["## Recent actions", ""]
+    lines += [f"- {a['ts'][:16]} [{a['kind']}] {a['summary']}" for a in memory.recent_actions(30)]
+    path.write_text("\n".join(lines), encoding="utf-8")
+    db.log_action("relatório", f"Conversa salva para relatar erro: {path.name}")
+    return {"ok": True, "file": str(path)}
+
+
 # ---------------------------------------------------------------- online integrations (v0.6)
 def _online(fn):
     @functools.wraps(fn)  # keeps the real signature: execute() filters arguments with inspect.signature
@@ -264,6 +287,10 @@ SCHEMAS = [
         {"action": {"type": "string", "enum": ["repeat", "clearer", "pause", "resume", "stop"]}}, ["action"]),
     _fn("update_profile", "Update a field of the user's profile (name, profession, routine, interests, goals, language).",
         {"field": S, "value": S}, ["field", "value"]),
+    _fn("report_issue",
+        "Save this whole conversation to a report file when the user wants to report an error/bug/problem of "
+        "NEXUS to the developers (e.g. 'salve essa conversa para relatar erros', 'report this bug').",
+        {"description": {"type": "string", "description": "what went wrong, in the user's words"}}),
     _fn("get_datetime", "Get the current local date and time."),
     _fn("get_weather", "Current weather and forecast (internet). City defaults to the user's city.",
         {"city": S, "days": {"type": "integer", "description": "1-7"}}),

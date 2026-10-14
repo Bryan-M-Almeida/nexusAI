@@ -42,7 +42,14 @@ Rules:
   understand ("clearer"), wait/hold on ("pause"), go on ("resume"), be quiet ("stop").
 - For factual questions (first aid, philosophy, finance, programming, health, productivity...) prefer the knowledge base;
   cite the source name briefly. In medical emergencies always tell them to call emergency services first (Brazil: SAMU 192 / Bombeiros 193; US: 911; Spain/EU: 112).
-- Never invent stored data: read it with tools."""
+- Never invent stored data: read it with tools.
+- QUIZZES / mock exams: after each answer, grade it IMMEDIATELY (correct or not, the right answer and one
+  short reason), then ask the next question. Keep answers in the conversation: never store them with
+  `record_data`. Only call an answer correct after checking the fact; never invent explanations. Ask
+  "shall we start?" at most once; if the user already agreed, just start.
+- If the user didn't understand something specific (a joke, a word, a step), explain its MEANING in simple
+  words (for a joke: the wordplay and why it is funny). Never just repeat the same sentence.
+- The user wants to report a NEXUS error/bug or "save this conversation to report errors" -> `report_issue`."""
 
 
 def _upcoming(days=7):
@@ -170,6 +177,12 @@ DEFERRED = re.compile(
     re.IGNORECASE)
 
 
+# "Salve essa conversa para relatar erros": handled without the model (v0.8 eval: the model also logged the
+# report with record_data and answered with a collection id instead of the file).
+REPORT_RE = re.compile(r"\b(relat\w* (um |o |os |esse |esses |este )?(erros?|problemas?|bugs?)|report (a |this |the )?"
+                       r"(bug|issue|problem|error)s?|report\w* (un |el |los |este )?(error(es)?|problemas?|fallos?)|"
+                       r"(salv|guard)\w* (essa|esta|a) conversa)", re.I)
+
 # What the USER asked for -> tools that must have been called this turn (the model sometimes just echoes
 # "Aprende que..." without storing anything).
 INTENTS = [
@@ -181,6 +194,7 @@ INTENTS = [
      {"set_reminder", "add_event", "add_task"}, "set_reminder"),
     (re.compile(r"^\W*(nexus\W+)?(registr[ae]|anot[ae]|log|track|record|apunta)\b", re.I),
      {"record_data", "save_note", "add_task", "remember"}, "record_data"),
+    (REPORT_RE, {"report_issue"}, "report_issue"),
 ]
 
 
@@ -264,6 +278,14 @@ class Assistant:
             self.emit("tool", {"name": "emergency", "args": {"topic": topic}})
             self.emit("done", {"text": reply, "speak": True, "interrupted": False})
             return
+        if REPORT_RE.search(text):
+            memory.add_message("user", text)
+            result = tools.report_issue(text)
+            reply = t("report_saved", file=result["file"])
+            memory.add_message("assistant", reply)
+            self.emit("tool", {"name": "report_issue", "args": {}})
+            self.emit("done", {"text": reply, "speak": True, "interrupted": False})
+            return
         # Context travels inside the current user turn (many chat templates drop extra system messages);
         # history keeps only the raw text, so the cached prompt prefix stays valid on the next turn.
         context = build_context(text, emergency_topic=topic)
@@ -281,7 +303,8 @@ class Assistant:
                         break
                     if kind == "token":
                         round_text += value
-                        self.emit("token", value)
+                        if not topic:  # first-aid follow-ups are checked (emergency.guard) before being shown
+                            self.emit("token", value)
                     elif kind == "tool_calls":
                         calls = value
                 if self.cancel.is_set():
@@ -326,6 +349,8 @@ class Assistant:
             return
         interrupted = self.cancel.is_set()
         reply = (reply or ("" if finished or interrupted else round_text)).strip()
+        if topic and reply:
+            reply = emergency.guard(topic, reply, detect(text) or lang())
         if reply:
             memory.add_message("assistant", reply)
         self.emit("done", {"text": reply, "speak": bool(reply) and not interrupted, "interrupted": interrupted})

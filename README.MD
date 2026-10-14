@@ -97,7 +97,7 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 - "Inicia um pomodoro"
 - "Na próxima vez que eu abrir, me lembra de continuar o projeto do app" → no próximo início: *"Olá, Alex, vamos continuar o projeto do app?"*
 
-Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas).
+Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia.
 
 ### Interface minimalista (v0.3)
 
@@ -105,7 +105,10 @@ A tela mostra só o **aro NEXUS**: ele se **expande** enquanto a IA fala (seguin
 
 - **Mouse no topo** → barra superior: versão, status da IA/voz, relógio, idioma, **Painel** (agenda, tarefas, memória, conhecimento, dados, log) e Configurações.
 - **Mouse na borda esquerda** → modos da IA; **mouse na borda direita** → conversa temporária (e, na v0.9, projetos).
-- **Mouse embaixo** → ícones: **apenas mensagens** · **apenas áudio** · **mutar/desmutar microfone** · **mutar/desmutar IA** · **interromper** · **repetir**.
+- **Mouse embaixo** → ícones: **apenas mensagens** · **apenas áudio** · **transcrição** · **mutar/desmutar microfone** · **mutar/desmutar IA** · **interromper** · **repetir** (interromper/repetir ficam esmaecidos quando não há o que fazer).
+- **Transcrição** (v0.8): mostra a conversa à direita sem sair do modo áudio. Todo texto é selecionável e cada mensagem tem **Copiar**.
+- **Aro**: passe o mouse para ver **N.E.X.U.S · NEX-1.0** (o modelo atual).
+- Abre em **tela cheia**; minimizar / tela cheia / fechar ficam na barra superior. Clicar fora fecha Configurações e Painel.
 - **Apenas áudio**: conversa contínua por voz, sem precisar dizer "Nexus" (dá para exigir a palavra em Configurações).
 - **Apenas mensagens**: o aro sobe, aparece o chat e a IA não fala.
 - **Repetir** (botão): "Acho que não entendeu, vou repetir." + a mesma resposta. Se você disser que **não entendeu**, ela explica de novo de forma mais clara.
@@ -118,13 +121,13 @@ A tela mostra só o **aro NEXUS**: ele se **expande** enquanto a IA fala (seguin
 | "continua", "pode continuar", "go on", "sigue" | continua de onde parou |
 | "para", "chega", "para de falar", "stop", "basta" | para de falar e cancela a resposta |
 | "repete", "o que você disse?", "say that again", "repite" | "Claro, vou repetir." + a mesma resposta |
-| "não entendi", "explica melhor", "I didn't understand", "no entendí" | "Acho que não entendeu…" e reexplica mais claro |
+| "não entendi", "não entendi a piada", "explica melhor", "I didn't understand", "no entendí" | "Tudo bem, vou explicar de outro jeito." e explica o significado (numa piada, o trocadilho) |
 
 Esses comandos são reconhecidos **localmente** (instantâneo) e funcionam **mesmo enquanto o NEXUS fala**. Para frases mais elaboradas ("hã? fala de novo com outras palavras"), a IA decide pela conversa. Com caixas de som, use fone de ouvido para o NEXUS não se ouvir.
 
 ### Modos da IA e conversa temporária (v0.7)
 
-- **Mouse na borda esquerda → Modo da IA**: *Assistente* (completo e cordial) ou *Direto* (o mínimo de palavras, exatamente o que foi pedido). Medido: respostas 66% mais curtas e 43% mais rápidas no modo Direto.
+- **Mouse na borda esquerda → Modo da IA**: *Assistente* (completo e cordial) ou *Direto* (o mínimo de palavras, exatamente o que foi pedido). Medido: respostas 66% mais curtas e 43% mais rápidas no modo Direto. Ao trocar, o NEXUS diz "Executando em modo …".
 - **Mouse na borda direita → Conversa temporária**: conversa à toa que fica só na memória RAM, não é salva no histórico e não gera memórias automáticas. Ao desligar, é descartada. Selo âmbar no topo enquanto ativa. Pedidos explícitos ("me lembra de…", "aprenda que…") continuam funcionando.
 
 ### Integrações online (v0.6)
@@ -165,6 +168,11 @@ Em *Configurações*: **voz masculina ou feminina**, **efeito** (`J.A.R.V.I.S` l
 - Usa as vozes SAPI do Windows, inclusive as "OneCore" (ex.: **Microsoft Daniel**, masculina em pt-BR). Vozes encontradas no PC de teste: Maria (pt, fem.), Daniel (pt, masc.), Zira (en, fem.).
 - Se o gênero escolhido não existir no idioma, o NEXUS usa a outra voz com o tom ajustado e avisa na tela. Instale mais vozes (ex.: David/Mark em inglês, qualquer voz em **espanhol**) em *Configurações do Windows → Hora e idioma → Fala → Adicionar vozes*.
 - No primeiro uso do microfone, o modelo Whisper escolhido é baixado (tiny ≈ 75 MB, base ≈ 145 MB, small ≈ 480 MB).
+- **Ouvir** (v0.8): o fim da fala é detectado pelo **Silero VAD** (rede neural; ruído de ventilador não segura mais a gravação) e o Whisper transcreve no idioma escolhido, com "NEXUS" e o seu nome no vocabulário. Se você fala outro idioma com o NEXUS, escolha-o em *Configurações → Idioma*.
+
+### Relatar um erro
+
+Diga **"salve essa conversa para relatar erros"** (ou use o botão em *Configurações*). A conversa, as ações recentes e as configurações vão para `reports/nexus-report-<data>.md` na pasta de dados; envie esse arquivo à equipe.
 
 ## Onde ficam os dados
 
@@ -179,6 +187,7 @@ Os testes **sempre** usam uma pasta de dados temporária, então nunca tocam nos
 .\.venv\Scripts\python tests\test_units.py          # segundos, sem IA
 .\.venv\Scripts\python tests\conversation_eval.py   # alguns minutos, precisa do Ollama e de internet
 .\.venv\Scripts\python tests\bench_latency.py --warm # tempos de resposta
+.\.venv\Scripts\python tests\bench_voice.py         # fim de fala e precisão do reconhecimento
 ```
 
 ## Gerar o executável
@@ -224,4 +233,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.7.0 (protótipo)**.
+Versão atual: **v0.8.0 (protótipo)**.

@@ -33,7 +33,7 @@ if (!window.pywebview && location.search.includes("mock")) {
     ui_ready: async () => {},
     boot: async () => {
       ["memory", "knowledge", "ai", "voice"].forEach((k, i) => emit("boot", { key: k, ok: true, detail: ["3", "198", "qwen3:8b", "small"][i] }, 600 + i * 200));
-      return { profile, lang: "pt", llm, settings, stt: "ready", version: "0.3.0" };
+      return { profile, lang: "pt", llm, settings, stt: "ready", version: "0.8.0", model_name: "NEX-1.0" };
     },
     greet: async () => { speak(2.5, 200); return "Olá, Alex, o que teremos para hoje?"; },
     history: async () => [],
@@ -58,7 +58,9 @@ if (!window.pywebview && location.search.includes("mock")) {
       return { control: null };
     },
     set_mode: async (m) => { settings.ui_mode = m; return state(); },
-    set_ai_mode: async (m) => { settings.ai_mode = m; return state(); },
+    set_ai_mode: async (m) => { settings.ai_mode = m; speak(1.5); return { ...state(), spoken: `Executando em modo ${m === "direct" ? "Direto" : "Assistente"}.` }; },
+    report_issue: async () => ({ ok: true, file: "C:/NEXUS/reports/nexus-report-20261014-120000.md" }),
+    toggle_fullscreen: async () => {}, minimize: async () => {}, quit: async () => {},
     set_temporary: async (on) => { temporary = on; return state(); },
     set_mic: async (muted) => { settings.mic_muted = muted; return state(); },
     set_ai_voice: async (on) => { settings.voice_enabled = on; return state(); },

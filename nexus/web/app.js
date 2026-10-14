@@ -127,6 +127,7 @@ async function start() {
   applyLang(st.lang);
   setAi(st.llm);
   $("#version").textContent = "v" + st.version;
+  $("#modelName").textContent = st.model_name || "NEX-1.0";
   applyState({ ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: st.stt,
     ai_mode: settings.ai_mode || "assistant", temporary: false });
   await new Promise((r) => setTimeout(r, Math.max(0, BOOT_MIN_MS - (Date.now() - t0))));
@@ -167,7 +168,8 @@ function addMsg(kind, text, spoken = false) {
   const el = document.createElement("div");
   el.className = `msg ${kind}`;
   const who = kind === "user" ? T("you") + (spoken ? " · 🎙 " + T("heard") : "") : kind === "nexus" ? "N.E.X.U.S" : "";
-  el.innerHTML = (who ? `<span class="who">${esc(who)}</span>` : "") + `<div class="txt">${kind === "nexus" ? md(text) : esc(text)}</div>`;
+  el.innerHTML = (who ? `<span class="who">${esc(who)}</span>` : "") + `<div class="txt">${kind === "nexus" ? md(text) : esc(text)}</div>`
+    + (kind === "system" ? "" : `<button class="msg-copy" data-copy title="${esc(T("copy"))}">${esc(T("copy"))}</button>`);
   $("#chat").appendChild(el);
   $("#chat").scrollTop = $("#chat").scrollHeight;
   if (kind === "user") { setVoiceState("thinking"); }
@@ -188,7 +190,14 @@ function onToken(tok) {
   s.text += tok;
   s.el.querySelector(".txt").innerHTML = md(s.text);
   $("#chat").scrollTop = $("#chat").scrollHeight;
+  if (!transcriptOn) caption(tail(s.text), 9000);
+  updateDock();
 }
+
+const tail = (text) => {  // last ~150 chars, cut at a word
+  const t = text.replace(/[*`#]/g, "").trim();
+  return t.length <= 150 ? t : "…" + t.slice(-150).replace(/^\S*\s/, "");
+};
 
 function onTool(p) {
   const s = ensureStream();
@@ -204,7 +213,9 @@ function onDone(p) {
   s.el.querySelector(".txt").classList.remove("caret");
   s.el.querySelector(".txt").innerHTML = md(p.text) + (p.interrupted ? " <span class=\"muted\">…</span>" : "");
   streaming = null;
+  state.can_repeat = true;
   if (!(state.ui_mode === "audio" && state.voice_enabled && p.speak)) setVoiceState("idle");
+  updateDock();
 }
 
 function onError(p) {
@@ -248,7 +259,9 @@ async function send(text) {
 }
 
 /* ------------------------------------------------------------------ voice state */
-let state = { ui_mode: "audio", mic_muted: false, voice_enabled: true, stt: "ready", ai_mode: "assistant", temporary: false };
+let state = { ui_mode: "audio", mic_muted: false, voice_enabled: true, stt: "ready", ai_mode: "assistant", temporary: false, can_repeat: false };
+let transcriptOn = false;
+try { transcriptOn = localStorage.getItem("nexus.transcript") === "1"; } catch (e) { /* storage unavailable */ }
 
 function setVoiceState(st) {
   voiceState = st;
@@ -259,6 +272,14 @@ function setVoiceState(st) {
   label.textContent = T("st_" + shown) || "";
   label.className = "core-label " + (["listening", "awake"].includes(shown) ? "red" : ["speaking", "thinking"].includes(shown) ? "blue" : "");
   $("#chipVoice").classList.toggle("on", state.ui_mode === "audio" && !state.mic_muted && state.stt === "ready");
+  updateDock();
+}
+
+// Interrupt only when something is running; repeat only when NEXUS already said something (v0.8).
+const BUSY = ["speaking", "paused", "thinking", "transcribing", "listening"];
+function updateDock() {
+  $("#btnInterrupt").disabled = !(streaming || BUSY.includes(voiceState));
+  $("#btnRepeat").disabled = !(state.can_repeat || $("#chat .msg.nexus"));
 }
 
 function applyState(st) {
@@ -272,6 +293,9 @@ function applyState(st) {
   $$("[data-ai-mode]").forEach((b) => b.classList.toggle("on", b.dataset.aiMode === state.ai_mode));
   $("#btnTemp").classList.toggle("on", state.temporary);
   $("#tempBadge").hidden = !state.temporary;
+  $("#app").classList.toggle("transcript", transcriptOn);
+  $("#btnTranscript").classList.toggle("on", transcriptOn);
+  $("#btnTranscript").disabled = state.ui_mode === "text";
   $("#app").classList.toggle("temporary", state.temporary);
   if (state.ui_mode === "text") setTimeout(() => $("#prompt").focus(), 300);
   setVoiceState(voiceState === "speaking" ? "speaking" : "idle");
@@ -346,8 +370,26 @@ function flashBars() {  // show every bar briefly once, so the user discovers th
 }
 
 async function setAiMode(mode) {
-  applyState(await api().set_ai_mode(mode));
+  const st = await api().set_ai_mode(mode);
+  applyState(st);
   showTip(T(mode === "direct" ? "modeDirect" : "modeAssistant"));
+  if (st.spoken) { caption(st.spoken, 3000); addMsg("system", st.spoken); }
+}
+
+function toggleTranscript() {
+  transcriptOn = !transcriptOn;
+  try { localStorage.setItem("nexus.transcript", transcriptOn ? "1" : "0"); } catch (e) { /* ignore */ }
+  applyState({});
+  $("#chat").scrollTop = $("#chat").scrollHeight;
+}
+
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); } catch (e) {  // WebView without clipboard permission
+    const ta = Object.assign(document.createElement("textarea"), { value: text });
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+  }
+  btn.textContent = T("copied"); btn.classList.add("done");
+  setTimeout(() => { btn.textContent = T("copy"); btn.classList.remove("done"); }, 1400);
 }
 
 async function toggleTemporary() {
@@ -366,14 +408,15 @@ async function dock(action) {
     applyState(st);
     if (!st.mic_muted && st.stt !== "ready") notice(T("voiceLoading"));
   } else if (action === "ai") applyState(await api().set_ai_voice(!state.voice_enabled));
-  else if (action === "interrupt") { api().interrupt(); setVoiceState("idle"); }
+  else if (action === "interrupt") { if ($("#btnInterrupt").disabled) return; api().interrupt(); setVoiceState("idle"); }
+  else if (action === "transcript") toggleTranscript();
   else if (action === "repeat") {
     const r = await api().repeat();
     if (r.text) addMsg("nexus", r.intro + "\n\n" + r.text); else addMsg("system", r.intro);
     caption(r.intro, 2500);
   }
   const tip = { text: "modeText", audio: "modeAudio", mic: state.mic_muted ? "micOff" : "micOn", ai: state.voice_enabled ? "aiOn" : "aiOff",
-    interrupt: "interrupt", repeat: "repeat" }[action];
+    interrupt: "interrupt", repeat: "repeat", transcript: "transcript" }[action];
   showTip(T(tip));
 }
 
@@ -510,7 +553,8 @@ async function testVoice() {
 /* ------------------------------------------------------------------ wiring */
 function wire() {
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); send($("#prompt").value); $("#prompt").value = ""; });
-  const dockButtons = { btnModeText: "text", btnModeAudio: "audio", btnMic: "mic", btnAiVoice: "ai", btnInterrupt: "interrupt", btnRepeat: "repeat" };
+  const dockButtons = { btnModeText: "text", btnModeAudio: "audio", btnTranscript: "transcript", btnMic: "mic", btnAiVoice: "ai",
+    btnInterrupt: "interrupt", btnRepeat: "repeat" };
   for (const [id, action] of Object.entries(dockButtons)) {
     $("#" + id).onclick = () => dock(action);
     $("#" + id).onmouseenter = (e) => showTip(e.currentTarget.title);
@@ -529,7 +573,22 @@ function wire() {
       const open = $$(".modal:not([hidden]), .drawer:not([hidden])");
       if (open.length) open.forEach((m) => (m.hidden = true)); else dock("interrupt");
     }
+    if (e.key === "F11") { e.preventDefault(); api().toggle_fullscreen(); }
   });
+
+  // Click outside a modal/drawer box closes it (press and release on the backdrop, so selecting text doesn't).
+  $$(".modal, .drawer").forEach((m) => {
+    let downOnBackdrop = false;
+    m.addEventListener("mousedown", (e) => (downOnBackdrop = e.target === m));
+    m.addEventListener("click", (e) => { if (downOnBackdrop && e.target === m) m.hidden = true; });
+  });
+  $("#chat").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-copy]");
+    if (b) copyText(b.closest(".msg").querySelector(".txt").innerText, b);
+  });
+  $("#btnMinimize").onclick = () => api().minimize();
+  $("#btnFullscreen").onclick = () => api().toggle_fullscreen();
+  $("#btnQuit").onclick = () => api().quit();
 
   $("#taskForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -607,6 +666,10 @@ function wire() {
   });
   $("#btnReimport").onclick = () => { $("#settings").hidden = true; openOnboarding(); };
   $("#btnClearChat").onclick = async () => { await api().clear_history(); $("#chat").innerHTML = ""; $("#settings").hidden = true; };
+  $("#btnReport").onclick = async () => {
+    const r = await api().report_issue();
+    if (r && r.ok) notice(T("reportSaved", { file: r.file.split(/[\\/]/).pop() }));
+  };
   $$("[data-close]").forEach((b) => (b.onclick = () => (b.closest(".modal, .drawer").hidden = true)));
 
   setInterval(() => ($("#clock").textContent = new Date().toLocaleTimeString(document.documentElement.lang, { hour: "2-digit", minute: "2-digit" })), 1000);

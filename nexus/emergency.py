@@ -69,11 +69,20 @@ def _norm(text: str) -> str:
 # Technical contexts that reuse emergency words ("o código está sangrando memória", "burn CPU cycles").
 _TECH = re.compile(r"\b(codigo|code|memoria|memory|ram|cpu|gpu|leak|vazamento|servidor|server|bug|deploy|build|app)\b")
 
+# Studying the subject is not an emergency (v0.8: a first-aid mock exam opened the protocol), unless the
+# message also sounds urgent.
+_STUDY = re.compile(r"\b(simulad\w*|quiz\w*|provas?|quest(ao|oes)|perguntas?|estud\w*|exames?|exam\w*|tests?|testes?|"
+                    r"curso|aula|materia|flashcards?|resum\w*|preguntas?|cuestionario|examen(es)?|questions?)\b")
+_URGENT = re.compile(r"\b(agora|urgente|rapido|socorro|ajuda|now|urgent|help|ahora|rapido|ayuda|esta (sangrando|"
+                     r"engasgad\w*|desmaiad\w*|inconsciente)|nao respira|not breathing|no respira)\b")
+
 
 def detect(text: str) -> str | None:
     """Emergency topic or None. Errs on the side of caution: a false alarm only shows a protocol."""
     norm = _norm(text)
     tech = _TECH.search(norm)
+    if _STUDY.search(norm) and not _URGENT.search(norm):  # "simulado sobre primeiros socorros" is studying
+        return None
     for topic, rx in _COMPILED.items():
         if rx.search(norm) and not (tech and topic in ("bleeding", "burn", "general")):
             return topic
@@ -90,6 +99,29 @@ def section(topic: str, lang: str) -> dict | None:
         if row:
             return {**row, "lang": code}
     return None
+
+
+# Follow-up answers about CPR that contradict the manual ("stop after 10 minutes", "interrupt the CPR"): seen in the
+# v0.8 evaluation even with the manual in the context. Such a reply is never shown; the manual's own line is.
+_UNSAFE = {
+    "cpr": re.compile(r"\b(interromp\w*|pode parar|pare (a |as )?(rcp|compress\w*|massagem)|parar a rcp|"
+                      r"(you can |may )?stop (the )?(cpr|compressions)|you can stop|puedes parar|deten\w*|"
+                      r"(mais|more|mas) (de|than) \d+ minut\w*|\d+ (a|to|y|ou|or|o) \d+ minut\w*)\b"),
+}
+_STOP_LINE = re.compile(r"^\d+\. (Nao pare|Não pare|Don't stop|No pares)", re.M | re.I)
+
+
+def guard(topic: str, reply: str, lang: str) -> str:
+    """Return the reply, or the manual's literal "don't stop until..." line when the reply contradicts it."""
+    rx = _UNSAFE.get(topic)
+    if not rx or not rx.search(_norm(reply)):
+        return reply
+    sec = section(topic, lang)
+    if not sec:
+        return reply
+    m = _STOP_LINE.search(sec["content"])
+    line = sec["content"][m.start():].splitlines()[0].split(". ", 1)[1] if m else sec["content"]
+    return f"**{sec['heading']}**\n{line}"
 
 
 class Tracker:

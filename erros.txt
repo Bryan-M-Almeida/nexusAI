@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 1.7  ·  Data: 2026-10-13  ·  Versão do app: 0.7.0
+ Versão do documento: 1.8  ·  Data: 2026-10-14  ·  Versão do app: 0.8.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -70,6 +70,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-021  Instruções de primeiros socorros erradas e perigosas
       NX-LLM-022  Modo emergência ativado sem emergência (falso alarme)
       NX-LLM-023  Dados ao vivo inventados ou recusados (clima, notícias, câmbio)
+      NX-LLM-024  Simulado/quiz: respostas guardadas, corrigidas errado ou nunca corrigidas
+      NX-LLM-025  "Não entendi" sem explicação (ex.: piada repetida em vez de explicada)
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -86,6 +88,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-VOZ-014  Modo "apenas áudio" responde a conversas ao redor / TV
       NX-VOZ-015  Voz "de aparelho de fumante" (laringe eletrônica), difícil de entender
       NX-VOZ-016  Nome pronunciado "NÊXUS" (ou soletrado "N, E, X, U, S")
+      NX-VOZ-017  Reconhecimento ruim: palavras trocadas, idioma errado, frases inventadas
  DAT  NX-DAT-001  Base de conhecimento não encontra um assunto existente
       NX-DAT-002  PDF importado sem texto ("Não consegui extrair texto")
       NX-DAT-003  "Data inválida" ao criar evento/tarefa
@@ -101,6 +104,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-UI-005   Não encontro os botões / a tela só mostra o aro
       NX-UI-006   Configurações demoram para abrir ou precisam de vários cliques
       NX-UI-007   Aba Saber (conhecimento) sem rolagem
+      NX-UI-008   Texto não selecionável / sem copiar / conversa invisível no modo áudio
+      NX-UI-009   Botões Interromper/Repetir clicáveis sem nada para fazer
  INT  NX-INT-001  Landing ainda não possui formulário de onboarding real
       NX-INT-002  Navegador bloqueia o envio da landing para 127.0.0.1
       NX-INT-003  Porta 47800 ocupada: ponte local desativada
@@ -414,6 +419,14 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                0 s, "metade inferior do esterno", "não pare").
   Importante : O NEXUS não substitui atendimento profissional. Ligue sempre
                para a emergência e siga a central.
+  Atualização: (v0.8) Na avaliação, mesmo com o manual no contexto, o modelo
+               respondeu "Quanto tempo uma pessoa dura em RCP?" com "não
+               deixe por mais de 10 minutos... interrompa". Agora respostas
+               de acompanhamento em emergência não são exibidas enquanto são
+               geradas: emergency.guard() as confere e, se mandarem parar a RCP
+               ou citarem limite de minutos, são trocadas pela linha literal
+               do manual ("Não pare até a vítima reagir, a equipe chegar ou
+               você não aguentar mais").
 
 [NX-LLM-022] Modo emergência ativado sem emergência (falso alarme)
   Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
@@ -426,6 +439,11 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Contorno   : Continue a conversa normalmente; o protocolo só é repetido
                depois de 10 minutos. Para novas exceções, ajuste _TECH ou
                TOPICS em nexus/emergency.py.
+  Atualização: (v0.8, observado na avaliação) "Me faça um simulado sobre
+               primeiros socorros" abria o protocolo. Agora mensagens de
+               estudo (simulado, quiz, prova, perguntas, estudar, curso...)
+               não acionam o modo emergência, a menos que também soem urgentes
+               ("agora", "socorro", "não respira"...): _STUDY / _URGENT.
 
 [NX-LLM-023] Dados ao vivo inventados ou recusados (clima, notícias, câmbio)
   Severidade : ALTA             Status: CORRIGIDO (v0.6)   Observado: SIM
@@ -437,6 +455,34 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                (assistant.LIVE): perguntas sobre clima, notícias ou câmbio sem a
                ferramenta correspondente são devolvidas ao modelo exigindo a
                consulta. Verificado em tests\conversation_eval.py.
+
+[NX-LLM-024] Simulado/quiz: respostas guardadas, corrigidas errado ou nunca corrigidas
+  Severidade : ALTA             Status: CORRIGIDO (v0.8)   Observado: SIM
+  Sintoma    : Num simulado (USMLE, 2026-10-14) o NEXUS guardou as respostas
+               com record_data (chaves fora de ordem: questao_1, questao_10,
+               questao_2...), informou respostas que o usuário não deu, disse
+               que tudo estava certo com fatos falsos e repetiu "Vamos
+               começar?" três vezes.
+  Causa      : Sem regra para quizzes, o modelo tratava cada resposta como um
+               dado a registrar e corrigia tudo no fim, de memória.
+  Correção   : Regra QUIZZES no prompt: corrigir cada resposta na hora (certo
+               ou errado, a resposta correta e o motivo), nunca usar
+               record_data para respostas, só afirmar "correto" após conferir,
+               perguntar "vamos começar?" no máximo uma vez. Verificado em
+               tests\conversation_eval.py.
+  Dica       : Em provas reais, confira os gabaritos em fontes oficiais; o
+               modelo local (8B) ainda pode errar fatos médicos específicos.
+
+[NX-LLM-025] "Não entendi" sem explicação (ex.: piada repetida em vez de explicada)
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.8)   Observado: SIM
+  Sintoma    : "Não entendi a piada" fazia o NEXUS dizer "Acho que não
+               entendeu" e repetir a mesma piada com outras palavras.
+  Causa      : O pedido enviado ao modelo era genérico ("explique de forma
+               mais clara") e não dizia O QUE o usuário não entendeu.
+  Correção   : O pedido agora inclui as palavras do usuário e pede o
+               SIGNIFICADO (numa piada: o trocadilho e por que é engraçada),
+               proibindo repetir a mesma frase. A introdução falada virou
+               "Tudo bem, vou explicar de outro jeito".
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE
@@ -467,7 +513,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                (sounddevice.query_devices).
 
 [NX-VOZ-003] Palavra de ativação "Nexus" não reconhecida / falsos disparos
-  Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.8)   Observado: SIM
   Sintoma    : Dizer "Nexus" não ativa; ou o NEXUS responde a conversas
                paralelas.
   Causa      : O Whisper transcreve "Nexus" de formas variadas ("Néxus",
@@ -477,9 +523,13 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                modelo "small" (mais preciso que "base"/"tiny"). Se surgir uma
                nova variação, adicione-a em WAKE_RE. Para ambientes ruidosos,
                prefira o botão do microfone ou Ctrl+Espaço.
+  Correção   : (v0.8) WAKE_RE cobre também "Nécsus", "Neksus", "Nexis",
+               "Nek us"; o Whisper recebe um vocabulário inicial com "NEXUS" e
+               o nome do usuário, e o idioma fixo. Medido com
+               tests\bench_voice.py: "Nexus" reconhecido 2/6 -> 6/6.
 
 [NX-VOZ-004] Gravação não começa ou não termina (detecção de voz)
-  Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.8)   Observado: SIM
   Sintoma    : O estado fica em "OUVINDO" indefinidamente, ou a fala não é
                captada.
   Causa      : A detecção de voz usa energia do sinal com limiar adaptativo
@@ -488,6 +538,11 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Dicas      : A gravação encerra após ~0,75 s de silêncio ou 30 s no
                máximo. Ajuste o volume do microfone no Windows para ~70-80%.
                Use headset em ambientes barulhentos.
+  Correção   : (v0.8) O detector por energia foi trocado pelo Silero VAD
+               (rede neural que distingue voz de ruído, ~0,2 ms por quadro,
+               já incluída no faster-whisper). Medido com ruído de ventilador:
+               energia encerrou 0/6 gravações (ficava "ouvindo" até 30 s);
+               Silero encerrou 6/6, logo após o fim da fala (0,7 s de pausa).
 
 [NX-VOZ-005] NEXUS ouve a própria voz (eco)
   Severidade : MÉDIA            Status: MITIGADO           Observado: PREVISTO
@@ -603,6 +658,23 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                (tts.pronounce()).
   Dicas      : Para uma voz nova, teste grafias e ajuste _SPOKEN_NAME em
                nexus/tts.py; confira sempre no ouvido.
+
+[NX-VOZ-017] Reconhecimento ruim: palavras trocadas, idioma errado, frases inventadas
+  Severidade : ALTA             Status: CORRIGIDO (v0.8)   Observado: SIM
+  Sintoma    : Frases curtas transcritas em outro idioma ou com palavras
+               erradas; com ruído, apareciam frases que ninguém disse
+               ("Obrigado.", "Legendas pela comunidade...").
+  Causa      : Idioma em "auto" (o Whisper adivinha o idioma por 1-2 s de
+               áudio), busca gulosa (beam 1), microfones com ganho baixo e
+               trechos de ruído enviados ao Whisper.
+  Correção   : Idioma fixo (o escolhido nas Configurações ou o do perfil),
+               beam 5, vocabulário inicial (NEXUS + nome), normalização de
+               volume com limite de ganho (8x) e descarte de segmentos que o
+               próprio Whisper marca como "sem fala". Medido com
+               tests\bench_voice.py (20 frases com ruído): erro de palavras
+               24,5% -> 12,1%, e mais rápido (3,2 s -> 2,0 s por frase).
+  Dica       : Se você fala outro idioma com o NEXUS, escolha-o em
+               Configurações > Idioma.
 
 ================================================================================
  DAT — DADOS, MEMÓRIA E CONHECIMENTO
@@ -744,6 +816,26 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Correção   : A aba inteira rola e as categorias viraram etiquetas
                compactas (152 px). Reproduzido e verificado no modo mock com
                21 categorias.
+
+[NX-UI-008] Texto não selecionável / sem copiar / conversa invisível no modo áudio
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.8)   Observado: SIM
+  Sintoma    : Não era possível selecionar nem copiar mensagens; no modo
+               "apenas áudio" não havia como ler o que o NEXUS dizia.
+  Causa      : O pywebview bloqueia a seleção de texto por padrão
+               (text_select=False); o modo áudio escondia a conversa.
+  Correção   : text_select=True e seleção liberada nas mensagens e listas;
+               botão "Copiar" em cada mensagem; botão "Transcrição" na barra
+               inferior mostra a conversa à direita sem sair do modo áudio
+               (a escolha é lembrada); com ela fechada, a fala aparece como
+               legenda enquanto é gerada.
+
+[NX-UI-009] Botões Interromper/Repetir clicáveis sem nada para fazer
+  Severidade : BAIXA            Status: CORRIGIDO (v0.8)   Observado: SIM
+  Sintoma    : Clicar em Interromper sem nada acontecendo, ou em Repetir antes
+               da primeira resposta, não fazia nada visível.
+  Correção   : Interromper só fica ativo enquanto o NEXUS ouve, pensa ou fala;
+               Repetir só depois que existe uma resposta. Desativados ficam
+               esmaecidos e não clicáveis.
 
 ================================================================================
  INT — INTEGRAÇÃO COM A LANDING PAGE

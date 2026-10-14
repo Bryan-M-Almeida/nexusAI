@@ -277,6 +277,38 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .records { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); padding: 6px; margin: 6px 0; max-height: 200px; overflow: auto; }
 .records div { padding: 3px 0; border-bottom: 1px solid rgba(74, 144, 226, .08); }
 
+/* ---------------------------------------------------------------- v0.8: window controls, transcript, copy, ring hover */
+.win-sep { width: 1px; height: 22px; background: var(--line-strong); margin: 0 2px; }
+.win-btn.danger:hover { color: #fff; border-color: var(--red); background: rgba(229, 50, 45, .35); }
+.dock-btn:disabled { opacity: .28; cursor: default; pointer-events: none; }
+/* Text is selectable everywhere it is content (pywebview text_select=True); controls stay unselectable. */
+.msg .txt, .list .body, .caption, .records, .profile-card, .modal-box p { user-select: text; cursor: text; }
+button, .dock, .rail, .topbar, .core-label { user-select: none; }
+.msg { position: relative; }
+.msg-copy { position: absolute; top: 4px; right: 4px; padding: 2px 6px; background: rgba(7, 11, 17, .9); border: 1px solid var(--line);
+  color: var(--muted); font-family: var(--f-mono); font-size: 10px; letter-spacing: .08em; opacity: 0; transition: opacity .15s; }
+.msg:hover .msg-copy { opacity: 1; }
+.msg-copy:hover { color: var(--text); border-color: var(--line-strong); }
+.msg-copy.done { color: var(--blue-bright); opacity: 1; }
+/* Audio mode + transcript: the conversation stays visible on the right while NEXUS talks. */
+.app[data-mode="audio"].transcript .chatview { opacity: 1; pointer-events: auto; top: 70px; bottom: 96px; left: auto; right: 24px;
+  width: min(440px, 36vw); transform: none; padding: 10px; background: rgba(7, 11, 17, .78); border: 1px solid var(--line);
+  backdrop-filter: blur(8px); }
+.app[data-mode="audio"].transcript .stage { right: min(464px, 38vw); }
+.app[data-mode="audio"].transcript .msg { max-width: 94%; font-size: 15px; }
+.app[data-mode="audio"].transcript .caption { display: none; }
+.core-hover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  opacity: 0; transition: opacity .35s; pointer-events: none; }
+.core:hover .core-hover { opacity: 1; }
+.core-hover .wordmark { font-size: calc(var(--size) * .055); justify-content: center; }
+.core-hover .mono { font-size: max(10px, calc(var(--size) * .022)); letter-spacing: .3em; color: var(--blue-bright); }
+.col { overflow-y: auto; }
+@media (max-width: 900px) {
+  .drawer-box { grid-template-columns: 1fr; overflow-y: auto; height: 92vh; }
+  .drawer-box .col { overflow: visible; }
+  .drawer-box .panel.grow { min-height: 260px; }
+}
+
 /* ---------------------------------------------------------------- modals & toasts */
 .modal { position: fixed; inset: 0; z-index: 20; background: rgba(3, 5, 8, .78); display: grid; place-items: center; padding: 20px; backdrop-filter: blur(4px); }
 .modal-box { width: min(560px, 100%); max-height: 92vh; overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line-strong); padding: 26px; position: relative; animation: rise .4s var(--ease-out); }

@@ -117,6 +117,26 @@ check("modo Direto responde mais curto", len(short_answer.split()) < len(long_an
 en = ask("What do the Stoics say about things outside our control? One sentence.")
 check("responde em inglês", bool(re.search(r"\b(the|control|what)\b", en.lower())) and " não " not in en, en)
 
+# 7) Quiz honesty, "I didn't get the joke" and error reports (v0.8, from the 2026-10-14 USMLE conversation)
+from nexus import i18n  # noqa: E402
+
+settings["language"] = "pt"
+tool_calls = []
+brain.emit = lambda event, payload: tool_calls.append(payload["name"]) if event == "tool" else None
+ask("Me faça um simulado de 2 perguntas de múltipla escolha sobre primeiros socorros, uma de cada vez.")
+tool_calls.clear()
+graded = ask("Letra A")
+check("simulado: corrige a resposta na hora", bool(re.search(r"(corret|errad|incorret|acertou|errou)", graded.lower())), graded)
+check("simulado: não guarda respostas com record_data", "record_data" not in tool_calls, str(tool_calls))
+joke = ask("Me conta uma piada curta.")
+explained = ask(i18n.t("clearer_request", said="não entendi a piada"))
+check("piada: explica em vez de repetir", explained.strip() != joke.strip()
+      and bool(re.search(r"(porque|trocadilho|graça|significa|sentido|duplo|refere)", explained.lower())), explained)
+tool_calls.clear()
+ask("Salve essa conversa para relatar erros: a IA errou o simulado.")
+check("relatar erro: chama report_issue", "report_issue" in tool_calls, str(tool_calls))
+settings["language"] = "auto"
+
 passed = sum(ok for _, ok in results)
 print(f"\n{passed}/{len(results)} checks passed")
 raise SystemExit(0 if passed == len(results) else 1)

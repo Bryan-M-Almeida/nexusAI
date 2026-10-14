@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 import webview
 
-from . import __version__, assistant, bridge, control, i18n, knowledge, llm, memory, profile, scheduler, tools
+from . import MODEL_NAME, __version__, assistant, bridge, control, i18n, knowledge, llm, memory, profile, scheduler, tools
 from .config import WEB_DIR, settings
 from .db import db
 from .i18n import LANGS, detect, lang
@@ -113,7 +113,7 @@ class Api:
         step("voice", self._listener.model_state != "error", f"{settings['stt_model']} · {self._listener.model_state}")
         self._sync_listening()
         return {"profile": db.get_profile(), "lang": lang(), "llm": st, "settings": dict(settings),
-                "stt": self._listener.model_state, "version": __version__}
+                "stt": self._listener.model_state, "version": __version__, "model_name": MODEL_NAME}
 
     def _warm_up(self):
         """Load the model and cache the fixed prompt while the boot animation plays (v0.6: 1st reply 30 s -> ~1 s)."""
@@ -162,7 +162,10 @@ class Api:
     def set_ai_mode(self, mode):
         """Left rail: "assistant" (complete) or "direct" (shortest exact answer)."""
         settings.apply({"ai_mode": mode if mode in assistant.MODES else "assistant"})
-        return self.state()
+        spoken = i18n.t("mode_on", mode=i18n.t("mode_" + settings["ai_mode"]))
+        self._speaker.stop()
+        self._speaker.say(spoken, remember=False)
+        return {**self.state(), "spoken": spoken}
 
     def set_temporary(self, on):
         """Right rail: temporary conversation - kept only in RAM, never saved, nothing learned automatically."""
@@ -174,7 +177,7 @@ class Api:
         return {"ui_mode": settings["ui_mode"], "mic_muted": settings["mic_muted"],
                 "voice_enabled": settings["voice_enabled"], "stt": self._listener.model_state,
                 "stt_error": self._listener.model_error, "ai_mode": settings["ai_mode"],
-                "temporary": memory.temporary}
+                "temporary": memory.temporary, "can_repeat": bool(assistant.last_reply())}
 
     def interrupt(self):
         """Dock "interrupt" / Esc: stop speaking and cancel the answer being generated."""
@@ -204,7 +207,7 @@ class Api:
             self._brain.interrupt()
         emit("control", {"action": action})
 
-    def _handle_control(self, action):
+    def _handle_control(self, action, said=""):
         """Short commands recognised locally: act instantly, no model round trip."""
         if action in ("pause", "resume", "stop"):
             self._speech_control(action)
@@ -222,12 +225,13 @@ class Api:
         else:  # clearer: say so right away, then let the model rephrase
             emit("control", {"action": "clearer", "intro": i18n.t("clearer_intro")})
             self._speaker.say(i18n.t("clearer_intro"), remember=False)
-            threading.Thread(target=self._brain.ask, args=(i18n.t("clearer_request"),), daemon=True).start()
+            request = i18n.t("clearer_request", said=said.strip() or "?")
+            threading.Thread(target=self._brain.ask, args=(request,), daemon=True).start()
 
     def send(self, text, spoken=False):
         action = control.detect(text)
         if action:
-            self._handle_control(action)
+            self._handle_control(action, text)
             return {"control": action}
         self._reply_lang = detect(text) or lang()
         threading.Thread(target=self._brain.ask, args=(text, spoken), daemon=True).start()
@@ -260,11 +264,30 @@ class Api:
         action = control.detect(text)
         if action:
             emit("heard", {"text": text, "control": action})
-            self._handle_control(action)
+            self._handle_control(action, text)
         elif not during_speech:  # while NEXUS talks only control commands count (echo protection)
             emit("heard", {"text": text})
             self._reply_lang = detect(text) or lang()
             threading.Thread(target=self._brain.ask, args=(text, True), daemon=True).start()
+
+    def report_issue(self):
+        """Settings button: save this conversation to a report file and show it in Explorer."""
+        result = tools.report_issue("Relatório gerado pelo botão das Configurações")
+        try:
+            os.startfile(os.path.dirname(result["file"]))
+        except Exception:
+            pass
+        return result
+
+    # -- window ----------------------------------------------------------------
+    def toggle_fullscreen(self):
+        _window.toggle_fullscreen()
+
+    def minimize(self):
+        _window.minimize()
+
+    def quit(self):
+        _window.destroy()
 
     # -- profile ---------------------------------------------------------------
     def _on_profile(self, prof):
@@ -384,7 +407,10 @@ def selftest() -> dict:
         import faster_whisper  # noqa: F401
         import sounddevice as sd
 
-        report["stt"] = {"ok": True, "input_device": sd.query_devices(kind="input")["name"]}
+        from .voice import SpeechDetector
+
+        report["stt"] = {"ok": True, "input_device": sd.query_devices(kind="input")["name"],
+                         "vad": "silero" if SpeechDetector().session is not None else "energy (fallback)"}
     except Exception as exc:
         report["stt"] = {"ok": False, "error": repr(exc)}
     (DATA_DIR / "selftest.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), "utf-8")
@@ -400,6 +426,7 @@ def main():
     _window = webview.create_window(
         "N.E.X.U.S", str(WEB_DIR / "index.html"), js_api=api,
         width=1360, height=860, min_size=(980, 660), background_color="#030508",
+        fullscreen=not os.environ.get("NEXUS_WINDOWED"), text_select=True,
     )
     webview.start(debug=bool(os.environ.get("NEXUS_DEBUG")))
     llm.unload()  # window closed: give the VRAM back to games and other apps

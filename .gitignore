@@ -15,7 +15,7 @@ data_backup*/
 
 # Build output
 build/
-dist/
+dist*/
 *.spec
 
 # Local tool config

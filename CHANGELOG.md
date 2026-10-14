@@ -8,6 +8,61 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.8.0 — Protótipo · 2026-10-14
+
+**Voz que entende e para de ouvir na hora certa, conversa visível no modo áudio e correções da conversa real.**
+
+### Voz (medido com `tests/bench_voice.py`: 20 frases sintetizadas, vozes Maria e Daniel, com ruído de ventilador)
+| | v0.7 | v0.8 |
+|---|---|---|
+| Gravações encerradas com ruído médio/alto | **0/6** (ficava "ouvindo" até 30 s) | **6/6**, logo após o fim da fala |
+| Erro de palavras (WER) | 24,5% | **12,1%** |
+| "Nexus" reconhecido | 2/6 | **6/6** |
+| Tempo de transcrição por frase | 3,2 s | **2,0 s** |
+
+- **Microfone ativo por muito tempo** (NX-VOZ-004): o detector por volume foi trocado pelo **Silero VAD**, uma rede
+  neural que separa voz de ruído (~0,2 ms por quadro, já incluída no faster-whisper; sem download novo).
+- **Áudio mal reconhecido** (NX-VOZ-017): idioma fixo (Configurações ou perfil) em vez de adivinhar, busca beam 5,
+  vocabulário inicial com "NEXUS" e o seu nome, normalização de volume para microfones baixos e descarte de
+  trechos que o Whisper marca como "sem fala" (fim das frases fantasmas como "Obrigado.").
+- **"Nexus" não ativava** (NX-VOZ-003): reconhece também "Nécsus", "Neksus", "Nexis", "Nek us"...
+
+### Interface
+- **Transcrição no modo áudio** (NX-UI-008): botão na barra inferior mostra a conversa à direita sem sair do modo
+  áudio; com ela fechada, a resposta aparece como legenda enquanto é gerada.
+- **Texto selecionável** e botão **Copiar** em cada mensagem.
+- **Clicar fora fecha** Configurações, Painel e Perfil.
+- **Sempre em tela cheia**, com minimizar / tela cheia (F11) / fechar na barra superior.
+- **Interromper/Repetir desativados** quando não há nada para interromper ou repetir (NX-UI-009).
+- Ao trocar o modo da IA, o NEXUS diz **"Executando em modo Direto/Assistente"**.
+- Passar o mouse no aro mostra **N.E.X.U.S · NEX-1.0** (nome do modelo exibido ao usuário).
+- Gaveta do Painel rola em telas pequenas (colunas com rolagem própria; uma coluna abaixo de 900 px).
+
+### Conversa (da conversa real de 2026-10-14)
+- **Simulados/quiz** (NX-LLM-024): cada resposta é corrigida na hora, nada de guardar respostas com `record_data`,
+  "correto" só depois de conferir e "vamos começar?" no máximo uma vez.
+- **"Não entendi a piada"** (NX-LLM-025): o pedido ao modelo leva as suas palavras e pede o significado (numa piada,
+  o trocadilho), em vez de repetir a mesma frase.
+- **Relatar erro**: diga "salve essa conversa para relatar erros" ou use o botão nas Configurações; a conversa,
+  as ações recentes e as configurações vão para `reports/nexus-report-<data>.md` na pasta de dados. É feito na hora,
+  sem passar pelo modelo (na avaliação ele também registrava o pedido como dado e respondia com um id).
+- **Simulado de primeiros socorros abria o modo emergência** (NX-LLM-022, achado na avaliação): mensagens de estudo
+  (simulado, quiz, prova, perguntas, curso…) não acionam mais o protocolo, a menos que soem urgentes
+  ("agora", "socorro", "não respira"…).
+- **Trava de segurança da RCP** (NX-LLM-021, achado na avaliação): mesmo com o manual no contexto, o modelo respondeu
+  "não deixe por mais de 10 minutos… interrompa". Agora, respostas de acompanhamento em emergência são conferidas
+  antes de aparecer/serem faladas; se mandarem parar a RCP ou citarem limite de minutos, são trocadas pela linha
+  literal do manual ("Não pare até a vítima reagir, a equipe chegar ou você não aguentar mais").
+- Caminhos de arquivo e trechos de código entre crases aparecem na tela, mas não são lidos em voz alta.
+- Latência conferida contra a v0.7 com `tests/bench_latency.py` (mesmas 9 mensagens): 7,3 s × 7,2 s até a 1ª
+  palavra. Sem regressão.
+
+### Testes desta versão
+- 81/81 testes unitários (22 novos: palavra de ativação, VAD com ruído, ganho, vocabulário, relatório, simulado ≠ emergência, trava da RCP).
+- Verificações de conversa com qwen3:8b ampliadas com simulado, piada e relatório (resultado nas notas da release).
+
+---
+
 ## v0.7.0 — Protótipo · 2026-10-14
 
 **Correções de usabilidade, modos da IA e conversa temporária.**
