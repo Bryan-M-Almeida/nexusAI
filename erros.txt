@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 1.2  ·  Data: 2026-10-13  ·  Versão do app: 0.3.0
+ Versão do documento: 1.3  ·  Data: 2026-10-13  ·  Versão do app: 0.4.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -65,6 +65,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-016  Memória automática salva fatos redundantes ou genéricos
       NX-LLM-017  Argumentos inventados pelo modelo em ferramentas
       NX-LLM-018  IA resolve "repete"/"explica melhor" conversando, sem a ferramenta
+      NX-LLM-019  Pergunta ambígua respondida com assunto de outra conversa
+      NX-LLM-020  Valores imprecisos ou contraditórios em perguntas factuais
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -79,6 +81,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-VOZ-012  Comandos durante a fala falham com caixas de som
       NX-VOZ-013  Frase dita enquanto o NEXUS fala é ignorada
       NX-VOZ-014  Modo "apenas áudio" responde a conversas ao redor / TV
+      NX-VOZ-015  Voz "de aparelho de fumante" (laringe eletrônica), difícil de entender
+      NX-VOZ-016  Nome pronunciado "NÊXUS" (ou soletrado "N, E, X, U, S")
  DAT  NX-DAT-001  Base de conhecimento não encontra um assunto existente
       NX-DAT-002  PDF importado sem texto ("Não consegui extrair texto")
       NX-DAT-003  "Data inválida" ao criar evento/tarefa
@@ -102,6 +106,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-ENV-004  Antivírus bloqueia ou remove o NEXUS.exe
       NX-ENV-005  Executável abre e fecha / módulo não encontrado
       NX-ENV-006  Porta 11434 ocupada ou dois Ollama rodando
+      NX-ENV-007  Dados de teste apareceram nos dados reais do usuário
 
 
 ================================================================================
@@ -156,6 +161,10 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                data\settings.json. Evite modelos menores que 7-8B para uso
                com ferramentas. Ao adicionar novas frases de confirmação em
                outros idiomas, atualize a regex CLAIMED em assistant.py.
+  v0.4       : A rede de segurança também olha o PEDIDO do usuário: se ele
+               disse "aprenda que", "lembra que", "me lembra de" ou "registra"
+               e a ferramenta correspondente não foi chamada, o NEXUS exige a
+               chamada (caso real: "Aprenda que o wifi..." era só ecoado).
 
 [NX-LLM-004] Contexto truncado em 4096 tokens pela API /v1 do Ollama
   Severidade : ALTA             Status: CORRIGIDO          Observado: SIM
@@ -339,6 +348,41 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                "para de falar", "chega"... são sempre reconhecidos. Para novas
                expressões, edite PATTERNS/LEADING em nexus/control.py.
 
+[NX-LLM-019] Pergunta ambígua respondida com assunto de outra conversa
+  Severidade : ALTA             Status: CORRIGIDO (v0.4)   Observado: SIM
+  Sintoma    : Conversa real de 2026-10-13: após perguntas sobre o peso do
+               coração, "fale os valores exatos" foi respondido com "Você
+               gastou R$ 18,00 no almoço e R$ 42,00 no mercado".
+  Causa      : (1) o histórico enviado à IA eram as 24 últimas mensagens, sem
+               limite de tempo, incluindo uma conversa de 1 h antes sobre
+               gastos; (2) o log de ações recentes ("Registrou em 'gastos'...")
+               ia no contexto de toda mensagem; (3) "valores" é ambíguo e o
+               modelo de 8B escolheu o "valor" mais saliente (dinheiro).
+  Correção   : - histórico só da sessão atual (desde que o app abriu; 2 h de
+                 silêncio também encerram a sessão) - memory.session_start();
+               - log de ações só da sessão e dos últimos 15 minutos;
+               - regra: perguntas curtas/elípticas referem-se à última
+                 resposta;
+               - a busca na base usa a pergunta anterior quando a mensagem tem
+                 menos de 6 palavras.
+  Como verificar: tests\conversation_eval.py reproduz o caso com uma sessão
+               antiga de gastos plantada 3 h antes.
+
+[NX-LLM-020] Valores imprecisos ou contraditórios em perguntas factuais
+  Severidade : MÉDIA            Status: MITIGADO           Observado: SIM
+  Sintoma    : "O coração de uma mulher pesa entre 250 e 350 g, semelhante ao
+               do homem" e, em seguida, "250 a 300 g" (contradição). Valores de
+               referência: homem ~280-340 g, mulher ~230-280 g.
+  Causa      : A base não tinha anatomia; o modelo respondeu "de memória", e
+               modelos de 8B são imprecisos com números. Também não disse que
+               "valor exato" não existe.
+  Correção   : - livro "Anatomia" (PT/EN/ES) com pesos de órgãos, sinais
+                 vitais, sangue, ossos e valores de referência;
+               - regra: dar média e faixa, dizer quando não existe valor
+                 exato, manter coerência e corrigir explicitamente.
+  Limitação  : Fora dos temas da base, o modelo ainda pode errar números.
+               Ensine fontes confiáveis ao NEXUS (botão Ensinar / inbox).
+
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE
 ================================================================================
@@ -447,12 +491,13 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
 
 [NX-VOZ-011] Efeito de voz "J.A.R.V.I.S"/"Robô" soa abafado ou metálico demais
   Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
-  Causa      : Os efeitos (anel de modulação, filtro metálico, faixa de
-               frequência limitada e eco curto) variam muito conforme o
-               alto-falante; caixas de notebook realçam o som metálico.
-  Dicas      : Use "J.A.R.V.I.S" (sutil) no dia a dia e "Robô" só para efeito.
-               "Natural" desliga o processamento. Para ajustar, edite os
-               parâmetros em apply_effect() (nexus/tts.py) e use "Testar voz".
+  Causa      : Efeitos variam muito conforme o alto-falante. Desde a v0.4 o
+               "J.A.R.V.I.S" é limpo (realce de presença 2-5 kHz, brilho de
+               1,2 ms e ambiente curto, sem modulação em anel); o "Robô"
+               mantém modulação em anel e filtro metálico de propósito.
+  Dicas      : Use "J.A.R.V.I.S" no dia a dia e "Robô" só para efeito.
+               "Natural" desliga o processamento. Para ajustar, edite
+               apply_effect() (nexus/tts.py) e use "Testar voz".
 
 [NX-VOZ-012] Comandos durante a fala falham com caixas de som
   Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
@@ -478,6 +523,27 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Solução    : Ative "Só responder quando eu disser Nexus" em Configurações,
                mute o microfone pela dock quando não estiver usando, ou use o
                modo "apenas mensagens".
+
+[NX-VOZ-015] Voz "de aparelho de fumante" (laringe eletrônica), difícil de entender
+  Severidade : ALTA             Status: CORRIGIDO (v0.4)   Observado: SIM
+  Causa      : O efeito J.A.R.V.I.S (v0.2-v0.3) multiplicava a voz por um tom
+               de 45 Hz (modulação em anel), além de filtro metálico e corte
+               acima de 7 kHz. Medido: zumbido 16 a 24 vezes acima da voz
+               natural e consoantes sem realce.
+  Correção   : Efeito novo sem modulação: realce de presença em 2-5 kHz,
+               brilho de 1,2 ms e ambiente curto. Medido: zumbido 1,2-1,5x,
+               fidelidade 0,88 -> 0,97, energia das consoantes ~2x.
+  Como verificar: tests\test_units.py compara com a modulação antiga.
+
+[NX-VOZ-016] Nome pronunciado "NÊXUS" (ou soletrado "N, E, X, U, S")
+  Severidade : BAIXA            Status: CORRIGIDO (v0.4)   Observado: SIM
+  Causa      : As vozes em português/espanhol leem "Nexus" com E fechado e
+               soletram "N.E.X.U.S".
+  Correção   : O texto enviado à voz troca o nome por "Nécsus" (pt/es), que
+               soa NÉCSUS / NÉ-QUI-SÚS; a tela continua mostrando N.E.X.U.S
+               (tts.pronounce()).
+  Dicas      : Se uma voz nova ainda pronunciar errado, ajuste _SPOKEN_NAME
+               em nexus/tts.py (ex.: "Néquissus").
 
 ================================================================================
  DAT — DADOS, MEMÓRIA E CONHECIMENTO
@@ -689,6 +755,19 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                Ollama está na bandeja. Para reiniciar, saia pelo ícone e abra
                de novo.
 
+
+[NX-ENV-007] Dados de teste apareceram nos dados reais do usuário
+  Severidade : ALTA             Status: CORRIGIDO (v0.4)   Observado: SIM
+  Sintoma    : Perfil "Alex Martins", gastos, compromissos e memórias que o
+               usuário nunca criou (ex.: "gatos Pixel e Byte").
+  Causa      : Um script de teste da equipe rodou sem a variável NEXUS_HOME
+               e gravou em .\data (pasta real) em vez de uma pasta temporária.
+  Correção   : Os testes ficam em tests/ e importam tests/_isolated.py
+               primeiro, que cria uma pasta temporária e se RECUSA a rodar se
+               o NEXUS apontar para outra pasta. A pasta data/ foi zerada
+               (backup em data_backup_20261013-2101/).
+  Dicas      : Nunca teste com a pasta real; para inspecionar dados reais,
+               abra uma CÓPIA do nexus.db.
 
 ================================================================================
  HISTÓRICO DE TESTES (2026-10-13)

@@ -124,10 +124,11 @@ class Speaker:
         self._ready.set()
         while True:
             text = self.q.get()
-            voice, pitch = engine.pick(detect(text) or lang(), settings["voice_gender"])
+            code = detect(text) or lang()
+            voice, pitch = engine.pick(code, settings["voice_gender"])
             self.speaking.set()
             self.on_state("speaking")
-            sentences, i = tts.split_sentences(text), 0
+            sentences, i = tts.split_sentences(tts.pronounce(text, code)), 0
             try:
                 while i < len(sentences) and not self.interrupt.is_set():
                     if self.paused.is_set():  # wait for resume(); the cut sentence is replayed

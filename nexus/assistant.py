@@ -12,6 +12,7 @@ from .i18n import WEEKDAYS, detect, lang, t
 
 MAX_TOOL_ROUNDS = 6
 KB_MIN_SCORE = -7.5  # calibrated on the seed books: real matches score below this, noise above
+ACTIONS_WINDOW_MIN = 15
 
 IDENTITY = """You are N.E.X.U.S (Networked Experiential Intelligence & User System), a personal AI assistant
 inspired by J.A.R.V.I.S, running locally on the user's computer. You remember the user, manage their tasks,
@@ -30,6 +31,11 @@ Rules:
 - Questions about agenda, schedule, commitments or pending items: answer from BOTH the "Upcoming
   appointments" and "Pending to-do tasks" context sections; appointments are commitments too. List every item.
 - Never show internal ids (#12) to the user; ids are only for tool calls.
+- Short or elliptical follow-ups ("and for a woman?", "tell me the exact values", "why?") refer to YOUR LAST ANSWER
+  and the user's last question, never to older topics, memories or the action log.
+- Numbers and facts: give the typical average and the usual range. If there is no single exact value (body
+  measurements, prices, populations...), say so clearly. Stay consistent with what you already said; if you
+  were wrong, correct yourself explicitly ("Correcting: ..."). Never invent precision.
 - Requests about your own speech -> call `conversation_control`: repeat what you said ("repeat"), the user didn't
   understand ("clearer"), wait/hold on ("pause"), go on ("resume"), be quiet ("stop").
 - For factual questions (first aid, philosophy, finance, programming, health, productivity...) prefer the knowledge base;
@@ -76,7 +82,10 @@ def build_context(user_text: str) -> str:
     if mems:
         parts.append("\n## What you remember about the user\n" + "\n".join(
             f"- [#{m['id']}] {m['content']}" for m in list(mems.values())[:12]))
-    actions = memory.recent_actions(6)
+    # Only what NEXUS did moments ago in this session ("cancel what you just scheduled"); older actions
+    # pulled unrelated topics into ambiguous questions (NX-LLM-019).
+    recent = max(memory.session_start(), (now - timedelta(minutes=ACTIONS_WINDOW_MIN)).isoformat(timespec="seconds"))
+    actions = memory.recent_actions(5, since=recent)
     if actions:
         parts.append("\n## Log of your recent actions (history only, NOT appointments)\n" + "\n".join(f"- {a['ts'][:16]} {a['summary']}" for a in actions))
     upcoming, pending = _upcoming(), _pending_tasks()
@@ -88,7 +97,12 @@ def build_context(user_text: str) -> str:
         or "- none"))
     # Only inject knowledge that clearly matches (BM25: more negative = better). Every token here costs
     # prompt-processing time on each turn; the model can still call search_knowledge on its own.
-    hits = [h for h in knowledge.search(user_text, limit=3) if h["score"] <= KB_MIN_SCORE]
+    # Short follow-ups ("and for a woman?") carry no keywords: search with the previous question too.
+    kb_query = user_text
+    if len(user_text.split()) < 6:
+        previous_user = next((m["content"] for m in reversed(memory.history(3)) if m["role"] == "user"), "")
+        kb_query = f"{previous_user} {user_text}"
+    hits = [h for h in knowledge.search(kb_query, limit=3) if h["score"] <= KB_MIN_SCORE]
     hits = [h for h in hits if h["score"] <= hits[0]["score"] * 0.6][:2] if hits else []
     if hits:
         parts.append("\n## Possibly relevant knowledge (local base)\n" + "\n\n".join(
@@ -114,7 +128,26 @@ DEFERRED = re.compile(
     re.IGNORECASE)
 
 
-def _needs_tool(reply: str, acted: bool) -> str | None:
+# What the USER asked for -> tools that must have been called this turn (the model sometimes just echoes
+# "Aprende que..." without storing anything).
+INTENTS = [
+    (re.compile(r"^\W*(nexus\W+)?(aprend[aei]|learn( that)?|memorize this|aprende que)\b", re.I),
+     {"learn_knowledge", "remember"}, "learn_knowledge"),
+    (re.compile(r"^\W*(nexus\W+)?(lembr[ae] que|guard[ae] que|remember that|recuerda que|no olvides que)\b", re.I),
+     {"remember", "learn_knowledge"}, "remember"),
+    (re.compile(r"^\W*(nexus\W+)?(me lembr[ae] de|remind me|recu[eé]rdame)\b", re.I),
+     {"set_reminder", "add_event", "add_task"}, "set_reminder"),
+    (re.compile(r"^\W*(nexus\W+)?(registr[ae]|anot[ae]|log|track|record|apunta)\b", re.I),
+     {"record_data", "save_note", "add_task", "remember"}, "record_data"),
+]
+
+
+def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None = None) -> str | None:
+    for rx, expected, tool in INTENTS:
+        if rx.search(user_text) and not (called or set()) & expected:
+            return (f"The user explicitly asked you to store this, but you did NOT call any tool, so nothing was saved. "
+                    f"Call `{tool}` now with the information from the user's message, then confirm briefly in the "
+                    f"user's language.")
     if not acted and CLAIMED.search(reply):
         return ("You said you stored/recorded something but you did NOT call any tool, so nothing was saved. "
                 "Call the correct tool now (record_data, remember, learn_knowledge, add_task, add_event, save_note...), "
@@ -160,7 +193,7 @@ class Assistant:
                     {"role": "user", "content": f"<context>\n{build_context(text)}\n</context>\n\n{text}"}]
         previous = last_reply()
         memory.add_message("user", text)
-        reply, changed, nudged, finished, round_text = "", False, False, False, ""
+        reply, changed, nudged, finished, round_text, called = "", False, False, False, "", set()
         try:
             for _ in range(MAX_TOOL_ROUNDS):
                 round_text, calls = "", None
@@ -176,7 +209,7 @@ class Assistant:
                     reply = round_text
                     break
                 if not calls:
-                    nudge = None if nudged else _needs_tool(round_text, changed)
+                    nudge = None if nudged else _needs_tool(round_text, changed, text, called)
                     if nudge:  # the model claimed/deferred an action without calling a tool: ask again once
                         nudged = True
                         self.emit("reset", None)
@@ -204,6 +237,7 @@ class Assistant:
                     else:
                         result = tools.execute(c["name"], args)
                         changed |= c["name"] in tools.MUTATING
+                        called.add(c["name"])
                     messages.append({"role": "tool", "tool_call_id": c["id"], "name": c["name"],
                                      "content": json.dumps(result, ensure_ascii=False, default=str)[:6000]})
                 if finished:

@@ -8,6 +8,39 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.4.0 — Protótipo · 2026-10-13
+
+**Correções da primeira conversa real.** Análise completa nos catálogos de erros (NX-LLM-019, NX-LLM-020, NX-VOZ-015,
+NX-VOZ-016, NX-ENV-007).
+
+### Corrigido
+- **Pergunta ambígua respondida com assunto antigo** (NX-LLM-019): "fale os valores exatos", logo após falar do peso
+  do coração, foi respondida com gastos de uma conversa de 1 hora antes.
+  - O histórico enviado à IA agora é só o da **sessão atual** (desde que o app abriu; 2 h de silêncio também encerram a sessão).
+  - O log de ações vai para o contexto só se for da sessão e dos **últimos 15 minutos**.
+  - Regra: perguntas curtas ("e de uma mulher?", "por quê?") referem-se à última resposta.
+  - A busca na base usa também a pergunta anterior quando a mensagem é curta.
+- **Valores imprecisos/contraditórios** (NX-LLM-020): peso do coração da mulher igual ao do homem e depois outro valor.
+  - Novo livro **Anatomia** (PT/EN/ES): pesos de órgãos, sinais vitais, sangue, ossos, valores de referência.
+  - Regra: dar média e faixa, dizer quando não existe valor exato e corrigir explicitamente o que disse antes.
+- **"Aprenda que..." ecoado sem salvar**: a rede de segurança agora também olha o pedido do usuário ("aprenda que",
+  "lembra que", "me lembra de", "registra") e exige a ferramenta correspondente.
+- **Voz de "aparelho de fumante"** (NX-VOZ-015): o efeito J.A.R.V.I.S tinha modulação em anel (zumbido 16–24× acima do
+  natural). Novo efeito: realce de presença nas consoantes, brilho sutil e ambiente curto; fidelidade 0,88 → 0,97.
+- **Pronúncia "NÊXUS"** (NX-VOZ-016): a voz agora fala "NÉCSUS" (NÉ-QUI-SÚS) em português e espanhol (a tela continua N.E.X.U.S).
+- **Dados de teste gravados na pasta real** (NX-ENV-007): os testes agora ficam em `tests/` e sempre usam uma pasta
+  temporária; a pasta `data/` foi zerada (backup em `data_backup_20261013-2101/`).
+
+### Novo
+- Velocidade da voz até **+10** (Configurações → Velocidade).
+- `tests/test_units.py` (sem IA, segundos) e `tests/conversation_eval.py` (IA real: reproduz a conversa do erro e a
+  bateria de ferramentas).
+
+### Testes desta versão
+- 25/25 testes unitários; 10/10 verificações de conversa com qwen3:8b.
+
+---
+
 ## v0.3.0 — Protótipo · 2026-10-13
 
 **Interface minimalista e controle da conversa.**
@@ -89,7 +122,7 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ## Próximas versões (planejamento)
 
-### v0.4.0 — Protótipo (próxima)
+### v0.5.0 — Protótipo (próxima)
 A definir com o usuário.
 
 ### Versões seguintes (a definir com o usuário)

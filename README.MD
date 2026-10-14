@@ -130,7 +130,7 @@ Esses comandos são reconhecidos **localmente** (instantâneo) e funcionam **mes
 
 ### Voz do NEXUS
 
-Em *Configurações*: **voz masculina ou feminina**, **efeito** (`J.A.R.V.I.S` sutil, `Robô` forte ou `Natural`), velocidade e o botão **Testar voz**.
+Em *Configurações*: **voz masculina ou feminina**, **efeito** (`J.A.R.V.I.S` limpo com brilho digital, `Robô` forte ou `Natural`), **velocidade** (de −5 a +10) e o botão **Testar voz**. O nome é sempre falado "NÉCSUS" (NÉ-QUI-SÚS).
 
 - Usa as vozes SAPI do Windows, inclusive as "OneCore" (ex.: **Microsoft Daniel**, masculina em pt-BR). Vozes encontradas no PC de teste: Maria (pt, fem.), Daniel (pt, masc.), Zira (en, fem.).
 - Se o gênero escolhido não existir no idioma, o NEXUS usa a outra voz com o tom ajustado e avisa na tela. Instale mais vozes (ex.: David/Mark em inglês, qualquer voz em **espanhol**) em *Configurações do Windows → Hora e idioma → Fala → Adicionar vozes*.
@@ -140,6 +140,15 @@ Em *Configurações*: **voz masculina ou feminina**, **efeito** (`J.A.R.V.I.S` s
 
 - Desenvolvimento: `./data/`. Executável instalado: `%LOCALAPPDATA%\NEXUS\`.
 - `nexus.db` (SQLite com tudo), `settings.json` e `inbox/`. Arquivos .md/.txt/.pdf colocados em `inbox/` são aprendidos no próximo boot.
+
+## Testes
+
+Os testes **sempre** usam uma pasta de dados temporária, então nunca tocam nos seus dados.
+
+```powershell
+.\.venv\Scripts\python tests\test_units.py          # segundos, sem IA
+.\.venv\Scripts\python tests\conversation_eval.py   # alguns minutos, precisa do Ollama
+```
 
 ## Gerar o executável
 
@@ -182,4 +191,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.3.0 (protótipo)**.
+Versão atual: **v0.4.0 (protótipo)**.

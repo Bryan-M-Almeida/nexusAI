@@ -103,22 +103,44 @@ def _taps(x: np.ndarray, taps) -> np.ndarray:
     return out
 
 
+def _eq(x: np.ndarray, high_pass: float, presence_db: float, center: float = 3200, width_oct: float = 1.2,
+        low_pass: float = 10000) -> np.ndarray:
+    """Zero-phase EQ via FFT: high-pass + a bell boost in the consonant range (clarity) + gentle top roll-off."""
+    spec = np.fft.rfft(x)
+    f = np.maximum(np.fft.rfftfreq(len(x), 1 / RATE), 1.0)
+    hp = 1 / np.sqrt(1 + (high_pass / f) ** 4)
+    lp = 1 / np.sqrt(1 + (f / low_pass) ** 8)
+    bell = 10 ** (presence_db / 20 * np.exp(-0.5 * (np.log2(f / center) / (width_oct / 2)) ** 2))
+    return np.fft.irfft(spec * hp * lp * bell, len(x))
+
+
 def apply_effect(x: np.ndarray, effect: str) -> np.ndarray:
+    """Voice colour. "jarvis" must stay perfectly intelligible: no ring modulation (it made the voice buzz
+    like an electrolarynx) and no band-limiting of consonants; only presence, a faint digital sheen and room."""
     if effect == "none" or len(x) == 0:
         return x
-    x = np.concatenate([x, np.zeros(int(0.25 * RATE), np.float32)])  # room for the echoes
-    t = np.arange(len(x)) / RATE
+    x = np.concatenate([x, np.zeros(int(0.2 * RATE), np.float32)])  # room for the echoes
     if effect == "robot":
-        x = 0.45 * x + 0.55 * x * np.sin(2 * np.pi * 85 * t)                  # strong ring modulation
-        x = _taps(x, [(0.004, 0.6), (0.008, 0.36), (0.012, 0.22), (0.016, 0.13)])  # metallic comb
-        x = _band(x, 200, 5000)
-    else:  # "jarvis": clean voice with a subtle synthetic, "suit speaker" colour
-        metal = _taps(x, [(0.0055, 0.35), (0.011, 0.12)])                   # light metallic flange
-        x = 0.8 * metal + 0.2 * metal * np.sin(2 * np.pi * 45 * t)           # faint ring modulation
-        x = _band(x, 130, 7000)
-        x = _taps(x, [(0.029, 0.16), (0.047, 0.1), (0.071, 0.06)])           # small room
+        t = np.arange(len(x)) / RATE
+        x = 0.6 * x + 0.4 * x * np.sin(2 * np.pi * 70 * t)                  # ring modulation (the robot buzz)
+        x = _taps(x, [(0.005, 0.45), (0.010, 0.2)])                          # metallic comb
+        x = _band(x, 180, 6000)
+    else:  # "jarvis"
+        x = _eq(x, high_pass=90, presence_db=4.0)                            # clarity: consonants 2-5 kHz up
+        x = x + 0.10 * np.roll(x, int(0.0012 * RATE))                        # faint digital sheen (1.2 ms)
+        x = _taps(x, [(0.023, 0.07), (0.037, 0.045)])                        # small, dry room
     peak = float(np.max(np.abs(x))) or 1.0
     return (x / peak * 0.9).astype(np.float32)
+
+
+# The name is pronounced "NÉCSUS" (open E, "NÉ-QUI-SÚS"). Portuguese/Spanish voices read "Nexus" as "NÊXUS" and spell
+# "N.E.X.U.S" letter by letter, so the spoken text uses an accented spelling (the screen keeps N.E.X.U.S).
+_NAME = re.compile(r"\bN\.E\.X\.U\.S\b|\bnexus\b", re.IGNORECASE)
+_SPOKEN_NAME = {"pt": "Nécsus", "es": "Nécsus", "en": "Nexus"}  # NÉCSUS / NÉ-QUI-SÚS
+
+
+def pronounce(text: str, lang: str) -> str:
+    return _NAME.sub(_SPOKEN_NAME.get(lang, "Nexus"), text)
 
 
 def split_sentences(text: str) -> list[str]:
