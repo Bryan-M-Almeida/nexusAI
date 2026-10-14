@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 1.4  ·  Data: 2026-10-13  ·  Versão do app: 0.4.1
+ Versão do documento: 1.5  ·  Data: 2026-10-13  ·  Versão do app: 0.5.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -62,11 +62,13 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-013  Aviso "AMD driver is too old" no log do Ollama
       NX-LLM-014  Modelo rodando parcialmente na CPU (VRAM insuficiente)
       NX-LLM-015  Modo de raciocínio (thinking) deixa o qwen3 lento
-      NX-LLM-016  Memória automática salva fatos redundantes ou genéricos
+      NX-LLM-016  Memória automática salva perguntas como "fatos" ou fatos redundantes
       NX-LLM-017  Argumentos inventados pelo modelo em ferramentas
       NX-LLM-018  IA resolve "repete"/"explica melhor" conversando, sem a ferramenta
       NX-LLM-019  Pergunta ambígua respondida com assunto de outra conversa
       NX-LLM-020  Valores imprecisos ou contraditórios em perguntas factuais
+      NX-LLM-021  Instruções de primeiros socorros erradas e perigosas
+      NX-LLM-022  Modo emergência ativado sem emergência (falso alarme)
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -316,15 +318,22 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                "/no_think" nas instruções do sistema ou desative o raciocínio
                na interface do LM Studio.
 
-[NX-LLM-016] Memória automática salva fatos redundantes ou genéricos
-  Severidade : BAIXA            Status: CONHECIDO          Observado: SIM
-  Sintoma    : Memórias como "O usuário prefere trabalhar de madrugada"
-               parecidas com outras já existentes.
-  Causa      : A extração automática roda após cada conversa e a remoção de
-               duplicatas compara apenas texto idêntico.
-  Contorno   : Remova itens pelo "✕" no painel Memória ou desative
-               "Memorizar fatos automaticamente" em Configurações.
-  Melhoria   : Deduplicação semântica com embeddings (roadmap).
+[NX-LLM-016] Memória automática salva perguntas como "fatos" ou fatos redundantes
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.5)   Observado: SIM
+  Sintoma    : Caso real (2026-10-13): perguntas sobre RCP geraram 6 memórias
+               falsas e repetidas, como "O usuário precisa fazer RCP" e
+               "O usuário está interessado em RCP".
+  Causa      : A extração automática rodava após TODA mensagem, recebia
+               também a resposta do NEXUS (o tema virava "interesse") e só
+               descartava duplicatas com texto idêntico.
+  Correção   : - só roda quando o usuário afirma algo sobre si (eu, meu, sou,
+                 tenho, prefiro, I, my, soy, tengo...) e nunca em perguntas
+                 ou emergências - memory.states_fact();
+               - lê apenas a mensagem do usuário, com prompt explícito de que
+                 perguntas não são fatos; no máximo 3 fatos por mensagem;
+               - não salva a mesma ideia com outras palavras (80% de palavras
+                 em comum); negação conta como correção - memory.similar().
+  Dicas      : Remova memórias erradas pelo "✕" no Painel > Memória.
 
 [NX-LLM-017] Argumentos inventados pelo modelo em ferramentas
   Severidade : MÉDIA            Status: CORRIGIDO          Observado: SIM
@@ -382,6 +391,39 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                  exato, manter coerência e corrigir explicitamente.
   Limitação  : Fora dos temas da base, o modelo ainda pode errar números.
                Ensine fontes confiáveis ao NEXUS (botão Ensinar / inbox).
+
+[NX-LLM-021] Instruções de primeiros socorros erradas e perigosas
+  Severidade : CRÍTICA          Status: CORRIGIDO (v0.5)   Observado: SIM
+  Sintoma    : Caso real (2026-10-13): "preciso fazer RCP, como faço?" foi
+               respondido com as mãos "sobre o processo xifoide" (o correto
+               é a metade inferior do esterno) e "RCP por 10 a 15 minutos
+               antes de parar" (o correto é não parar até a vítima reagir, a
+               equipe chegar ou você não aguentar mais). 26-37 s por resposta.
+  Causa      : A busca por palavras-chave não encontrava o manual para frases
+               do dia a dia ("preciso fazer RCP" trouxe Existencialismo;
+               "engasgado" não casa com "engasgo") e o modelo improvisou.
+  Correção   : Modo emergência (nexus/emergency.py): emergências comuns em
+               PT/EN/ES são reconhecidas por padrões dedicados. A primeira
+               mensagem é respondida na hora, sem IA, com o número de
+               emergência e o protocolo literal do manual. Perguntas seguintes
+               do mesmo tema vão para a IA com o trecho do manual sempre no
+               contexto e a regra de não acrescentar nada fora dele.
+  Como verificar: tests\conversation_eval.py reproduz a conversa (resposta em
+               0 s, "metade inferior do esterno", "não pare").
+  Importante : O NEXUS não substitui atendimento profissional. Ligue sempre
+               para a emergência e siga a central.
+
+[NX-LLM-022] Modo emergência ativado sem emergência (falso alarme)
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Sintoma    : Frases figuradas como "dor no peito de saudade" mostram o
+               protocolo de infarto.
+  Causa      : O reconhecimento prefere errar para o lado da cautela: mostrar
+               um protocolo à toa custa pouco; deixar de reconhecer uma
+               emergência pode custar uma vida. Contextos técnicos ("o código
+               está sangrando memória") já são ignorados.
+  Contorno   : Continue a conversa normalmente; o protocolo só é repetido
+               depois de 10 minutos. Para novas exceções, ajuste _TECH ou
+               TOPICS em nexus/emergency.py.
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE

@@ -5,7 +5,7 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import knowledge, llm, memory, profile, tools
+from . import emergency, knowledge, llm, memory, profile, tools
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
@@ -63,7 +63,7 @@ def build_system() -> str:
     ])
 
 
-def build_context(user_text: str) -> str:
+def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     """Per-message context, sent right before the user's message."""
     now = datetime.now()
     msg_lang = detect(user_text)
@@ -104,7 +104,11 @@ def build_context(user_text: str) -> str:
         kb_query = f"{previous_user} {user_text}"
     hits = [h for h in knowledge.search(kb_query, limit=3) if h["score"] <= KB_MIN_SCORE]
     hits = [h for h in hits if h["score"] <= hits[0]["score"] * 0.6][:2] if hits else []
-    if hits:
+    if emergency_topic:  # first-aid follow-up: the exact manual section is always present (NX-LLM-021)
+        sec = emergency.section(emergency_topic, msg_lang or lang())
+        if sec:
+            parts.append(f"\n## {emergency.RULE}\n[{sec['heading']}]\n{sec['content']}")
+    elif hits:
         parts.append("\n## Possibly relevant knowledge (local base)\n" + "\n\n".join(
             f"[{h['title']} › {h['heading']}]\n{h['content'][:900]}" for h in hits))
     if msg_lang:
@@ -172,6 +176,7 @@ class Assistant:
         self.control_hook = control_hook  # executes pause/resume/stop on the speaker
         self.lock = threading.Lock()
         self.cancel = threading.Event()
+        self.emergencies = emergency.Tracker()
 
     def ask(self, text: str, spoken: bool = False):
         """Handle one user message (blocking; call from a worker thread)."""
@@ -187,10 +192,21 @@ class Assistant:
         self.cancel.set()
 
     def _ask(self, text, spoken):
+        topic = emergency.detect(text)
+        if topic and self.emergencies.first_time(topic):
+            # Emergency: answer instantly with the manual's protocol; never wait for or trust the model here.
+            reply = emergency.protocol_reply(topic, detect(text) or lang())
+            self.emergencies.mark(topic)
+            memory.add_message("user", text)
+            memory.add_message("assistant", reply)
+            self.emit("tool", {"name": "emergency", "args": {"topic": topic}})
+            self.emit("done", {"text": reply, "speak": True, "interrupted": False})
+            return
         # Context travels inside the current user turn (many chat templates drop extra system messages);
         # history keeps only the raw text, so the cached prompt prefix stays valid on the next turn.
+        context = build_context(text, emergency_topic=topic)
         messages = [{"role": "system", "content": build_system()}, *_history_messages(),
-                    {"role": "user", "content": f"<context>\n{build_context(text)}\n</context>\n\n{text}"}]
+                    {"role": "user", "content": f"<context>\n{context}\n</context>\n\n{text}"}]
         previous = last_reply()
         memory.add_message("user", text)
         reply, changed, nudged, finished, round_text, called = "", False, False, False, "", set()
@@ -252,7 +268,7 @@ class Assistant:
         self.emit("done", {"text": reply, "speak": bool(reply) and not interrupted, "interrupted": interrupted})
         if changed:
             self.emit("refresh", None)
-        if settings["auto_memory"] and reply and not finished:
+        if settings["auto_memory"] and reply and not finished and not topic and memory.states_fact(text):
             threading.Thread(target=self._extract_memories, args=(text, reply), daemon=True).start()
 
     def _control(self, action: str, previous: str):
@@ -270,11 +286,15 @@ class Assistant:
 
     def _extract_memories(self, user_text, reply):
         """Background pass that saves durable facts the model didn't explicitly store."""
+        # Only the user's own words: summarising the assistant's answer turned topics into fake "interests"
+        # ("the user is interested in CPR") - NX-LLM-016.
         prompt = (
-            "Extract durable facts about the USER from this exchange (preferences, people, habits, goals, health, work). "
-            "Ignore requests, questions and temporary things. Write each fact as a short sentence in the user's language. "
-            'Answer ONLY with a JSON array of objects {"fact": str, "category": str}, or [] if nothing.\n\n'
-            f"USER: {user_text}\nASSISTANT: {reply}"
+            "Below is ONE message written by the user. Extract only durable facts the user EXPLICITLY STATED about "
+            "THEMSELVES (preferences, people in their life, habits, goals, health conditions, work). "
+            "Questions, requests and the topics they ask about are NOT facts: never infer interests, needs or goals "
+            "from them. Temporary situations are not facts. Write each fact as a short sentence in the user's language. "
+            'Answer ONLY with a JSON array of objects {"fact": str, "category": str}, or [] if nothing (most messages).\n\n'
+            f"USER MESSAGE: {user_text}"
         )
         try:
             out = llm.complete([{"role": "user", "content": prompt}])
@@ -283,7 +303,7 @@ class Assistant:
         except Exception:
             return
         saved = False
-        for f in facts[:5]:
+        for f in facts[:3]:
             if isinstance(f, dict) and f.get("fact"):
                 saved |= bool(memory.remember(f["fact"], f.get("category") or "geral", source="auto"))
         if saved:

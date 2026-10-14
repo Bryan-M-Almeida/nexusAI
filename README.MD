@@ -119,6 +119,14 @@ A tela mostra só o **aro NEXUS**: ele se **expande** enquanto a IA fala (seguin
 
 Esses comandos são reconhecidos **localmente** (instantâneo) e funcionam **mesmo enquanto o NEXUS fala**. Para frases mais elaboradas ("hã? fala de novo com outras palavras"), a IA decide pela conversa. Com caixas de som, use fone de ouvido para o NEXUS não se ouvir.
 
+### Modo emergência (v0.5)
+
+Se você descrever uma emergência — "preciso fazer RCP", "ele não está respirando", "meu filho está engasgado",
+"my dad is having a heart attack", "se está atragantando"… — o NEXUS responde **na hora, sem passar pela IA**, com
+o número de emergência (SAMU 192 / Bombeiros 193 · 911 · 112) e o **protocolo literal do Manual de Primeiros Socorros**.
+Perguntas seguintes sobre o mesmo tema vão para a IA, mas sempre com o trecho do manual e a regra de não inventar nada
+fora dele. Isso não substitui o atendimento profissional: siga sempre as instruções da central de emergência.
+
 ### Saudação
 
 | Situação | O NEXUS diz |
@@ -178,6 +186,7 @@ nexus/
   knowledge.py  base de conhecimento (SQLite FTS5) e importação de arquivos
   voice.py      Whisper (ouvir, conversa contínua), fila de fala com pausa/retomada/repetição
   control.py    comandos de conversa por voz/texto (repetir, explicar melhor, pausar, continuar, parar)
+  emergency.py  modo emergência: protocolo de primeiros socorros instantâneo e literal do manual
   tts.py        motor de voz: vozes SAPI/OneCore, gênero, efeitos J.A.R.V.I.S/robô
   scheduler.py  lembretes em tempo real
   bridge.py     endpoint local para o formulário da landing
@@ -191,4 +200,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.4.1 (protótipo)**.
+Versão atual: **v0.5.0 (protótipo)**.

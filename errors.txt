@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 1.4  ·  Date: 2026-10-13  ·  App version: 0.4.1
+ Document version: 1.5  ·  Date: 2026-10-13  ·  App version: 0.5.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -64,11 +64,13 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-013  "AMD driver is too old" warning in the Ollama log
       NX-LLM-014  Model running partly on CPU (not enough VRAM)
       NX-LLM-015  Thinking mode makes qwen3 slow
-      NX-LLM-016  Automatic memory stores redundant or generic facts
+      NX-LLM-016  Automatic memory stores questions as "facts" or redundant facts
       NX-LLM-017  Model invents tool arguments
       NX-LLM-018  AI handles "repeat"/"explain better" by talking, without the tool
       NX-LLM-019  Ambiguous question answered with a topic from another conversation
       NX-LLM-020  Imprecise or contradictory values in factual questions
+      NX-LLM-021  Wrong and dangerous first-aid instructions
+      NX-LLM-022  Emergency mode triggered without an emergency (false alarm)
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -316,15 +318,22 @@ QUICK DIAGNOSTICS (run these before investigating)
                "/no_think" to the system instructions or disable reasoning in
                the LM Studio interface.
 
-[NX-LLM-016] Automatic memory stores redundant or generic facts
-  Severity   : LOW              Status: KNOWN              Observed: YES
-  Symptom    : Memories like "The user prefers working late at night" that
-               resemble existing ones.
-  Cause      : Automatic extraction runs after each exchange and duplicate
-               removal only compares identical text.
-  Workaround : Remove items with "✕" in the Memory panel or disable
-               "Automatically memorize facts" in Settings.
-  Improvement: Semantic de-duplication with embeddings (roadmap).
+[NX-LLM-016] Automatic memory stores questions as "facts" or redundant facts
+  Severity   : MEDIUM           Status: FIXED (v0.5)       Observed: YES
+  Symptom    : Real case (2026-10-13): questions about CPR created 6 false,
+               repeated memories, such as "The user needs to perform CPR" and
+               "The user is interested in CPR".
+  Cause      : Automatic extraction ran after EVERY message, also read
+               NEXUS's answer (the topic became an "interest") and only
+               discarded duplicates with identical text.
+  Fix        : - it only runs when the user states something about themselves
+                 (I, my, I'm, eu, sou, soy, tengo...) and never on questions or
+                 emergencies - memory.states_fact();
+               - it reads only the user's message, with an explicit prompt that
+                 questions are not facts; at most 3 facts per message;
+               - the same idea in other words is not stored again (80% shared
+                 words); a negation counts as a correction - memory.similar().
+  Tips       : Remove wrong memories with "✕" in Panel > Memory.
 
 [NX-LLM-017] Model invents tool arguments
   Severity   : MEDIUM           Status: FIXED              Observed: YES
@@ -383,6 +392,39 @@ QUICK DIAGNOSTICS (run these before investigating)
                  stay consistent and correct yourself explicitly.
   Limitation : Outside the base's topics the model may still get numbers
                wrong. Teach NEXUS reliable sources (Teach button / inbox).
+
+[NX-LLM-021] Wrong and dangerous first-aid instructions
+  Severity   : CRITICAL         Status: FIXED (v0.5)       Observed: YES
+  Symptom    : Real case (2026-10-13): "preciso fazer RCP, como faço?" (how do
+               I do CPR?) was answered with hands "over the xiphoid process"
+               (correct: lower half of the sternum) and "CPR for 10 to 15
+               minutes before stopping" (correct: don't stop until the person
+               responds, help arrives or you are exhausted). 26-37 s per reply.
+  Cause      : Keyword search didn't find the manual for everyday phrasing
+               ("preciso fazer RCP" retrieved Existentialism; "engasgado"
+               doesn't match "engasgo") and the model improvised.
+  Fix        : Emergency mode (nexus/emergency.py): common emergencies in
+               PT/EN/ES are recognized by dedicated patterns. The first
+               message is answered instantly, without the AI, with the
+               emergency number and the manual's literal protocol. Follow-up
+               questions on the same topic go to the AI with the manual
+               excerpt always in context and a rule to add nothing outside it.
+  How to check: tests\conversation_eval.py replays the conversation (0 s
+               reply, "lower half of the sternum", "don't stop").
+  Important  : NEXUS does not replace professional care. Always call
+               emergency services and follow the dispatcher.
+
+[NX-LLM-022] Emergency mode triggered without an emergency (false alarm)
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Symptom    : Figurative phrases such as "dor no peito de saudade" (chest
+               pain from missing someone) show the heart-attack protocol.
+  Cause      : Recognition deliberately errs on the side of caution: showing
+               a protocol needlessly costs little; missing an emergency may
+               cost a life. Technical contexts ("my code is bleeding memory")
+               are already ignored.
+  Workaround : Just keep talking; the protocol is only repeated after 10
+               minutes. For new exceptions, adjust _TECH or TOPICS in
+               nexus/emergency.py.
 
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS

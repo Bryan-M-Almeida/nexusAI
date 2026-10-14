@@ -8,6 +8,33 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.5.0 — Protótipo · 2026-10-14
+
+**Modo emergência e memória automática confiável.** Motivada por uma conversa real sobre RCP (NX-LLM-021, NX-LLM-016).
+
+### Corrigido
+- **Primeiros socorros perigosos** (NX-LLM-021): a IA mandou posicionar as mãos "sobre o processo xifoide" e fazer RCP
+  "por 10 a 15 minutos" — ambos errados. A busca por palavras não achava o manual ("preciso fazer RCP" trazia o capítulo
+  de Existencialismo) e o modelo improvisava.
+  - **Modo emergência** (`nexus/emergency.py`): RCP/parada, engasgo, sangramento, queimadura, fratura, convulsão, AVC,
+    infarto, desmaio, intoxicação, hipoglicemia/choque elétrico e "preciso socorrer alguém", em PT/EN/ES.
+  - A primeira mensagem é respondida **na hora (0 s) e literalmente pelo manual**, com o número de emergência
+    (SAMU 192 / Bombeiros 193 · 911 · 112) — sem passar pela IA.
+  - Perguntas seguintes sobre o mesmo tema vão para a IA **com o trecho do manual sempre no contexto** e a regra de não
+    acrescentar posições, tempos ou doses que não estejam nele.
+- **Memória automática salvando perguntas como "fatos"** (NX-LLM-016): 6 memórias falsas sobre RCP ("O usuário precisa
+  fazer RCP"...) a partir de perguntas.
+  - A extração só roda quando o usuário afirma algo sobre si (eu/meu/sou/tenho/prefiro…), nunca em perguntas ou emergências.
+  - Ela lê só a mensagem do usuário (não a resposta do NEXUS, que virava "interesse").
+  - Duplicatas com outras palavras não são salvas de novo (negação conta como correção); no máximo 3 fatos por mensagem.
+  - As 6 memórias erradas foram apagadas do banco do usuário (backup em `data_backup_20261014-1306_antes_limpar_memorias/`).
+
+### Testes desta versão
+- 47/47 testes unitários; 14/14 verificações de conversa com qwen3:8b (inclui a conversa de RCP: resposta em 0 s com o
+  protocolo correto e "não pare" na pergunta de duração).
+
+---
+
 ## v0.4.1 — Protótipo · 2026-10-13
 
 **Pronúncia do nome como em inglês/espanhol ("NÉK-sus").**
@@ -132,7 +159,7 @@ NX-VOZ-016, NX-ENV-007).
 
 ## Próximas versões (planejamento)
 
-### v0.5.0 — Protótipo (próxima)
+### v0.6.0 — Protótipo (próxima)
 A definir com o usuário.
 
 ### Versões seguintes (a definir com o usuário)

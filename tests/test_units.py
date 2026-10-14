@@ -73,5 +73,29 @@ check("name spoken as Néc-sus (female voice)", tts.pronounce("Eu sou NEXUS.", "
 check("name untouched in English", tts.pronounce("I am NEXUS.", "en") == "I am Nexus.")
 check("other words untouched", tts.pronounce("nexusAI e annexus", "pt") == "nexusAI e annexus")
 
+# -- emergency mode (NX-LLM-021) ---------------------------------------------------------------------------
+from nexus import emergency  # noqa: E402
+
+for text, expected in [("Preciso socorrer alguém agora", "general"), ("preciso fazer RCP, como faço?", "cpr"),
+                       ("ele não está respirando", "cpr"), ("meu filho está engasgado", "choking"),
+                       ("my dad is having a heart attack", "heart_attack"), ("mi hijo se está atragantando", "choking"),
+                       ("queimei a mão no fogão", "burn"), ("acho que é um AVC", "stroke"),
+                       ("Em que ano Maquiavel nasceu?", None), ("meu código está sangrando memória", None),
+                       ("quero aprender sobre a queima de calorias", None)]:
+    check(f"emergency.detect({text!r}) == {expected}", emergency.detect(text) == expected, str(emergency.detect(text)))
+cpr = emergency.protocol_reply("cpr", "pt")
+check("CPR protocol: lower half of the sternum, 192, never the xiphoid",
+      "metade inferior do esterno" in cpr and "192" in cpr and "xif" not in cpr.lower())
+check("CPR protocol in English and Spanish", "Cardiac arrest" in emergency.protocol_reply("cpr", "en")
+      and "Parada cardiorrespiratoria" in emergency.protocol_reply("cpr", "es"))
+
+# -- automatic memory: questions are not facts; same idea is not stored twice (NX-LLM-016) -----------------
+for text, expected in [("preciso fazer RCP, como faço?", False), ("Quanto tempo uma pessoa dura em RCP?", False),
+                       ("Eu tenho dois gatos, o Pixel e o Byte", True), ("Me llamo Lucía y vivo en Madrid", True)]:
+    check(f"states_fact({text!r}) == {expected}", memory.states_fact(text) == expected)
+check("similar: same fact in other words", memory.similar("O usuário tem dois gatos chamados Pixel e Byte", "Tem dois gatos: Pixel e Byte"))
+check("similar: different facts sharing words", not memory.similar("Mora em São Paulo", "Trabalha em São Paulo"))
+check("similar: a negation is a correction", not memory.similar("Gosta de café", "Não gosta de café"))
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

@@ -1,4 +1,5 @@
 """Long-term memory: facts about the user, conversation history and the action log."""
+import re
 from datetime import datetime, timedelta
 
 from .db import db, now
@@ -9,12 +10,45 @@ def _norm(text: str) -> str:
     return " ".join(text.lower().strip(" .!").split())
 
 
+_FILLER = {"o", "a", "os", "as", "de", "do", "da", "dos", "das", "e", "que", "um", "uma", "em", "no", "na", "com",
+           "usuario", "usuário", "user", "the", "is", "of", "and", "el", "la", "los", "las", "y", "en", "es"}
+
+
+def _words(text: str) -> set[str]:
+    return {w for w in re.findall(r"\w+", text.lower()) if len(w) > 2 and w not in _FILLER}
+
+
+_NEGATION = re.compile(r"\b(não|nao|nunca|not|never|no|nunca|ya no|não mais)\b", re.IGNORECASE)
+
+
+def similar(a: str, b: str, threshold: float = 0.8) -> bool:
+    """Same idea in other words ("O usuário tem dois gatos" ~ "Tem dois gatos"). A negation on only one side
+    ("gosta de café" vs "não gosta de café") is a correction, not a duplicate."""
+    if bool(_NEGATION.search(a)) != bool(_NEGATION.search(b)):
+        return False
+    wa, wb = _words(a), _words(b)
+    if not wa or not wb:
+        return _norm(a) == _norm(b)
+    return len(wa & wb) / min(len(wa), len(wb)) >= threshold
+
+
+# The user's message states something about themselves (not a question about the world).
+_SELF = re.compile(r"\b(eu|meu|minha|meus|minhas|sou|tenho|gosto|prefiro|moro|trabalho|estudo|nasci|chamo|"
+                   r"i|i'm|im|my|me|mine|yo|mi|mis|soy|tengo|prefiero|vivo|trabajo|estoy)\b", re.IGNORECASE)
+
+
+def states_fact(user_text: str) -> bool:
+    """Run automatic memory extraction only for self-statements; questions never become 'facts'."""
+    text = user_text.strip()
+    return bool(_SELF.search(text)) and not text.endswith("?")
+
+
 def remember(content: str, category: str = "geral", source: str = "chat") -> dict | None:
     content = content.strip()
     if not content:
         return None
-    for row in db.all("SELECT id, content FROM memories WHERE category = ?", (category,)):
-        if _norm(row["content"]) == _norm(content):
+    for row in db.all("SELECT id, content FROM memories"):
+        if similar(row["content"], content):  # already known, maybe worded differently
             return None
     mid = db.execute(
         "INSERT INTO memories(content, category, source, created) VALUES (?,?,?,?)",

@@ -10,7 +10,7 @@ from nexus import assistant, knowledge, llm, memory, tools
 from nexus.config import settings
 from nexus.db import db
 
-settings["auto_memory"] = False
+settings["auto_memory"] = True  # exercised on purpose: questions must not become memories
 knowledge.load_seed()
 _isolated.load_example_profile()
 status = llm.status()
@@ -18,6 +18,7 @@ if not (status["online"] and status["model_ready"]):
     raise SystemExit(f"AI server not ready: {status}")
 
 brain = assistant.Assistant(lambda event, payload: None)
+
 results = []
 
 
@@ -52,7 +53,21 @@ check("'valores exatos' fala do coração, não de gastos", "R$" not in exact an
 check("'valores exatos' explica que não há valor exato ou dá médias",
       bool(re.search(r"(não (há|existe)|varia|média|aproximad)", exact.lower())), exact)
 
-# 2) Tools: actions must really be stored (NX-LLM-003)
+# 2) Regression of the 2026-10-13 CPR conversation (NX-LLM-021 / NX-LLM-016)
+memories_before = len(memory.all_memories())
+t0 = time.time()
+cpr = ask("preciso fazer RCP, como faço?")
+check("RCP: resposta imediata (< 2 s, sem IA)", time.time() - t0 < 2, f"{time.time() - t0:.1f}s")
+check("RCP: metade inferior do esterno + 192, nunca xifoide",
+      "metade inferior do esterno" in cpr and "192" in cpr and "xif" not in cpr.lower(), cpr)
+duration = ask("Quanto tempo uma pessoa dura em RCP?")
+check("RCP: não inventa '10 a 15 minutos' e manda não parar",
+      "10 a 15" not in duration and bool(re.search(r"(não pare|nao pare|até .*(cheg|reag)|continue)", duration.lower())), duration)
+time.sleep(8)  # automatic memory extraction runs in the background
+check("perguntas de emergência não viram memórias", len(memory.all_memories()) == memories_before,
+      str([m["content"] for m in memory.all_memories()]))
+
+# 3) Tools: actions must really be stored (NX-LLM-003)
 ask("Me lembra de ligar para o dentista amanhã às 10h.")
 tomorrow = (datetime.now() + timedelta(days=1)).date().isoformat()
 check("lembrete criado para amanhã 10:00", any(e["start"] == f"{tomorrow}T10:00" for e in tools.list_events(
@@ -65,7 +80,7 @@ check("memória salva", any("manh" in m["content"].lower() for m in memory.all_m
 ask("Aprenda que o wifi do escritório se chama NEXUS-LAB.")
 check("conhecimento aprendido", any(d["source"].startswith("learned:") for d in knowledge.documents()))
 
-# 3) Languages
+# 4) Languages
 en = ask("What do the Stoics say about things outside our control? One sentence.")
 check("responde em inglês", bool(re.search(r"\b(the|control|what)\b", en.lower())) and " não " not in en, en)
 
