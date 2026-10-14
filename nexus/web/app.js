@@ -96,6 +96,7 @@ window.nexus = {
       case "ai_state": return setAiState(p);
       case "alert": return onAlert(p);
       case "profile": return onProfile(p);
+      case "conversations": return !$("#convDrawer").hidden && renderConversations();
     }
   },
 };
@@ -273,6 +274,24 @@ function setVoiceState(st) {
   label.className = "core-label " + (["listening", "awake"].includes(shown) ? "red" : ["speaking", "thinking"].includes(shown) ? "blue" : "");
   $("#chipVoice").classList.toggle("on", state.ui_mode === "audio" && !state.mic_muted && state.stt === "ready");
   updateDock();
+  updateTelemetry();
+}
+
+/* ------------------------------------------------------------------ HUD telemetry (v0.9) */
+function updateTelemetry() {
+  $("#tmMode").textContent = T(state.ai_mode === "direct" ? "modeDirect" : "modeAssistant").toUpperCase();
+  const micOn = state.ui_mode === "audio" && !state.mic_muted && state.stt === "ready";
+  $("#tmMic").textContent = state.ui_mode === "text" ? T("micText") : T(state.mic_muted ? "micMuted" : "micLive");
+  $("#tmMicLed").className = "led " + (micOn ? "on" : state.mic_muted ? "off" : "");
+  $("#tmAi").textContent = T(state.voice_enabled ? "aiVoiceOn" : "aiVoiceOff");
+  $("#tmAiLed").className = "led " + (state.voice_enabled ? "on" : "off");
+}
+
+function tickClock() {
+  const d = new Date(), lc = document.documentElement.lang;
+  const hm = d.toLocaleTimeString(lc, { hour: "2-digit", minute: "2-digit" });
+  $("#clock").textContent = $("#tmClock").textContent = hm;
+  $("#tmDate").textContent = d.toLocaleDateString(lc, { weekday: "short", day: "2-digit", month: "short" }).toUpperCase();
 }
 
 // Interrupt only when something is running; repeat only when NEXUS already said something (v0.8).
@@ -324,7 +343,18 @@ function ringFrame(now) {
   ring.style.setProperty("--s", (1 + breathe + 0.14 * ringAi - 0.12 * ringMic).toFixed(4));
   ring.style.setProperty("--ai", ringAi.toFixed(3));
   ring.style.setProperty("--mic", ringMic.toFixed(3));
+  if ((pulseTick = (pulseTick + 1) % 2) === 0 && state.ui_mode === "audio") drawPulse(now);
   requestAnimationFrame(ringFrame);
+}
+
+// Pulse trace under the ring: a scrolling line driven by the same voice/mic levels as the ring.
+const PULSE_N = 60, pulse = new Array(PULSE_N).fill(0);
+let pulseTick = 0;
+function drawPulse(now) {
+  const level = Math.min(1, ringAi + ringMic);
+  pulse.shift();
+  pulse.push(level * Math.sin(now / 38) * (0.6 + 0.4 * Math.random()) + 0.04 * Math.sin(now / 420));
+  $("#pulseLine").setAttribute("points", pulse.map((v, i) => `${(i * 240 / (PULSE_N - 1)).toFixed(1)},${(12 - v * 11).toFixed(1)}`).join(" "));
 }
 
 /* ------------------------------------------------------------------ captions & notices (audio mode has no chat) */
@@ -464,7 +494,7 @@ function renderDashboard(d) {
       <button class="x" data-forget="${m.id}">✕</button></li>`).join("") || empty("noMemories");
   $("#actionList").innerHTML = d.actions.map((a) => `
     <li><span class="body">${esc(a.summary)}<span class="meta">${esc(a.ts.replace("T", " ").slice(0, 16))} · ${esc(a.kind)}</span></span></li>`).join("");
-  $("#kbStats").innerHTML = d.knowledge.map((k) => `<span class="kb-stat">${esc(k.category)}<b>${k.chunks}</b></span>`).join("");
+  $("#kbStats").innerHTML = d.knowledge.map((k) => `<span class="kb-stat">${catIcon(k.category)}${esc(k.category)}<b>${k.chunks}</b></span>`).join("");
   if (!$("#kbSearch").value) renderDocs(d.documents);
   $("#collectionList").innerHTML = d.collections.map((c) => `
     <li class="clickable" data-collection="${esc(c.collection)}"><span class="body">${esc(c.collection)}<span class="meta">${c.items} · ${esc(c.last.slice(0, 10))}</span></span></li>`).join("") || empty("noCollections");
@@ -474,7 +504,7 @@ function renderDashboard(d) {
 
 function renderDocs(docs) {
   $("#kbList").innerHTML = docs.map((doc) => `
-    <li><span class="body">${esc(doc.title)}<span class="meta">${esc(doc.category)} · ${esc(doc.source.split(":")[0])}</span></span>
+    <li>${catIcon(doc.category)}<span class="body">${esc(doc.title)}<span class="meta">${esc(doc.category)} · ${esc(doc.source.split(":")[0])}</span></span>
       ${doc.source.startsWith("seed:") ? "" : `<button class="x" data-del-doc="${doc.id}">✕</button>`}</li>`).join("");
 }
 
@@ -672,7 +702,14 @@ function wire() {
   };
   $$("[data-close]").forEach((b) => (b.onclick = () => (b.closest(".modal, .drawer").hidden = true)));
 
-  setInterval(() => ($("#clock").textContent = new Date().toLocaleTimeString(document.documentElement.lang, { hour: "2-digit", minute: "2-digit" })), 1000);
+  tickClock();
+  setInterval(tickClock, 1000);
+  wireRingDrag();
+  $("#btnNewConv").onclick = newConversation;
+  $("#btnConvs").onclick = () => openConversations("threads");
+  $$("#convTabs button").forEach((b) => (b.onclick = () => openConversations(b.dataset.ctab)));
+  $("#convThreads").addEventListener("click", onConversationClick);
+  $("#convAll").addEventListener("click", onConversationClick);
 }
 
 async function showCollection(name) {
@@ -681,6 +718,152 @@ async function showCollection(name) {
     const { id, created, ...rest } = r;
     return `<div>#${id} · ${esc(created.slice(0, 16).replace("T", " "))} · ${esc(Object.entries(rest).map(([k, v]) => `${k}: ${v}`).join(" · "))}</div>`;
   }).join("")}</div>`;
+}
+
+/* ------------------------------------------------------------------ knowledge icons (v0.9) */
+const ICONS = {  // 24x24 line icons, one per area (pt/en/es category names map to the same icon)
+  aid: '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
+  philo: '<path d="M4 21h16M5 18h14M6 7h12M5 7l7-4 7 4M7 7v11M10.3 7v11M13.7 7v11M17 7v11"/>',
+  money: '<circle cx="12" cy="12" r="9"/><path d="M15 9.2c-.5-1-1.6-1.6-3-1.6-1.8 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2-1.5 0-2.6-.6-3.1-1.7M12 6v1.6M12 16.6V18"/>',
+  code: '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/>',
+  health: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/><path d="M5.5 12h3l1.5-2.5 2 5 1.5-2.5h5"/>',
+  focus: '<path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/>',
+  body: '<circle cx="12" cy="4.5" r="2"/><path d="M12 7v7M8 9.5h8M12 14l-3 7M12 14l3 7"/>',
+  learned: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
+  book: '<path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>',
+};
+const CAT_RULES = [[/socorr|first aid|auxilio/, "aid"], [/filosof|philosoph/, "philo"], [/finan/, "money"],
+  [/program|codigo|code/, "code"], [/saud|health|salud/, "health"], [/produtiv|productiv/, "focus"],
+  [/anatom/, "body"], [/aprend|learn/, "learned"]];
+function catIcon(category) {
+  const c = String(category || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const key = (CAT_RULES.find(([rx]) => rx.test(c)) || [null, "book"])[1];
+  return `<svg class="cat-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[key]}</svg>`;
+}
+
+/* ------------------------------------------------------------------ draggable ring (v0.9) */
+function setRingPos(dx, dy, save = true) {
+  const max = (v, lim) => Math.max(-lim, Math.min(lim, v));
+  dx = max(dx, innerWidth / 2 - 80); dy = max(dy, innerHeight / 2 - 80);
+  $("#stage").style.setProperty("--dx", dx + "px");
+  $("#stage").style.setProperty("--dy", dy + "px");
+  if (save) try { localStorage.setItem("nexus.ringPos", JSON.stringify([dx, dy])); } catch (e) { /* ignore */ }
+  return [dx, dy];
+}
+
+function wireRingDrag() {
+  let pos = [0, 0];
+  try { pos = JSON.parse(localStorage.getItem("nexus.ringPos")) || [0, 0]; } catch (e) { /* ignore */ }
+  pos = setRingPos(pos[0], pos[1], false);
+  const core = $("#core");
+  core.title = T("ringDrag");
+  let start = null;
+  core.addEventListener("pointerdown", (e) => {
+    if (state.ui_mode !== "audio" || e.button !== 0) return;
+    start = { x: e.clientX, y: e.clientY, pos: [...pos], moved: false };
+    core.setPointerCapture(e.pointerId);
+  });
+  core.addEventListener("pointermove", (e) => {
+    if (!start) return;
+    const dx = e.clientX - start.x, dy = e.clientY - start.y;
+    if (!start.moved && Math.hypot(dx, dy) < 4) return;  // a click is not a drag
+    start.moved = true;
+    core.classList.add("dragging"); $("#stage").classList.add("dragging");
+    pos = setRingPos(start.pos[0] + dx, start.pos[1] + dy, false);
+  });
+  const end = () => {
+    if (start && start.moved) setRingPos(pos[0], pos[1]);
+    start = null;
+    core.classList.remove("dragging"); $("#stage").classList.remove("dragging");
+  };
+  core.addEventListener("pointerup", end);
+  core.addEventListener("pointercancel", end);
+  core.addEventListener("dblclick", () => (pos = setRingPos(0, 0)));
+}
+
+/* ------------------------------------------------------------------ conversations (v0.9) */
+let convTab = "threads", timelineOldest = null;
+
+async function openConversations(tab = convTab) {
+  convTab = tab;
+  $$("#convTabs button").forEach((b) => b.classList.toggle("on", b.dataset.ctab === tab));
+  $("#convThreads").hidden = tab !== "threads";
+  $("#convAll").hidden = tab !== "all";
+  $("#convDrawer").hidden = false;
+  await renderConversations();
+}
+
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString(document.documentElement.lang, { weekday: "short", day: "2-digit", month: "short", year: "numeric" })
+    + " · " + iso.slice(11, 16);
+}
+
+async function renderConversations() {
+  if (convTab === "threads") {
+    const r = await api().conversations();
+    $("#convThreads").innerHTML = r.list.map((c) => `
+      <div class="conv-card ${c.id === r.current ? "current" : ""}" data-copen="${c.id}">
+        <span class="t">${esc(c.title || "…")}${c.id === r.current ? `<span class="badge">${esc(T("convCurrent"))}</span>` : ""}</span>
+        ${c.description ? `<span class="d">${esc(c.description)}</span>` : ""}
+        <span class="m">${esc(fmtDate(c.updated))} · ${esc(T("convMsgs", { n: c.messages }))}</span>
+        <span class="acts"><button data-crename="${c.id}" title="✎">✎</button><button data-cdel="${c.id}" title="✕">✕</button></span>
+      </div>`).join("") || `<p class="muted">${esc(T("convEmpty"))}</p>`;
+  } else {
+    timelineOldest = null;
+    $("#convAll").innerHTML = "";
+    await loadTimeline(true);
+  }
+}
+
+async function loadTimeline(first = false) {
+  const rows = await api().timeline(timelineOldest);
+  if (!rows.length) { if (first) $("#convAll").innerHTML = `<p class="muted">${esc(T("convEmpty"))}</p>`; return; }
+  timelineOldest = rows[0].id;
+  let html = "", day = "", conv = null;
+  for (const m of rows) {
+    const d = m.ts.slice(0, 10);
+    if (d !== day) { day = d; conv = null; html += `<div class="tl-day">${esc(new Date(m.ts).toLocaleDateString(document.documentElement.lang, { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).toUpperCase())}</div>`; }
+    if (m.conversation_id !== conv) { conv = m.conversation_id; html += `<div class="tl-conv" data-copen="${conv}">▸ ${esc(m.title || "…")}</div>`; }
+    html += `<div class="tl-msg ${m.role}"><time>${esc(m.ts.slice(11, 16))}</time><span>${esc(m.content)}</span></div>`;
+  }
+  const box = $("#convAll"), oldHeight = box.scrollHeight;
+  $(".conv-more", box)?.remove();
+  box.insertAdjacentHTML("afterbegin", (rows.length >= 200 ? `<button class="btn-ghost conv-more" data-cmore>${esc(T("convLoadMore"))}</button>` : "") + html);
+  if (first) box.scrollTop = box.scrollHeight; else box.scrollTop = box.scrollHeight - oldHeight;
+}
+
+async function onConversationClick(e) {
+  const b = e.target.closest("[data-copen],[data-cdel],[data-crename],[data-cmore]");
+  if (!b) return;
+  const d = b.dataset;
+  if (d.cmore !== undefined) return loadTimeline();
+  if (d.cdel) { e.stopPropagation(); if (confirm(T("convDelete"))) { await api().delete_conversation(d.cdel); renderConversations(); } return; }
+  if (d.crename) {
+    e.stopPropagation();
+    const card = b.closest(".conv-card"), title = prompt(T("convRename"), $(".t", card).firstChild.textContent);
+    if (title) { await api().rename_conversation(d.crename, title); renderConversations(); }
+    return;
+  }
+  if (window.getSelection().toString()) return;  // selecting text is not opening
+  const r = await api().open_conversation(d.copen);
+  if (!r.ok) return;
+  applyState(r);
+  $("#chat").innerHTML = "";
+  for (const m of r.messages) addMsg(m.role === "user" ? "user" : "nexus", m.content);
+  setVoiceState("idle");
+  $("#convDrawer").hidden = true;
+  const title = $(`[data-copen="${d.copen}"] .t`)?.firstChild?.textContent || $(`[data-copen="${d.copen}"]`)?.textContent.replace("▸", "").trim() || "";
+  caption(T("convOpened", { title }), 3500);
+  showTip(T("convOpened", { title }));
+}
+
+async function newConversation() {
+  applyState(await api().new_conversation());
+  $("#chat").innerHTML = "";
+  addMsg("system", T("convNew"));
+  setVoiceState("idle");
+  caption(T("convNew"), 2500);
 }
 
 /* ------------------------------------------------------------------ init */

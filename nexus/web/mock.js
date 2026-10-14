@@ -59,6 +59,18 @@ if (!window.pywebview && location.search.includes("mock")) {
     },
     set_mode: async (m) => { settings.ui_mode = m; return state(); },
     set_ai_mode: async (m) => { settings.ai_mode = m; speak(1.5); return { ...state(), spoken: `Executando em modo ${m === "direct" ? "Direto" : "Assistente"}.` }; },
+    conversations: async () => ({ current: 3, list: [
+      { id: 3, title: "Simulado USMLE", description: "Questões de múltipla escolha corrigidas uma a uma.", created: iso(15), updated: iso(16), messages: 18 },
+      { id: 2, title: "Peso do coração", description: "Valores médios do coração adulto por sexo.", created: iso(11, 0, -1), updated: iso(11, 20, -1), messages: 6 },
+      { id: 1, title: "O que você pode fazer?", description: "", created: iso(9, 0, -2), updated: iso(9, 5, -2), messages: 2 }] }),
+    timeline: async (before) => before ? [] : [
+      { id: 1, role: "user", content: "O que você pode fazer?", ts: iso(9, 0, -2), conversation_id: 1, title: "O que você pode fazer?" },
+      { id: 2, role: "assistant", content: "Posso cuidar da sua agenda, tarefas, dados e responder por voz.", ts: iso(9, 1, -2), conversation_id: 1, title: "O que você pode fazer?" },
+      { id: 3, role: "user", content: "Quanto pesa o coração de um homem adulto?", ts: iso(11, 0, -1), conversation_id: 2, title: "Peso do coração" },
+      { id: 4, role: "assistant", content: "Em média de 280 a 340 gramas.", ts: iso(11, 1, -1), conversation_id: 2, title: "Peso do coração" },
+      { id: 5, role: "user", content: "Me dê uma aula para o USMLE", ts: iso(15), conversation_id: 3, title: "Simulado USMLE" }],
+    open_conversation: async (id) => ({ ok: true, messages: [{ role: "user", content: "Quanto pesa o coração de um homem adulto?" }, { role: "assistant", content: "Em média de 280 a 340 gramas." }], ...state() }),
+    new_conversation: async () => state(), delete_conversation: async () => ({}), rename_conversation: async () => ({}),
     report_issue: async () => ({ ok: true, file: "C:/NEXUS/reports/nexus-report-20261014-120000.md" }),
     toggle_fullscreen: async () => {}, minimize: async () => {}, quit: async () => {},
     set_temporary: async (on) => { temporary = on; return state(); },

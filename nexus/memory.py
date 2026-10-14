@@ -104,42 +104,125 @@ def set_temporary(on: bool):
     _temp.clear()
 
 
+# Conversations (v0.9). Every message belongs to one. A new conversation starts when the app opens, when the
+# user asks for one, or after 2 hours of silence; older ones can be reopened from the conversations panel.
+# Only the open conversation is sent to the model: an ambiguous follow-up ("tell me the exact values") must
+# never be answered with something from another conversation (NX-LLM-019).
+CONVERSATION_IDLE = timedelta(hours=2)
+_current: int | None = None  # None = the next message opens a new conversation
+
+
+def current_conversation() -> int | None:
+    """Open conversation id, or None if the next message starts a new one (also after 2 h of silence)."""
+    global _current
+    if _current is not None:
+        row = db.one("SELECT updated FROM conversations WHERE id = ?", (_current,))
+        if not row or datetime.now() - datetime.fromisoformat(row["updated"]) > CONVERSATION_IDLE:
+            _current = None
+    return _current
+
+
+def new_conversation():
+    """The next message starts a new conversation (button "New conversation")."""
+    global _current
+    _current = None
+
+
+def open_conversation(conversation_id: int) -> bool:
+    """Continue an older conversation: its messages become the model's history again."""
+    global _current
+    row = db.one("SELECT id FROM conversations WHERE id = ?", (int(conversation_id),))
+    if not row:
+        return False
+    _current = row["id"]
+    db.execute("UPDATE conversations SET updated = ? WHERE id = ?", (now(), _current))
+    return True
+
+
 def add_message(role: str, content: str):
+    global _current
     if temporary:
         _temp.append({"role": role, "content": content, "ts": now()})
         return
-    db.execute("INSERT INTO messages(role, content, ts) VALUES (?,?,?)", (role, content, now()))
+    ts = now()
+    if current_conversation() is None:
+        # conversations that only got the opening greeting are noise: drop them before starting a new one
+        db.execute("DELETE FROM messages WHERE conversation_id IN (SELECT conversation_id FROM messages WHERE conversation_id IS NOT NULL "
+                   "GROUP BY conversation_id HAVING SUM(role = 'user') = 0)")
+        db.execute("DELETE FROM conversations WHERE id NOT IN (SELECT DISTINCT conversation_id FROM messages "
+                   "WHERE conversation_id IS NOT NULL)")
+        _current = db.execute("INSERT INTO conversations(created, updated) VALUES (?, ?)", (ts, ts)).lastrowid
+    db.execute("INSERT INTO messages(role, content, ts, conversation_id) VALUES (?,?,?,?)", (role, content, ts, _current))
+    db.execute("UPDATE conversations SET updated = ? WHERE id = ?", (ts, _current))
+    if role == "user":
+        conv = db.one("SELECT title FROM conversations WHERE id = ?", (_current,))
+        if conv and not conv["title"]:  # provisional title; the assistant replaces it with a better one
+            db.execute("UPDATE conversations SET title = ? WHERE id = ?", (_short(content), _current))
 
 
-# A conversation "session" starts when the app opens; a long silence also starts a new one.
-# Older conversations stay in the database but are not sent to the model: otherwise an ambiguous
-# follow-up ("tell me the exact values") gets answered with something from hours ago (NX-LLM-019).
-SESSION_START = now()
-SESSION_IDLE = timedelta(hours=2)
+def _short(text: str, words: int = 8) -> str:
+    return " ".join(text.split()[:words])[:60]
 
 
 def session_start() -> str:
-    """Start of the current session: app start, or the end of the last 2-hour silence after it."""
-    rows = db.all("SELECT ts FROM messages WHERE ts >= ? ORDER BY id DESC LIMIT 200", (SESSION_START,))
-    start = SESSION_START
-    for newer, older in zip(rows, rows[1:]):
-        if datetime.fromisoformat(newer["ts"]) - datetime.fromisoformat(older["ts"]) > SESSION_IDLE:
-            start = newer["ts"]
-            break
-    if rows and datetime.now() - datetime.fromisoformat(rows[0]["ts"]) > SESSION_IDLE:
-        start = now()  # silent for 2 h: the next message opens a fresh session
-    return start
+    """Start of the open conversation (recent actions older than this belong to other conversations)."""
+    cid = current_conversation()
+    row = db.one("SELECT created FROM conversations WHERE id = ?", (cid,)) if cid else None
+    return row["created"] if row else now()
 
 
 def history(turns: int) -> list[dict]:
-    """Last `turns` exchanges of the current session (oldest first)."""
+    """Last `turns` exchanges of the open conversation (oldest first)."""
     if temporary:
         return list(_temp[-turns * 2:])
-    rows = db.all("SELECT role, content, ts FROM messages WHERE ts >= ? ORDER BY id DESC LIMIT ?",
-                  (session_start(), turns * 2))
+    cid = current_conversation()
+    if cid is None:
+        return []
+    rows = db.all("SELECT role, content, ts FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?",
+                  (cid, turns * 2))
     return list(reversed(rows))
 
 
+def conversations(limit: int = 200) -> list[dict]:
+    """Conversations with at least one user message, most recent first."""
+    return db.all(
+        "SELECT c.id, c.title, c.description, c.created, c.updated, COUNT(m.id) AS messages "
+        "FROM conversations c JOIN messages m ON m.conversation_id = c.id "
+        "GROUP BY c.id HAVING SUM(m.role = 'user') > 0 ORDER BY c.updated DESC LIMIT ?", (limit,))
+
+
+def conversation_messages(conversation_id: int) -> list[dict]:
+    return db.all("SELECT id, role, content, ts FROM messages WHERE conversation_id = ? ORDER BY id",
+                  (int(conversation_id),))
+
+
+def timeline(limit: int = 300, before_id: int | None = None) -> list[dict]:
+    """Every message of every conversation in chronological order (the "All" view), newest page first."""
+    rows = db.all(
+        "SELECT m.id, m.role, m.content, m.ts, m.conversation_id, c.title FROM messages m "
+        "LEFT JOIN conversations c ON c.id = m.conversation_id WHERE m.id < ? ORDER BY m.id DESC LIMIT ?",
+        (before_id or 2 ** 62, limit))
+    return list(reversed(rows))
+
+
+def set_conversation_title(conversation_id: int, title: str, description: str = "", final: bool = False):
+    db.execute("UPDATE conversations SET title = ?, description = ?, titled_at = CASE WHEN ? THEN -1 ELSE "
+               "(SELECT COUNT(*) FROM messages WHERE conversation_id = ?) END WHERE id = ?",
+               (title.strip()[:80], description.strip()[:240], final, conversation_id, conversation_id))
+
+
+def delete_conversation(conversation_id: int):
+    global _current
+    db.execute("DELETE FROM messages WHERE conversation_id = ?", (int(conversation_id),))
+    db.execute("DELETE FROM conversations WHERE id = ?", (int(conversation_id),))
+    if _current == int(conversation_id):
+        _current = None
+
+
 def clear_history():
+    global _current
     db.execute("DELETE FROM messages")
+    db.execute("DELETE FROM conversations")
+    _current = None
     db.log_action("sistema", "Histórico de conversa limpo")
+

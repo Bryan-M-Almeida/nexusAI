@@ -104,10 +104,12 @@ Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a 
 A tela mostra só o **aro NEXUS**: ele se **expande** enquanto a IA fala (seguindo o volume da voz) e se **contrai** enquanto você fala.
 
 - **Mouse no topo** → barra superior: versão, status da IA/voz, relógio, idioma, **Painel** (agenda, tarefas, memória, conhecimento, dados, log) e Configurações.
-- **Mouse na borda esquerda** → modos da IA; **mouse na borda direita** → conversa temporária (e, na v0.9, projetos).
+- **Mouse na borda esquerda** → modos da IA; **mouse na borda direita** → nova conversa, **Conversas** e conversa temporária (projetos chegam na v0.10).
 - **Mouse embaixo** → ícones: **apenas mensagens** · **apenas áudio** · **transcrição** · **mutar/desmutar microfone** · **mutar/desmutar IA** · **interromper** · **repetir** (interromper/repetir ficam esmaecidos quando não há o que fazer).
 - **Transcrição** (v0.8): mostra a conversa à direita sem sair do modo áudio. Todo texto é selecionável e cada mensagem tem **Copiar**.
-- **Aro**: passe o mouse para ver **N.E.X.U.S · NEX-1.0** (o modelo atual).
+- **Aro**: passe o mouse para ver **N.E.X.U.S · NEX-1.0** (o modelo atual). No modo áudio, **arraste** para mover e dê **duplo clique** para centralizar.
+- **HUD** (v0.9): em volta do aro ficam modelo e modo, hora e data, microfone e voz; a linha de **pulso** sob o aro oscila com a sua voz (vermelha) e a do NEXUS (azul).
+- **Conversas** (v0.9): cada conversa recebe título e descrição escritos pela IA. *Separadas* lista os cartões (clique para continuar, ✎ renomeia, ✕ apaga); *Todas* mostra tudo em ordem cronológica. Só a conversa aberta vai para a IA.
 - Abre em **tela cheia**; minimizar / tela cheia / fechar ficam na barra superior. Clicar fora fecha Configurações e Painel.
 - **Apenas áudio**: conversa contínua por voz, sem precisar dizer "Nexus" (dá para exigir a palavra em Configurações).
 - **Apenas mensagens**: o aro sobe, aparece o chat e a IA não fala.
@@ -233,4 +235,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.8.1 (protótipo)**.
+Versão atual: **v0.9.0 (protótipo)**.

@@ -95,6 +95,14 @@ CREATE TABLE IF NOT EXISTS session_notes (
     created TEXT NOT NULL,
     delivered TEXT
 );
+CREATE TABLE IF NOT EXISTS conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,  -- ids of deleted conversations are never reused
+    title TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    titled_at INTEGER NOT NULL DEFAULT 0,
+    created TEXT NOT NULL,
+    updated TEXT NOT NULL
+);
 CREATE VIRTUAL TABLE IF NOT EXISTS kb_chunks USING fts5(
     heading, content, category UNINDEXED, doc_id UNINDEXED,
     tokenize='unicode61 remove_diacritics 2'
@@ -122,6 +130,32 @@ class DB:
         if "external_id" not in cols:  # v0.6: events imported from a calendar feed (ICS UID)
             self.conn.execute("ALTER TABLE events ADD COLUMN external_id TEXT")
             self.conn.commit()
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(messages)")}
+        if "conversation_id" not in cols:  # v0.9: messages belong to conversations
+            self.conn.execute("ALTER TABLE messages ADD COLUMN conversation_id INTEGER")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS messages_conversation ON messages(conversation_id)")
+            self._split_old_messages()
+            self.conn.commit()
+
+    def _split_old_messages(self, gap_hours: float = 2):
+        """Group messages saved before v0.9 into conversations: a silence of 2 h starts a new one (the same rule
+        the old 'session' used). Titles come from the first user message."""
+        rows = self.conn.execute("SELECT id, role, content, ts FROM messages ORDER BY id").fetchall()
+        groups, last = [], None
+        for r in rows:
+            ts = datetime.fromisoformat(r["ts"])
+            if last is None or (ts - last).total_seconds() > gap_hours * 3600:
+                groups.append([])
+            groups[-1].append(r)
+            last = ts
+        for g in groups:
+            first_user = next((r["content"] for r in g if r["role"] == "user"), "")
+            title = " ".join(first_user.split()[:8])[:60]
+            cid = self.conn.execute(
+                "INSERT INTO conversations(title, created, updated) VALUES (?,?,?)",
+                (title, g[0]["ts"], g[-1]["ts"])).lastrowid
+            self.conn.execute("UPDATE messages SET conversation_id = ? WHERE id BETWEEN ? AND ?",
+                              (cid, g[0]["id"], g[-1]["id"]))
 
     def execute(self, sql, params=()) -> sqlite3.Cursor:
         with self.lock:

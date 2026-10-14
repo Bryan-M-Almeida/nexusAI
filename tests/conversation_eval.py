@@ -52,6 +52,11 @@ exact = ask("fale os valores exatos")
 check("'valores exatos' fala do coração, não de gastos", "R$" not in exact and "gast" not in exact.lower(), exact)
 check("'valores exatos' explica que não há valor exato ou dá médias",
       bool(re.search(r"(não (há|existe)|varia|média|aproximad)", exact.lower())), exact)
+time.sleep(8)  # the title is written in the background after an answer (v0.9)
+conv = db.one("SELECT title, description, titled_at FROM conversations WHERE id = ?", (memory.current_conversation(),))
+print(f"  conversa: {conv}")
+check("conversa: título do modelo sobre o coração", bool(conv and conv["titled_at"] != 0
+      and re.search(r"cora", conv["title"].lower()) and conv["description"]), str(conv))
 
 # 2) Regression of the 2026-10-13 CPR conversation (NX-LLM-021 / NX-LLM-016)
 memories_before = len(memory.all_memories())

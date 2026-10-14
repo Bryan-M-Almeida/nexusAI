@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 1.9  ·  Date: 2026-10-14  ·  App version: 0.8.1
+ Document version: 2.0  ·  Date: 2026-10-14  ·  App version: 0.9.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -99,6 +99,8 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-DAT-006  Seed books re-indexed or duplicated
       NX-DAT-007  File in the inbox folder is not re-imported
       NX-DAT-008  "Shall we continue...?" greeting doesn't show / shows only once
+      NX-DAT-009  Old conversation missing from the list or without title/description
+      NX-DAT-010  Answer uses a topic from another conversation
  UI   NX-UI-001   Fonts differ from the landing page (offline)
       NX-UI-002   Window doesn't open: WebView2 missing
       NX-UI-003   Window opens blank or stuck at boot
@@ -747,6 +749,30 @@ QUICK DIAGNOSTICS (run these before investigating)
                project X".
   To see the introduction again: delete the "introduced" row from the state
                table (or use a new NEXUS_HOME).
+
+[NX-DAT-009] Old conversation missing from the list or without title/description
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Symptom    : A conversation is missing from Conversations > Threads, or it
+               only shows the beginning of the first question, with no
+               description.
+  Cause      : (1) The list only shows conversations where you wrote
+               something (the greeting alone doesn't count). (2) The title and
+               description are written by the AI in the background after the
+               1st answer and refined at the 4th exchange; if the AI was off
+               or the answer was interrupted, the provisional title stays.
+               (3) Conversations from before v0.9 were split automatically by
+               2 h pauses and only have the provisional title.
+  Solution   : Use the pencil (✎) on the card to rename it. The "All" tab
+               shows every message, including those not in the list.
+
+[NX-DAT-010] Answer uses a topic from another conversation
+  Severity   : MEDIUM           Status: MITIGATED          Observed: EXPECTED
+  Cause      : Only the OPEN conversation is sent to the AI. When you reopen
+               an old conversation it becomes the context again; short
+               questions ("and for a woman?") then refer to it.
+  Tips       : To change subject, use "New conversation" on the right edge.
+               After 2 h without messages, the next message already opens a
+               new conversation (same rule as v0.5, NX-LLM-019).
 
 ================================================================================
  UI — DESKTOP INTERFACE

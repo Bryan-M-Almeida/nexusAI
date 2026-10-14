@@ -177,7 +177,8 @@ class Api:
         return {"ui_mode": settings["ui_mode"], "mic_muted": settings["mic_muted"],
                 "voice_enabled": settings["voice_enabled"], "stt": self._listener.model_state,
                 "stt_error": self._listener.model_error, "ai_mode": settings["ai_mode"],
-                "temporary": memory.temporary, "can_repeat": bool(assistant.last_reply())}
+                "temporary": memory.temporary, "can_repeat": bool(assistant.last_reply()),
+                "conversation": memory.current_conversation()}
 
     def interrupt(self):
         """Dock "interrupt" / Esc: stop speaking and cancel the answer being generated."""
@@ -242,6 +243,38 @@ class Api:
 
     def clear_history(self):
         memory.clear_history()
+
+    # -- conversations (v0.9) ----------------------------------------------------
+    def conversations(self):
+        return {"list": memory.conversations(), "current": memory.current_conversation()}
+
+    def timeline(self, before_id=None):
+        return memory.timeline(200, before_id)
+
+    def new_conversation(self):
+        """Right rail "New conversation": the next message starts a fresh one."""
+        self._speaker.stop()
+        if memory.temporary:
+            memory.set_temporary(False)
+        memory.new_conversation()
+        return self.state()
+
+    def open_conversation(self, conversation_id):
+        self._speaker.stop()
+        if memory.temporary:
+            memory.set_temporary(False)
+        ok = memory.open_conversation(int(conversation_id))
+        return {"ok": ok, "messages": memory.conversation_messages(int(conversation_id)) if ok else [], **self.state()}
+
+    def delete_conversation(self, conversation_id):
+        memory.delete_conversation(int(conversation_id))
+        return self.conversations()
+
+    def rename_conversation(self, conversation_id, title):
+        row = db.one("SELECT description FROM conversations WHERE id = ?", (int(conversation_id),))
+        if row and title.strip():
+            memory.set_conversation_title(int(conversation_id), title, row["description"], final=True)
+        return self.conversations()
 
     def stop_speaking(self):
         self._speaker.stop()

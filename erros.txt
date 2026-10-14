@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 1.9  ·  Data: 2026-10-14  ·  Versão do app: 0.8.1
+ Versão do documento: 2.0  ·  Data: 2026-10-14  ·  Versão do app: 0.9.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -97,6 +97,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-DAT-006  Livros iniciais reindexados ou duplicados
       NX-DAT-007  Arquivo da pasta inbox não é reimportado
       NX-DAT-008  Saudação "vamos continuar...?" não aparece / aparece só uma vez
+      NX-DAT-009  Conversa antiga não aparece na lista ou ficou sem título/descrição
+      NX-DAT-010  Resposta usa assunto de outra conversa
  UI   NX-UI-001   Fontes diferentes da landing (sem internet)
       NX-UI-002   Janela não abre: WebView2 ausente
       NX-UI-003   Janela abre em branco ou travada no boot
@@ -748,6 +750,29 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                lembra de continuar o projeto X".
   Para rever a apresentação: apague a linha "introduced" da tabela state
                (ou use um novo NEXUS_HOME).
+
+[NX-DAT-009] Conversa antiga não aparece na lista ou ficou sem título/descrição
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Sintoma    : Em Conversas > Separadas falta uma conversa, ou ela mostra só
+               o começo da primeira pergunta, sem descrição.
+  Causa      : (1) A lista mostra só conversas em que você escreveu algo
+               (a saudação sozinha não conta). (2) O título e a descrição
+               são escritos pela IA em segundo plano depois da 1ª resposta e
+               refinados na 4ª troca; se a IA estava desligada ou a resposta
+               foi interrompida, fica o título provisório. (3) Conversas de
+               antes da v0.9 foram separadas automaticamente por pausas de 2 h
+               e têm só o título provisório.
+  Solução    : Use o lápis (✎) no cartão para renomear. A aba "Todas" mostra
+               todas as mensagens, inclusive as que não aparecem na lista.
+
+[NX-DAT-010] Resposta usa assunto de outra conversa
+  Severidade : MÉDIA            Status: MITIGADO           Observado: PREVISTO
+  Causa      : Só a conversa ABERTA vai para a IA. Ao reabrir uma conversa
+               antiga, ela volta a ser o contexto; perguntas curtas ("e de uma
+               mulher?") passam a se referir a ela.
+  Dicas      : Para mudar de assunto, use "Nova conversa" na borda direita.
+               Depois de 2 h sem mensagens, a próxima mensagem já abre uma
+               conversa nova (mesma regra da v0.5, NX-LLM-019).
 
 ================================================================================
  UI — INTERFACE DESKTOP

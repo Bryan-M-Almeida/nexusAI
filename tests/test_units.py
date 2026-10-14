@@ -184,5 +184,63 @@ with open(rep["file"], encoding="utf-8") as f:
     report_text = f.read()
 check("report file has the conversation", "pergunta com erro" in report_text and "## Conversation" in report_text)
 
+# -- conversations (v0.9) ---------------------------------------------------------------------------------------
+memory.new_conversation()
+memory.add_message("user", "Quanto pesa o coração de um homem adulto?")
+memory.add_message("assistant", "Entre 280 e 340 gramas.")
+first = memory.current_conversation()
+memory.new_conversation()
+check("new conversation: history starts empty", memory.history(10) == [])
+memory.add_message("user", "Qual a capital da Austrália?")
+second = memory.current_conversation()
+check("new conversation: only its own messages go to the model",
+      [m["content"] for m in memory.history(10)] == ["Qual a capital da Austrália?"])
+convs = {c["id"]: c for c in memory.conversations()}
+check("conversation gets a provisional title from the first user message",
+      convs[first]["title"].startswith("Quanto pesa o coração"), str(convs.get(first)))
+memory.open_conversation(first)
+check("reopened conversation brings its history back", memory.history(10)[-1]["content"] == "Entre 280 e 340 gramas.")
+check("repeat uses the open conversation", assistant.last_reply() == "Entre 280 e 340 gramas.")
+memory.set_conversation_title(first, "Peso do coração", "Valores médios por sexo.", final=True)
+check("model title stored", db.one("SELECT title, titled_at FROM conversations WHERE id = ?", (first,))
+      == {"title": "Peso do coração", "titled_at": -1})
+tl = memory.timeline(50)
+check("timeline is chronological across conversations", [m["id"] for m in tl] == sorted(m["id"] for m in tl)
+      and {first, second} <= {m["conversation_id"] for m in tl})
+db.execute("UPDATE conversations SET updated = ? WHERE id = ?",
+           ((datetime.now() - timedelta(hours=3)).isoformat(timespec="seconds"), first))
+check("2 h of silence closes the open conversation", memory.current_conversation() is None)
+memory.delete_conversation(second)
+check("deleted conversation disappears with its messages",
+      second not in {c["id"] for c in memory.conversations()}
+      and db.one("SELECT COUNT(*) n FROM messages WHERE conversation_id = ?", (second,))["n"] == 0)
+
+memory.new_conversation()
+memory.add_message("assistant", "Olá, o que teremos para hoje?")  # opening greeting, never answered
+greeting_only = memory.current_conversation()
+memory.new_conversation()
+memory.add_message("user", "oi")
+check("greeting-only conversations are cleaned up",
+      db.one("SELECT COUNT(*) n FROM messages WHERE content = 'Olá, o que teremos para hoje?'")["n"] == 0)  # ids are reused
+
+# migration of pre-v0.9 messages: a 2 h gap splits them into two conversations
+import sqlite3  # noqa: E402
+import tempfile  # noqa: E402
+from nexus.db import DB  # noqa: E402
+
+old_db = tempfile.mktemp(suffix=".db")
+con = sqlite3.connect(old_db)
+con.execute("CREATE TABLE messages (id INTEGER PRIMARY KEY, role TEXT NOT NULL, content TEXT NOT NULL, ts TEXT NOT NULL)")
+con.executemany("INSERT INTO messages(role, content, ts) VALUES (?,?,?)", [
+    ("user", "oi", "2026-10-13T09:00:00"), ("assistant", "olá", "2026-10-13T09:00:05"),
+    ("user", "e o clima?", "2026-10-13T15:00:00"), ("assistant", "sol", "2026-10-13T15:00:04")])
+con.commit(); con.close()
+migrated = DB(old_db)
+groups = migrated.all("SELECT conversation_id, COUNT(*) n FROM messages GROUP BY conversation_id")
+check("migration: old messages split by 2 h gaps", [g["n"] for g in groups] == [2, 2], str(groups))
+check("migration: titles from the first user message",
+      [c["title"] for c in migrated.all("SELECT title FROM conversations ORDER BY id")] == ["oi", "e o clima?"])
+migrated.conn.close()
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

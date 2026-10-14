@@ -8,6 +8,41 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.9.0 — Protótipo · 2026-10-14
+
+**Conversas com histórico e descrição, HUD novo, ícones do conhecimento e aro arrastável.**
+
+### Conversas
+- **Nova conversa** e **Conversas** na borda direita. Cada conversa ganha **título e descrição escritos pela IA** em
+  segundo plano (depois da 1ª resposta e de novo na 4ª troca); dá para renomear (✎) e apagar (✕).
+- Aba **Separadas**: cartões com título, descrição, data e número de mensagens; clique para **continuar** a conversa
+  (o histórico dela volta a ser o contexto da IA).
+- Aba **Todas · linha do tempo**: todas as mensagens em ordem cronológica, separadas por dia e por conversa;
+  "Carregar mais antigas" para voltar no tempo.
+- Só a conversa aberta vai para a IA (como as "sessões" da v0.5, NX-LLM-019); 2 h de silêncio abrem uma nova.
+- Mensagens de versões anteriores foram separadas em conversas automaticamente (pausas de 2 h), com título provisório.
+- Repetir usa a última resposta da conversa aberta.
+
+### Visual (HUD)
+- Inspirado no HUD do Homem de Ferro, com toques do NEXUS: cantos e réguas laterais da abertura sempre visíveis
+  e discretos, linhas de varredura quase invisíveis e **telemetria ligada ao aro** (modelo e modo, hora e data,
+  microfone e voz com indicadores).
+- **Pulso**: uma linha sob o aro que oscila com a sua voz (vermelha) e a do NEXUS (azul).
+- Custo de desempenho perto de zero: tudo é CSS estático, exceto o pulso (uma linha SVG atualizada junto com o aro).
+
+### Outros
+- **Ícones por área do conhecimento** (primeiros socorros, filosofia, finanças, programação, saúde, produtividade,
+  anatomia, aprendido) nas etiquetas e na lista de documentos, nos 3 idiomas.
+- **Aro arrastável** no modo áudio: arraste para mover (a posição é lembrada), duplo clique para centralizar.
+  Base para, no futuro, reduzir o NEXUS só ao aro.
+
+### Testes desta versão
+- 93/93 testes unitários (12 novos: conversas, histórico isolado, reabrir, título, linha do tempo, silêncio de 2 h,
+  apagar, limpeza das saudações, migração das mensagens antigas).
+- 26/26 verificações de conversa com qwen3:8b (nova: título e descrição gerados pela IA — "Peso do coração humano").
+
+---
+
 ## v0.8.1 — Protótipo · 2026-10-14
 
 **Correção: abas do Painel sem rolagem.**
@@ -286,12 +321,14 @@ NX-VOZ-016, NX-ENV-007).
 
 ## Próximas versões (planejamento)
 
-### v0.8.0 — Protótipo (próxima) · prioridade média: identidade visual
-- Redesenho completo: visual mais limpo, cores harmônicas, inspirado no HUD do Homem de Ferro com toques originais.
-- Ícones originais por tipo de conhecimento (saúde, programação, finanças...).
-- Base visual das laterais (modos à esquerda, projetos à direita).
+### v0.10.0 — Protótipo (próxima) · notificações e configurações
+- **Sistema de notificações** e **ações automáticas** com o app aberto: lembretes falados com antecedência
+  configurável (ex.: 1 h, 15 min e na hora), notificações do Windows e central de notificações.
+- **Configurações completas**, organizadas por seções, com o máximo de opções ajustáveis.
+- **Provedores de IA**: presets (Ollama, LM Studio, OpenAI, OpenRouter, Groq, Gemini...), chave de API e teste
+  de conexão. Hoje já funciona qualquer API compatível com OpenAI, mas a chave não aparece na tela.
 
-### v0.9.0 — Protótipo · prioridade média: recursos novos
+### v0.11.0 — Protótipo · recursos novos
 - **Projetos** na lateral direita: a IA consulta e atualiza o projeto ativo com o usuário.
 - **Sistema de habilidades estilo Solo Leveling**: nível do NEXUS e de cada habilidade, subindo com o uso; minimalista.
 

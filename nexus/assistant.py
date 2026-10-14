@@ -240,10 +240,8 @@ def warm_up() -> dict:
 
 
 def last_reply() -> str:
-    if memory.temporary:
-        return next((m["content"] for m in reversed(memory.history(50)) if m["role"] == "assistant" and m["content"]), "")
-    row = db.one("SELECT content FROM messages WHERE role = 'assistant' AND content != '' ORDER BY id DESC LIMIT 1")
-    return row["content"] if row else ""
+    """Last answer of the open conversation (temporary chats included)."""
+    return next((m["content"] for m in reversed(memory.history(50)) if m["role"] == "assistant" and m["content"]), "")
 
 
 class Assistant:
@@ -361,6 +359,31 @@ class Assistant:
         if (settings["auto_memory"] and reply and not finished and not topic and "remember" not in called
                 and not memory.temporary and memory.states_fact(text)):
             threading.Thread(target=self._extract_memories, args=(text, reply), daemon=True).start()
+        cid = memory.current_conversation()
+        if reply and not interrupted and cid and not memory.temporary:
+            threading.Thread(target=self._title_conversation, args=(cid,), daemon=True).start()
+
+    def _title_conversation(self, cid: int):
+        """Title + one-line description for the conversations panel, written by the model in the background:
+        after the first answer and again (final) after the 4th exchange, when the topic is clearer."""
+        row = db.one("SELECT titled_at, (SELECT COUNT(*) FROM messages WHERE conversation_id = ?) AS n "
+                     "FROM conversations WHERE id = ?", (cid, cid))
+        if not row or row["titled_at"] == -1 or not (row["n"] >= 2 and row["titled_at"] == 0 or row["n"] >= 8):
+            return
+        final = row["n"] >= 8
+        talk = "\n".join(f"{m['role']}: {m['content'][:400]}" for m in memory.conversation_messages(cid)[-8:])
+        prompt = ("Give this conversation a short title (max 6 words) and a one-sentence description of what it is "
+                  f"about, in the language of the conversation. Answer ONLY with JSON "
+                  f'{{"title": str, "description": str}}.\n\n{talk}')
+        try:
+            out = llm.complete([{"role": "user", "content": prompt}])
+            data = json.loads(re.search(r"\{.*\}", out, re.DOTALL).group(0))
+            title = str(data.get("title", "")).strip().strip('"')
+        except Exception:
+            return
+        if title:
+            memory.set_conversation_title(cid, title, str(data.get("description", "")), final=final)
+            self.emit("conversations", None)
 
     def _control(self, action: str, previous: str):
         """conversation_control chosen by the model. Returns (tool result, final reply or None)."""
