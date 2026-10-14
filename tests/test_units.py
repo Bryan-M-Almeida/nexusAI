@@ -131,5 +131,20 @@ titles = [e["title"] for e in db.all("SELECT title FROM events WHERE external_id
 check("ICS: event deleted at the source disappears", "Feriado" not in titles and "Outro" in titles, str(titles))
 settings["calendar_ics_url"] = ""
 
+# -- temporary conversation and AI modes (v0.7) ---------------------------------------------------------------
+saved_before = db.one("SELECT COUNT(*) n FROM messages")["n"]
+memory.set_temporary(True)
+memory.add_message("user", "conversa à toa")
+memory.add_message("assistant", "resposta à toa")
+check("temporary: nothing written to the database", db.one("SELECT COUNT(*) n FROM messages")["n"] == saved_before)
+check("temporary: history comes from RAM", [m["content"] for m in memory.history(5)] == ["conversa à toa", "resposta à toa"])
+check("temporary: repeat uses the temporary answer", assistant.last_reply() == "resposta à toa")
+memory.set_temporary(False)
+check("temporary: discarded when turned off", all("à toa" not in m["content"] for m in memory.history(50)))
+settings["ai_mode"] = "direct"
+check("direct mode instruction in the context", "MODE DIRECT" in assistant.build_context("O que é estoicismo?"))
+settings["ai_mode"] = "assistant"
+check("assistant mode adds no instruction", "MODE DIRECT" not in assistant.build_context("O que é estoicismo?"))
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

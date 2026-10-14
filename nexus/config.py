@@ -33,6 +33,7 @@ DEFAULTS = {
     "llm_provider": "auto",       # auto (Ollama native API when the URL is :11434) | ollama | openai
     "llm_context": 8192,          # context window requested from Ollama (its default 4096 truncates the tools)
     "llm_temperature": 0.3,
+    "ai_mode": "assistant",       # assistant (complete, friendly) | direct (shortest exact answer, faster)
     "auto_memory": True,          # extract facts about the user after each exchange
     "voice_enabled": True,        # speak replies
     "voice_gender": "male",       # male | female (falls back to the other voice with shifted pitch)

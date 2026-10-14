@@ -77,6 +77,15 @@ TIME_WORDS = re.compile(
 ABOUT_ME = re.compile(r"\b(sobre mim|me conhece|sabe de mim|about me|know me|sobre m[ií]|me conoces|lembra de mim|"
                       r"meu nome|my name|mi nombre)\b", re.IGNORECASE)
 KB_CHARS = 650
+# AI modes (v0.7). The instruction travels in the per-message context (~40 tokens), NOT in the system prompt:
+# changing the system prompt would invalidate the cached prefix and cost ~25 s on the next message.
+MODES = {
+    "assistant": "",
+    "direct": ("MODE DIRECT: give exactly what was asked in the fewest words - usually one or two short sentences, "
+               "or a minimal list only if steps are essential. No greetings, no filler, no follow-up questions, no "
+               "emojis, no restating the question."),
+}
+DIRECT_MAX_TOKENS = 320  # safety cap for the direct mode (the instruction keeps answers far below it)
 
 
 def build_context(user_text: str, emergency_topic: str | None = None) -> str:
@@ -133,6 +142,8 @@ def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     if msg_lang:
         name = {"pt": "Brazilian Portuguese", "en": "English", "es": "Spanish"}[msg_lang]
         parts.append(f"\nReply ONLY in {name}.")
+    if MODES.get(settings["ai_mode"]):
+        parts.append(MODES[settings["ai_mode"]])
     parts.append("Requests to store, log, remember, learn, schedule or look up something need the matching tool call.")
     return "\n".join(parts)
 
@@ -215,6 +226,8 @@ def warm_up() -> dict:
 
 
 def last_reply() -> str:
+    if memory.temporary:
+        return next((m["content"] for m in reversed(memory.history(50)) if m["role"] == "assistant" and m["content"]), "")
     row = db.one("SELECT content FROM messages WHERE role = 'assistant' AND content != '' ORDER BY id DESC LIMIT 1")
     return row["content"] if row else ""
 
@@ -262,7 +275,8 @@ class Assistant:
         try:
             for _ in range(MAX_TOOL_ROUNDS):
                 round_text, calls = "", None
-                for kind, value in llm.stream_chat(messages, tools.SCHEMAS):
+                cap = DIRECT_MAX_TOKENS if settings["ai_mode"] == "direct" else None
+                for kind, value in llm.stream_chat(messages, tools.SCHEMAS, max_tokens=cap):
                     if self.cancel.is_set():
                         break
                     if kind == "token":
@@ -317,8 +331,10 @@ class Assistant:
         self.emit("done", {"text": reply, "speak": bool(reply) and not interrupted, "interrupted": interrupted})
         if changed:
             self.emit("refresh", None)
+        # Automatic memory: only self-statements, never in emergencies or temporary conversations, and not when
+        # the model already called `remember` this turn (no second LLM pass).
         if (settings["auto_memory"] and reply and not finished and not topic and "remember" not in called
-                and memory.states_fact(text)):  # the model already stored it: no second LLM pass
+                and not memory.temporary and memory.states_fact(text)):
             threading.Thread(target=self._extract_memories, args=(text, reply), daemon=True).start()
 
     def _control(self, action: str, previous: str):

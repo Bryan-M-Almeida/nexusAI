@@ -230,6 +230,27 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 6; text-transform: uppercase; }
 .dock-tip.show { opacity: .9; }
 
+/* Side rails (v0.7): AI modes on the left, conversation options on the right; revealed at the screen edges. */
+.rail { top: 50%; width: 236px; padding: 12px; display: flex; flex-direction: column; gap: 6px;
+  background: rgba(7, 11, 17, .9); border: 1px solid var(--line-strong); backdrop-filter: blur(10px); opacity: 0; }
+.rail::before { content: ""; position: absolute; top: -1px; width: 14px; height: 14px; border-top: 1px solid var(--red); }
+.rail-left { left: 14px; transform: translate(calc(-100% - 20px), -50%); }
+.rail-left::before { left: -1px; border-left: 1px solid var(--red); }
+.rail-right { right: 14px; transform: translate(calc(100% + 20px), -50%); }
+.rail-right::before { right: -1px; border-right: 1px solid var(--red); }
+.rail.show { transform: translate(0, -50%); opacity: 1; }
+.rail-title { margin: 0 0 4px; font-size: 10px; letter-spacing: .2em; color: var(--muted); }
+.rail-btn { display: flex; align-items: center; gap: 11px; text-align: left; padding: 9px 10px; background: none;
+  border: 1px solid transparent; color: var(--muted); transition: color .2s, border-color .2s, background .2s; }
+.rail-btn:hover { color: var(--text); border-color: var(--line-strong); }
+.rail-btn.on { color: var(--blue-bright); border-color: rgba(61, 139, 219, .6); background: rgba(61, 139, 219, .12); }
+.rail-btn span { display: flex; flex-direction: column; gap: 1px; }
+.rail-btn b { font-weight: 500; font-size: 15px; color: inherit; }
+.rail-btn small { font-family: var(--f-mono); font-size: 10px; letter-spacing: .04em; color: var(--muted); }
+.temp-badge { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 4px 12px; font-size: 10.5px;
+  letter-spacing: .16em; color: #f2b33d; border: 1px dashed rgba(242, 179, 61, .6); background: rgba(40, 28, 6, .55); }
+.app.temporary .chat { border: 1px dashed rgba(242, 179, 61, .35); padding: 8px; }
+
 .drawer { position: fixed; inset: 0; z-index: 15; background: rgba(3, 5, 8, .8); backdrop-filter: blur(5px); display: grid; place-items: center; padding: 20px; }
 .drawer-box { position: relative; width: min(1100px, 96vw); height: min(86vh, 820px); display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
   padding: 44px 14px 14px; background: var(--bg-2); border: 1px solid var(--line-strong); animation: rise .4s var(--ease-out); }
@@ -240,9 +261,13 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .tabs { display: flex; border: 1px solid var(--line); background: var(--panel); flex-shrink: 0; }
 .tabs button { flex: 1; background: none; border: 0; padding: 8px 4px; font-size: 10.5px; letter-spacing: .14em; color: var(--muted); border-bottom: 2px solid transparent; }
 .tabs button.on { color: var(--text); border-bottom-color: var(--red); }
-.kb-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.kb-stat { border: 1px solid var(--line); padding: 6px 8px; font-size: 13px; }
-.kb-stat b { display: block; font-family: var(--f-mono); color: var(--blue-bright); font-weight: 400; font-size: 15px; }
+/* Tab bodies scroll as a whole: with 21 categories the stats grid used to push the documents list to 0 px
+   inside an overflow:hidden panel, so nothing in the Knowledge tab could be reached (v0.7 fix). */
+.tab-body { overflow-y: auto; }
+.tab-body .list { flex: none; overflow: visible; }
+.kb-stats { display: flex; flex-wrap: wrap; gap: 5px; }
+.kb-stat { display: inline-flex; align-items: baseline; gap: 6px; border: 1px solid var(--line); padding: 3px 8px; font-size: 12.5px; }
+.kb-stat b { font-family: var(--f-mono); color: var(--blue-bright); font-weight: 400; font-size: 11px; }
 .row-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .btn-primary, .btn-ghost { padding: 7px 14px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; border: 1px solid var(--blue); }
 .btn-primary { background: linear-gradient(180deg, rgba(61, 139, 219, .4), rgba(18, 53, 94, .55)); color: #fff; }

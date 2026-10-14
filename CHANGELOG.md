@@ -8,6 +8,29 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.7.0 — Protótipo · 2026-10-14
+
+**Correções de usabilidade, modos da IA e conversa temporária.**
+
+### Corrigido
+- **Configurações demoravam para abrir / precisavam de vários cliques** (NX-UI-006): a tela só aparecia depois de
+  consultar o Python — e o Ollama, que pode estar carregando o modelo na abertura. Agora abre na hora com as
+  configurações já conhecidas; status da IA, modelos e vozes chegam em seguida.
+- **Aba Saber sem rolagem** (NX-UI-007): as 21 categorias ocupavam 672 px num painel que cortava o excesso, deixando
+  a lista de documentos com 0 px. Agora a aba inteira rola e as categorias são etiquetas compactas (152 px).
+
+### Novo
+- **Modos da IA** (borda esquerda): *Assistente* e *Direto*. Medido com `tests/bench_modes.py`: no Direto, respostas
+  66% mais curtas (47 × 137 palavras) e 43% mais rápidas (7,7 s × 13,4 s). A instrução do modo vai no contexto da
+  mensagem, não no prompt fixo, para trocar de modo sem perder o cache.
+- **Conversa temporária** (borda direita): só em RAM, nunca salva, sem memória automática, descartada ao desligar.
+- Laterais reveladas ao aproximar o mouse das bordas, como as barras superior e inferior; todas aparecem por 3,5 s ao abrir.
+
+### Testes desta versão
+- 59/59 testes unitários; 21/21 verificações de conversa com qwen3:8b (inclui conversa temporária e modo Direto).
+
+---
+
 ## v0.6.0 — Protótipo · 2026-10-14
 
 **Respostas ~3× mais rápidas, IA carregada na abertura e integrações online.**
@@ -196,8 +219,14 @@ NX-VOZ-016, NX-ENV-007).
 
 ## Próximas versões (planejamento)
 
-### v0.7.0 — Protótipo (próxima)
-A definir com o usuário.
+### v0.8.0 — Protótipo (próxima) · prioridade média: identidade visual
+- Redesenho completo: visual mais limpo, cores harmônicas, inspirado no HUD do Homem de Ferro com toques originais.
+- Ícones originais por tipo de conhecimento (saúde, programação, finanças...).
+- Base visual das laterais (modos à esquerda, projetos à direita).
+
+### v0.9.0 — Protótipo · prioridade média: recursos novos
+- **Projetos** na lateral direita: a IA consulta e atualiza o projeto ativo com o usuário.
+- **Sistema de habilidades estilo Solo Leveling**: nível do NEXUS e de cada habilidade, subindo com o uso; minimalista.
 
 ### Versão final do protótipo
 - **Instalador** (Inno Setup) e início automático com o Windows — reservado pelo usuário para a versão final do protótipo.

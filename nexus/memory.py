@@ -92,7 +92,22 @@ def recent_actions(limit: int = 10, since: str | None = None) -> list[dict]:
     return db.all("SELECT ts, kind, summary FROM actions ORDER BY id DESC LIMIT ?", (limit,))
 
 
+# Temporary conversation (v0.7): small talk that must not be saved. Messages live only in RAM and are discarded
+# when the mode is turned off; automatic memory extraction is skipped while it is on.
+temporary = False
+_temp: list[dict] = []
+
+
+def set_temporary(on: bool):
+    global temporary
+    temporary = bool(on)
+    _temp.clear()
+
+
 def add_message(role: str, content: str):
+    if temporary:
+        _temp.append({"role": role, "content": content, "ts": now()})
+        return
     db.execute("INSERT INTO messages(role, content, ts) VALUES (?,?,?)", (role, content, now()))
 
 
@@ -118,6 +133,8 @@ def session_start() -> str:
 
 def history(turns: int) -> list[dict]:
     """Last `turns` exchanges of the current session (oldest first)."""
+    if temporary:
+        return list(_temp[-turns * 2:])
     rows = db.all("SELECT role, content, ts FROM messages WHERE ts >= ? ORDER BY id DESC LIMIT ?",
                   (session_start(), turns * 2))
     return list(reversed(rows))

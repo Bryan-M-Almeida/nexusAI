@@ -127,7 +127,8 @@ async function start() {
   applyLang(st.lang);
   setAi(st.llm);
   $("#version").textContent = "v" + st.version;
-  applyState({ ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: st.stt });
+  applyState({ ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: st.stt,
+    ai_mode: settings.ai_mode || "assistant", temporary: false });
   await new Promise((r) => setTimeout(r, Math.max(0, BOOT_MIN_MS - (Date.now() - t0))));
   $("#boot").classList.add("leaving");
   $("#app").hidden = false;
@@ -247,7 +248,7 @@ async function send(text) {
 }
 
 /* ------------------------------------------------------------------ voice state */
-let state = { ui_mode: "audio", mic_muted: false, voice_enabled: true, stt: "ready" };
+let state = { ui_mode: "audio", mic_muted: false, voice_enabled: true, stt: "ready", ai_mode: "assistant", temporary: false };
 
 function setVoiceState(st) {
   voiceState = st;
@@ -268,6 +269,10 @@ function applyState(st) {
   $("#btnMic").classList.toggle("off", state.mic_muted);
   $("#btnAiVoice").classList.toggle("off", !state.voice_enabled);
   $("#btnMic").disabled = $("#btnAiVoice").disabled = state.ui_mode === "text";
+  $$("[data-ai-mode]").forEach((b) => b.classList.toggle("on", b.dataset.aiMode === state.ai_mode));
+  $("#btnTemp").classList.toggle("on", state.temporary);
+  $("#tempBadge").hidden = !state.temporary;
+  $("#app").classList.toggle("temporary", state.temporary);
   if (state.ui_mode === "text") setTimeout(() => $("#prompt").focus(), 300);
   setVoiceState(voiceState === "speaking" ? "speaking" : "idle");
 }
@@ -318,25 +323,40 @@ function notice(text) {
 }
 
 /* ------------------------------------------------------------------ edge bars: top bar and dock appear near the screen edges */
-const EDGE_TOP = 64, EDGE_BOTTOM = 110;
-let topTimer, dockTimer;
-function showBar(el, timerName, on) {
-  clearTimeout(timerName === "top" ? topTimer : dockTimer);
+const EDGE_TOP = 64, EDGE_BOTTOM = 110, EDGE_SIDE = 56;
+const barTimers = {};
+function showBar(el, on) {
+  clearTimeout(barTimers[el.id]);
   if (on) return el.classList.add("show");
-  const t = setTimeout(() => el.classList.remove("show"), 900);
-  if (timerName === "top") topTimer = t; else dockTimer = t;
+  barTimers[el.id] = setTimeout(() => el.classList.remove("show"), 900);
 }
 
 function trackEdges(e) {
-  const overTop = e.clientY < EDGE_TOP || $("#topbar").matches(":hover");
-  const overDock = e.clientY > innerHeight - EDGE_BOTTOM || $("#dock").matches(":hover");
-  showBar($("#topbar"), "top", overTop);
-  showBar($("#dock"), "dock", overDock);
+  const hover = (id) => $("#" + id).matches(":hover");
+  showBar($("#topbar"), e.clientY < EDGE_TOP || hover("topbar"));
+  showBar($("#dock"), e.clientY > innerHeight - EDGE_BOTTOM || hover("dock"));
+  showBar($("#railLeft"), e.clientX < EDGE_SIDE || hover("railLeft"));
+  showBar($("#railRight"), e.clientX > innerWidth - EDGE_SIDE || hover("railRight"));
 }
 
-function flashBars() {  // show both bars briefly once, so the user discovers them
-  $("#topbar").classList.add("show"); $("#dock").classList.add("show");
-  setTimeout(() => { showBar($("#topbar"), "top", false); showBar($("#dock"), "dock", false); }, 3500);
+const BARS = ["topbar", "dock", "railLeft", "railRight"];
+function flashBars() {  // show every bar briefly once, so the user discovers them
+  BARS.forEach((id) => $("#" + id).classList.add("show"));
+  setTimeout(() => BARS.forEach((id) => showBar($("#" + id), false)), 3500);
+}
+
+async function setAiMode(mode) {
+  applyState(await api().set_ai_mode(mode));
+  showTip(T(mode === "direct" ? "modeDirect" : "modeAssistant"));
+}
+
+async function toggleTemporary() {
+  const st = await api().set_temporary(!state.temporary);
+  applyState(st);
+  $("#chat").innerHTML = "";
+  if (st.temporary) addMsg("system", T("tempStarted"));
+  else for (const m of await api().history()) addMsg(m.role === "user" ? "user" : "nexus", m.content);
+  caption(T(st.temporary ? "tempStarted" : "tempEnded"), 3000);
 }
 
 async function dock(action) {
@@ -401,7 +421,7 @@ function renderDashboard(d) {
       <button class="x" data-forget="${m.id}">✕</button></li>`).join("") || empty("noMemories");
   $("#actionList").innerHTML = d.actions.map((a) => `
     <li><span class="body">${esc(a.summary)}<span class="meta">${esc(a.ts.replace("T", " ").slice(0, 16))} · ${esc(a.kind)}</span></span></li>`).join("");
-  $("#kbStats").innerHTML = d.knowledge.map((k) => `<div class="kb-stat"><b>${k.chunks}</b>${esc(k.category)}</div>`).join("");
+  $("#kbStats").innerHTML = d.knowledge.map((k) => `<span class="kb-stat">${esc(k.category)}<b>${k.chunks}</b></span>`).join("");
   if (!$("#kbSearch").value) renderDocs(d.documents);
   $("#collectionList").innerHTML = d.collections.map((c) => `
     <li class="clickable" data-collection="${esc(c.collection)}"><span class="body">${esc(c.collection)}<span class="meta">${c.items} · ${esc(c.last.slice(0, 10))}</span></span></li>`).join("") || empty("noCollections");
@@ -445,22 +465,28 @@ async function importResult(r) {
   if (r && r.ok === false && r.error) $("#profileErr").textContent = r.error;
 }
 
-async function openSettings() {
-  const r = await api().get_settings();
+// Opens instantly with the settings the UI already has; only the AI status, model list and voices are fetched
+// afterwards. (v0.6 and older waited for Python - and for Ollama while the model was loading - before showing
+// anything, so the click looked ignored and users clicked again.)
+function openSettings() {
   const f = $("#settingsForm");
-  for (const [k, v] of Object.entries(r.settings)) {
+  for (const [k, v] of Object.entries(settings)) {
     const el = f.elements[k];
     if (!el) continue;
     if (el.type === "checkbox") el.checked = !!v; else el.value = v;
   }
-  $("#modelList").innerHTML = r.llm.models.map((m) => `<option value="${esc(m)}">`).join("");
-  voices = r.voices || [];
   renderVoiceInfo();
-  $("#aiStatus").innerHTML = r.llm.online && r.llm.model_ready
-    ? `<span class="ok">● ${esc(T("aiOk"))}</span> — ${esc(r.llm.model)}`
-    : `<span class="bad">● ${esc(aiHelp(r.llm))}</span>`;
-  setAi(r.llm);
+  $("#aiStatus").innerHTML = `<span class="muted">● ${esc(T("checking"))}</span>`;
   $("#settings").hidden = false;
+  api().get_settings().then((r) => {
+    $("#modelList").innerHTML = r.llm.models.map((m) => `<option value="${esc(m)}">`).join("");
+    voices = r.voices || [];
+    renderVoiceInfo();
+    $("#aiStatus").innerHTML = r.llm.online && r.llm.model_ready
+      ? `<span class="ok">● ${esc(T("aiOk"))}</span> — ${esc(r.llm.model)}`
+      : `<span class="bad">● ${esc(aiHelp(r.llm))}</span>`;
+    setAi(r.llm);
+  });
 }
 
 let voices = [];
@@ -491,6 +517,8 @@ function wire() {
   }
   document.addEventListener("mousemove", trackEdges);
   $("#btnPanel").onclick = () => { loadDashboard(); $("#panelDrawer").hidden = false; };
+  $$("[data-ai-mode]").forEach((b) => (b.onclick = () => setAiMode(b.dataset.aiMode)));
+  $("#btnTemp").onclick = toggleTemporary;
   document.addEventListener("keydown", async (e) => {
     if (e.ctrlKey && e.code === "Space") {  // push-to-talk works in both modes
       e.preventDefault();

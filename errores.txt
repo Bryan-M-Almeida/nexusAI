@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 1.6  ·  Fecha: 2026-10-13  ·  Versión de la app: 0.6.0
+ Versión del documento: 1.7  ·  Fecha: 2026-10-13  ·  Versión de la app: 0.7.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -102,6 +102,8 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-UI-003   La ventana se abre en blanco o se bloquea en el arranque
       NX-UI-004   Interfaz descuadrada en pantallas pequeñas
       NX-UI-005   No encuentro los botones / la pantalla solo muestra el anillo
+      NX-UI-006   La configuración tarda en abrirse o necesita varios clics
+      NX-UI-007   La pestaña Saber (conocimiento) no tiene desplazamiento
  INT  NX-INT-001  La landing aún no tiene un formulario de registro real
       NX-INT-002  El navegador bloquea el envío de la landing a 127.0.0.1
       NX-INT-003  Puerto 47800 ocupado: puente local desactivado
@@ -749,6 +751,29 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Consejos   : Agenda, tareas, memoria y conocimiento están en el botón Panel
                (barra superior). Esc cierra las ventanas abiertas; si no hay
                ninguna, interrumpe el habla.
+  v0.7       : También los bordes laterales: ratón a la IZQUIERDA abre los
+               modos de la IA (Asistente / Directo) y a la DERECHA la
+               conversación temporal.
+
+[NX-UI-006] La configuración tarda en abrirse o necesita varios clics
+  Gravedad   : MEDIA            Estado: CORREGIDO (v0.7)   Observado: SÍ
+  Causa      : La pantalla solo aparecía después de consultar Python y Ollama
+               (estado de la IA). Hasta la v0.5 esa consulta pagaba los ~2 s de
+               "localhost" (NX-ENV-008), y en los primeros ~25 s tras abrir la
+               app Ollama aún está cargando el modelo. Sin respuesta visual,
+               el clic parecía ignorado.
+  Corrección : La pantalla se abre al instante con la configuración ya
+               conocida; el estado de la IA muestra "Comprobando..." y se
+               completa después, junto con la lista de modelos y voces.
+
+[NX-UI-007] La pestaña Saber (conocimiento) no tiene desplazamiento
+  Gravedad   : MEDIA            Estado: CORREGIDO (v0.7)   Observado: SÍ
+  Causa      : Las 21 categorías en bloques ocupaban 672 px en un panel que
+               recortaba el exceso (overflow: hidden); la lista de documentos
+               quedaba con 0 px y los botones Importar/Enseñar quedaban ocultos.
+  Corrección : Toda la pestaña se desplaza y las categorías pasaron a ser
+               etiquetas compactas (152 px). Reproducido y verificado en el
+               modo simulado con 21 categorías.
 
 ================================================================================
  INT — INTEGRACIÓN CON LA LANDING PAGE

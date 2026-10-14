@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 1.6  ·  Data: 2026-10-13  ·  Versão do app: 0.6.0
+ Versão do documento: 1.7  ·  Data: 2026-10-13  ·  Versão do app: 0.7.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -99,6 +99,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-UI-003   Janela abre em branco ou travada no boot
       NX-UI-004   Interface fora de escala em telas pequenas
       NX-UI-005   Não encontro os botões / a tela só mostra o aro
+      NX-UI-006   Configurações demoram para abrir ou precisam de vários cliques
+      NX-UI-007   Aba Saber (conhecimento) sem rolagem
  INT  NX-INT-001  Landing ainda não possui formulário de onboarding real
       NX-INT-002  Navegador bloqueia o envio da landing para 127.0.0.1
       NX-INT-003  Porta 47800 ocupada: ponte local desativada
@@ -720,6 +722,28 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Dicas      : Agenda, tarefas, memória e conhecimento ficam no botão Painel
                (barra superior). Esc fecha janelas abertas; sem janelas
                abertas, interrompe a fala.
+  v0.7       : Bordas laterais também: mouse à ESQUERDA abre os modos da IA
+               (Assistente / Direto) e à DIREITA a conversa temporária.
+
+[NX-UI-006] Configurações demoram para abrir ou precisam de vários cliques
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.7)   Observado: SIM
+  Causa      : A tela só aparecia depois de consultar o Python e o Ollama
+               (status da IA). Até a v0.5 a consulta pagava ~2 s do
+               "localhost" (NX-ENV-008), e nos primeiros ~25 s após abrir o app
+               o Ollama ainda está carregando o modelo. Sem retorno visual, o
+               clique parecia ignorado.
+  Correção   : A tela abre na hora com as configurações já conhecidas; o
+               status da IA mostra "Verificando..." e é preenchido depois,
+               junto com a lista de modelos e vozes.
+
+[NX-UI-007] Aba Saber (conhecimento) sem rolagem
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.7)   Observado: SIM
+  Causa      : As 21 categorias em blocos ocupavam 672 px num painel que
+               cortava o excesso (overflow: hidden); a lista de documentos
+               ficava com 0 px e os botões Importar/Ensinar ficavam escondidos.
+  Correção   : A aba inteira rola e as categorias viraram etiquetas
+               compactas (152 px). Reproduzido e verificado no modo mock com
+               21 categorias.
 
 ================================================================================
  INT — INTEGRAÇÃO COM A LANDING PAGE

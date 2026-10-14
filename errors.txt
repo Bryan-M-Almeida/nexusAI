@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 1.6  ·  Date: 2026-10-13  ·  App version: 0.6.0
+ Document version: 1.7  ·  Date: 2026-10-13  ·  App version: 0.7.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -101,6 +101,8 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-UI-003   Window opens blank or stuck at boot
       NX-UI-004   Interface out of scale on small screens
       NX-UI-005   I can't find the buttons / the screen only shows the ring
+      NX-UI-006   Settings slow to open or needing several clicks
+      NX-UI-007   Knowledge tab cannot scroll
  INT  NX-INT-001  Landing page has no real onboarding form yet
       NX-INT-002  Browser blocks the landing page request to 127.0.0.1
       NX-INT-003  Port 47800 busy: local bridge disabled
@@ -720,6 +722,28 @@ QUICK DIAGNOSTICS (run these before investigating)
   Tips       : Schedule, tasks, memory and knowledge live under the Panel
                button (top bar). Esc closes open windows; with none open, it
                interrupts the speech.
+  v0.7       : Side edges too: mouse on the LEFT opens the AI modes
+               (Assistant / Direct) and on the RIGHT the temporary chat.
+
+[NX-UI-006] Settings slow to open or needing several clicks
+  Severity   : MEDIUM           Status: FIXED (v0.7)       Observed: YES
+  Cause      : The screen only appeared after querying Python and Ollama (AI
+               status). Up to v0.5 that query paid the ~2 s "localhost" delay
+               (NX-ENV-008), and in the first ~25 s after opening the app
+               Ollama is still loading the model. With no visual feedback the
+               click looked ignored.
+  Fix        : The screen opens instantly with the settings already known; the
+               AI status shows "Checking..." and is filled in afterwards, with
+               the model and voice lists.
+
+[NX-UI-007] Knowledge tab cannot scroll
+  Severity   : MEDIUM           Status: FIXED (v0.7)       Observed: YES
+  Cause      : The 21 category blocks took 672 px inside a panel that clipped
+               the overflow (overflow: hidden); the documents list ended up
+               0 px tall and the Import/Teach buttons were hidden.
+  Fix        : The whole tab scrolls and categories became compact tags
+               (152 px). Reproduced and verified in mock mode with 21
+               categories.
 
 ================================================================================
  INT — LANDING PAGE INTEGRATION

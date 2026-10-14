@@ -10,14 +10,16 @@ if (!window.pywebview && location.search.includes("mock")) {
     modules: ["código", "agenda", "foco/pomodoro"], language: "pt-BR" };
   const settings = { llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, auto_memory: true, voice_enabled: true, bridge_port: 47800,
-    integrations: true, home_city: "São Paulo", calendar_ics_url: "",
+    integrations: true, home_city: "São Paulo", calendar_ics_url: "", ai_mode: "assistant",
     ui_mode: "audio", mic_muted: false, require_wake_word: false };
   const llm = { online: true, model_ready: true, model: "qwen3:8b", models: ["qwen3:8b"] };
   const VOICES = [{ name: "Microsoft Maria", gender: "female", lang: "pt" }, { name: "Microsoft Zira", gender: "female", lang: "en" },
     { name: "Microsoft Daniel", gender: "male", lang: "pt" }];
   const REPLY = "Claro. Pela base local, o **estoicismo** foca no que depende de você.";
   const emit = (e, p, ms) => setTimeout(() => window.nexus.on(e, p), ms);
-  const state = () => ({ ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: "ready" });
+  let temporary = false;
+  const state = () => ({ ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: "ready",
+    ai_mode: settings.ai_mode, temporary });
   // Fake speech: a syllable-like envelope so the ring visibly breathes with the "voice".
   const speak = (seconds, delay = 0) => {
     if (settings.ui_mode !== "audio" || !settings.voice_enabled) return;
@@ -42,8 +44,8 @@ if (!window.pywebview && location.search.includes("mock")) {
       memories: [{ id: 1, content: "Prefere café sem açúcar", category: "preferencia", created: iso(10), source: "chat" },
         { id: 2, content: "Trabalha melhor à tarde", category: "rotina", created: iso(10), source: "auto" }],
       actions: [{ ts: iso(10), kind: "tarefa", summary: "Criou tarefa #1: Revisar PRs do NEXUS" }],
-      knowledge: [{ category: "Primeiros Socorros", docs: 1, chunks: 14 }, { category: "Filosofia", docs: 1, chunks: 15 }, { category: "Finanças", docs: 1, chunks: 11 }, { category: "Programação", docs: 1, chunks: 12 }],
-      documents: [{ id: 1, title: "Manual de Primeiros Socorros", category: "Primeiros Socorros", source: "seed:pt/primeiros_socorros.md" }],
+      knowledge: [{ category: "Primeiros Socorros", docs: 1, chunks: 10 }, { category: "Filosofia", docs: 1, chunks: 11 }, { category: "Finanças", docs: 1, chunks: 12 }, { category: "Programação", docs: 1, chunks: 13 }, { category: "Saúde", docs: 1, chunks: 14 }, { category: "Produtividade", docs: 1, chunks: 15 }, { category: "Anatomia", docs: 1, chunks: 10 }, { category: "First Aid", docs: 1, chunks: 11 }, { category: "Philosophy", docs: 1, chunks: 12 }, { category: "Finance", docs: 1, chunks: 13 }, { category: "Programming", docs: 1, chunks: 14 }, { category: "Health", docs: 1, chunks: 15 }, { category: "Productivity", docs: 1, chunks: 10 }, { category: "Anatomy", docs: 1, chunks: 11 }, { category: "Primeros Auxilios", docs: 1, chunks: 12 }, { category: "Filosofía", docs: 1, chunks: 13 }, { category: "Finanzas", docs: 1, chunks: 14 }, { category: "Programación", docs: 1, chunks: 15 }, { category: "Salud", docs: 1, chunks: 10 }, { category: "Productividad", docs: 1, chunks: 11 }, { category: "Anatomía", docs: 1, chunks: 12 }],
+      documents: [{ id: 1, title: "Manual — Primeiros Socorros", category: "Primeiros Socorros", source: "seed:pt/x.md" }, { id: 2, title: "Manual — Filosofia", category: "Filosofia", source: "seed:pt/x.md" }, { id: 3, title: "Manual — Finanças", category: "Finanças", source: "seed:pt/x.md" }, { id: 4, title: "Manual — Programação", category: "Programação", source: "seed:pt/x.md" }, { id: 5, title: "Manual — Saúde", category: "Saúde", source: "seed:pt/x.md" }, { id: 6, title: "Manual — Produtividade", category: "Produtividade", source: "seed:pt/x.md" }, { id: 7, title: "Manual — Anatomia", category: "Anatomia", source: "seed:pt/x.md" }, { id: 8, title: "Manual — First Aid", category: "First Aid", source: "seed:pt/x.md" }, { id: 9, title: "Manual — Philosophy", category: "Philosophy", source: "seed:pt/x.md" }, { id: 10, title: "Manual — Finance", category: "Finance", source: "seed:pt/x.md" }, { id: 11, title: "Manual — Programming", category: "Programming", source: "seed:pt/x.md" }, { id: 12, title: "Manual — Health", category: "Health", source: "seed:pt/x.md" }, { id: 13, title: "Manual — Productivity", category: "Productivity", source: "seed:pt/x.md" }, { id: 14, title: "Manual — Anatomy", category: "Anatomy", source: "seed:pt/x.md" }, { id: 15, title: "Manual — Primeros Auxilios", category: "Primeros Auxilios", source: "seed:pt/x.md" }, { id: 16, title: "Manual — Filosofía", category: "Filosofía", source: "seed:pt/x.md" }, { id: 17, title: "Manual — Finanzas", category: "Finanzas", source: "seed:pt/x.md" }, { id: 18, title: "Manual — Programación", category: "Programación", source: "seed:pt/x.md" }, { id: 19, title: "Manual — Salud", category: "Salud", source: "seed:pt/x.md" }, { id: 20, title: "Manual — Productividad", category: "Productividad", source: "seed:pt/x.md" }, { id: 21, title: "Manual — Anatomía", category: "Anatomía", source: "seed:pt/x.md" }, { id: 99, title: "Horário da academia", category: "aprendido", source: "learned:academia" }],
       collections: [{ collection: "gastos", items: 3, last: iso(12) }],
       notes: [{ title: "Ideias", content: "Integração com smart home na fase 3" }],
     }),
@@ -56,6 +58,8 @@ if (!window.pywebview && location.search.includes("mock")) {
       return { control: null };
     },
     set_mode: async (m) => { settings.ui_mode = m; return state(); },
+    set_ai_mode: async (m) => { settings.ai_mode = m; return state(); },
+    set_temporary: async (on) => { temporary = on; return state(); },
     set_mic: async (muted) => { settings.mic_muted = muted; return state(); },
     set_ai_voice: async (on) => { settings.voice_enabled = on; return state(); },
     interrupt: async () => emit("control", { action: "stop" }, 10),

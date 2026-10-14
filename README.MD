@@ -104,6 +104,7 @@ Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a 
 A tela mostra só o **aro NEXUS**: ele se **expande** enquanto a IA fala (seguindo o volume da voz) e se **contrai** enquanto você fala.
 
 - **Mouse no topo** → barra superior: versão, status da IA/voz, relógio, idioma, **Painel** (agenda, tarefas, memória, conhecimento, dados, log) e Configurações.
+- **Mouse na borda esquerda** → modos da IA; **mouse na borda direita** → conversa temporária (e, na v0.9, projetos).
 - **Mouse embaixo** → ícones: **apenas mensagens** · **apenas áudio** · **mutar/desmutar microfone** · **mutar/desmutar IA** · **interromper** · **repetir**.
 - **Apenas áudio**: conversa contínua por voz, sem precisar dizer "Nexus" (dá para exigir a palavra em Configurações).
 - **Apenas mensagens**: o aro sobe, aparece o chat e a IA não fala.
@@ -120,6 +121,11 @@ A tela mostra só o **aro NEXUS**: ele se **expande** enquanto a IA fala (seguin
 | "não entendi", "explica melhor", "I didn't understand", "no entendí" | "Acho que não entendeu…" e reexplica mais claro |
 
 Esses comandos são reconhecidos **localmente** (instantâneo) e funcionam **mesmo enquanto o NEXUS fala**. Para frases mais elaboradas ("hã? fala de novo com outras palavras"), a IA decide pela conversa. Com caixas de som, use fone de ouvido para o NEXUS não se ouvir.
+
+### Modos da IA e conversa temporária (v0.7)
+
+- **Mouse na borda esquerda → Modo da IA**: *Assistente* (completo e cordial) ou *Direto* (o mínimo de palavras, exatamente o que foi pedido). Medido: respostas 66% mais curtas e 43% mais rápidas no modo Direto.
+- **Mouse na borda direita → Conversa temporária**: conversa à toa que fica só na memória RAM, não é salva no histórico e não gera memórias automáticas. Ao desligar, é descartada. Selo âmbar no topo enquanto ativa. Pedidos explícitos ("me lembra de…", "aprenda que…") continuam funcionando.
 
 ### Integrações online (v0.6)
 
@@ -218,4 +224,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.6.0 (protótipo)**.
+Versão atual: **v0.7.0 (protótipo)**.

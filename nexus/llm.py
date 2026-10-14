@@ -48,7 +48,8 @@ def status() -> dict:
     return {"online": True, "model": wanted, "model_ready": ready, "models": models}
 
 
-def stream_chat(messages: list, tools: list | None = None, temperature: float | None = None):
+def stream_chat(messages: list, tools: list | None = None, temperature: float | None = None,
+                max_tokens: int | None = None):
     """Yield ("token", text) while streaming and finally ("tool_calls", [...]) or ("done", None).
 
     `messages` use the OpenAI shape (tool call arguments as JSON strings); tool calls come back as
@@ -56,7 +57,7 @@ def stream_chat(messages: list, tools: list | None = None, temperature: float | 
     temperature = settings["llm_temperature"] if temperature is None else temperature
     stream = _stream_ollama if _is_ollama() else _stream_openai
     try:
-        yield from stream(messages, tools, temperature)
+        yield from stream(messages, tools, temperature, max_tokens)
     except httpx.HTTPError as exc:
         raise LLMOffline(str(exc)) from exc
 
@@ -111,8 +112,8 @@ def unload():
             pass
 
 
-def _stream_ollama(messages, tools, temperature):
-    body = _native_body(messages, tools, temperature)
+def _stream_ollama(messages, tools, temperature, max_tokens=None):
+    body = _native_body(messages, tools, temperature, **({"num_predict": max_tokens} if max_tokens else {}))
     calls = []
     with httpx.stream("POST", f"{_ollama_root()}/api/chat", json=body, timeout=TIMEOUT) as r:
         if r.status_code >= 400:
@@ -140,8 +141,10 @@ def _stream_ollama(messages, tools, temperature):
     yield ("tool_calls", calls) if calls else ("done", None)
 
 
-def _stream_openai(messages, tools, temperature):
+def _stream_openai(messages, tools, temperature, max_tokens=None):
     body = {"model": settings["llm_model"], "messages": messages, "stream": True, "temperature": temperature}
+    if max_tokens:
+        body["max_tokens"] = max_tokens
     if tools:
         body["tools"] = tools
     calls: dict[int, dict] = {}

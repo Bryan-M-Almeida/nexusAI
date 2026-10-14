@@ -159,10 +159,22 @@ class Api:
             self._speaker.stop()
         return self.state()
 
+    def set_ai_mode(self, mode):
+        """Left rail: "assistant" (complete) or "direct" (shortest exact answer)."""
+        settings.apply({"ai_mode": mode if mode in assistant.MODES else "assistant"})
+        return self.state()
+
+    def set_temporary(self, on):
+        """Right rail: temporary conversation - kept only in RAM, never saved, nothing learned automatically."""
+        self._speaker.stop()
+        memory.set_temporary(bool(on))
+        return self.state()
+
     def state(self):
         return {"ui_mode": settings["ui_mode"], "mic_muted": settings["mic_muted"],
                 "voice_enabled": settings["voice_enabled"], "stt": self._listener.model_state,
-                "stt_error": self._listener.model_error}
+                "stt_error": self._listener.model_error, "ai_mode": settings["ai_mode"],
+                "temporary": memory.temporary}
 
     def interrupt(self):
         """Dock "interrupt" / Esc: stop speaking and cancel the answer being generated."""

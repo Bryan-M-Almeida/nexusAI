@@ -94,7 +94,26 @@ for question, tool in [("Vai chover hoje?", "get_weather"),
 ada = ask("Quem foi Ada Lovelace?")  # historical fact: own knowledge or Wikipedia are both fine
 check("Ada Lovelace: resposta correta (Babbage / século XIX)", bool(re.search(r"(Babbage|18[0-9]{2})", ada)), ada)
 
-# 5) Languages
+# 5) Temporary conversation and Direct mode (v0.7)
+brain.emit = lambda event, payload: None
+saved = db.one("SELECT COUNT(*) n FROM messages")["n"]
+memories_before = len(memory.all_memories())
+memory.set_temporary(True)
+ask("Eu tenho uma tartaruga chamada Jorge.")
+time.sleep(6)
+memory.set_temporary(False)
+check("temporária: nada salvo no histórico", db.one("SELECT COUNT(*) n FROM messages")["n"] == saved)
+check("temporária: nenhuma memória automática", len(memory.all_memories()) == memories_before,
+      str([m["content"] for m in memory.all_memories()]))
+settings["ai_mode"] = "assistant"
+long_answer = ask("O que é a técnica Pomodoro?")
+settings["ai_mode"] = "direct"
+short_answer = ask("O que é a técnica Pomodoro?")
+settings["ai_mode"] = "assistant"
+check("modo Direto responde mais curto", len(short_answer.split()) < len(long_answer.split()) * 0.7,
+      f"{len(short_answer.split())} vs {len(long_answer.split())} palavras")
+
+# 6) Languages
 en = ask("What do the Stoics say about things outside our control? One sentence.")
 check("responde em inglês", bool(re.search(r"\b(the|control|what)\b", en.lower())) and " não " not in en, en)
 
