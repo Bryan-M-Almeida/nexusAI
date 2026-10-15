@@ -5,7 +5,7 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import emergency, knowledge, llm, memory, profile, tools, workspace
+from . import emergency, knowledge, llm, memory, profile, skills, tools, workspace
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
@@ -353,6 +353,7 @@ class Assistant:
             memory.add_message("user", text)
             memory.add_message("assistant", reply)
             self.emit("tool", {"name": "emergency", "args": {"topic": topic}})
+            self._level_up(text, {"emergency"}, spoken)
             self.emit("done", {"text": reply, "speak": True, "interrupted": False})
             return
         if REPORT_RE.search(text):
@@ -372,6 +373,7 @@ class Assistant:
         memory.add_message("user", text)
         reply, changed, nudged, finished, round_text, called = "", False, False, False, "", set()
         kept = ""  # real answer text written before a tool call: stays on screen and in the reply (v0.12)
+        used: set = set()  # every tool that ran this turn (skills XP)
         try:
             schemas = turn_tools()
             for _ in range(MAX_WORKSPACE_ROUNDS if workspace.active else MAX_TOOL_ROUNDS):
@@ -418,6 +420,7 @@ class Assistant:
                     except json.JSONDecodeError:
                         args = {}
                     self.emit("tool", {"name": c["name"], "args": args})
+                    used.add(c["name"])
                     if c["name"] == "conversation_control":
                         result, final = self._control(str(args.get("action", "")), previous)
                         if final is not None:  # pause/stop/resume/repeat end the turn without another model round
@@ -446,6 +449,8 @@ class Assistant:
         if reply:
             memory.add_message("assistant", reply)
         self.emit("done", {"text": reply, "speak": bool(reply) and not interrupted, "interrupted": interrupted})
+        if reply and not interrupted and not memory.temporary:
+            self._level_up(text, used, spoken)
         if changed:
             self.emit("refresh", None)
         # Automatic memory: only self-statements, never in emergencies or temporary conversations, and not when
@@ -478,6 +483,16 @@ class Assistant:
         if title:
             memory.set_conversation_title(cid, title, str(data.get("description", "")), final=final)
             self.emit("conversations", None)
+
+    def _level_up(self, text, used, spoken=False):
+        """Skills XP for the finished turn (v0.13); a level-up shows a toast in the interface."""
+        try:
+            ups = skills.award(text, used, spoken=spoken, workspace=bool(workspace.active),
+                               study=settings["ai_mode"] == "study")
+        except Exception:
+            return
+        if ups:
+            self.emit("levelup", ups)
 
     def _control(self, action: str, previous: str):
         """conversation_control chosen by the model. Returns (tool result, final reply or None)."""

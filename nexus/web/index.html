@@ -29,7 +29,8 @@
 <!-- ============ APP (minimal: only the ring; bars appear at the screen edges) ============ -->
 <main id="app" class="app" hidden data-mode="audio">
   <header class="topbar edge-bar" id="topbar">
-    <div class="brand"><span class="wordmark wordmark-xs is-on"></span><span class="version mono" id="version"></span></div>
+    <div class="brand"><span class="wordmark wordmark-xs is-on"></span><span class="version mono" id="version"></span>
+      <button class="lv-badge mono" id="btnSkills" data-i18n-title="skillsTitleCap"><b id="lvRank">E</b><span id="lvNum">LV 1</span><i><em id="lvBar"></em></i></button></div>
     <div class="chips">
       <span class="chip" id="chipAi"><i class="dot"></i><span data-i18n="ai">IA</span></span>
       <span class="chip" id="chipVoice"><i class="dot"></i><span data-i18n="voice">VOZ</span></span>
@@ -250,6 +251,21 @@
   </div>
 </div>
 
+<!-- ============ SKILLS (v0.13) ============ -->
+<div class="drawer" id="skillsDrawer" hidden>
+  <div class="conv-box skills-box">
+    <button class="icon-btn drawer-close" data-close aria-label="Close">✕</button>
+    <div class="sk-head">
+      <div class="sk-rank mono" id="skRank">E</div>
+      <div><p class="mono kicker" data-i18n="skillsTitleCap">HABILIDADES</p>
+        <h2 id="skLevel">N.E.X.U.S · LV 1</h2>
+        <div class="sk-bar"><em id="skBar"></em></div><small class="mono muted" id="skNext"></small></div>
+    </div>
+    <p class="hint" data-i18n="skillsHint">Sobem com o uso: cada ação e cada assunto contam. Sem nenhuma chamada extra à IA.</p>
+    <ul class="sk-list" id="skList"></ul>
+  </div>
+</div>
+
 <!-- ============ ONBOARDING ============ -->
 <div class="modal" id="onboarding" hidden>
   <div class="modal-box">
@@ -263,6 +279,14 @@
     <div class="row-btns">
       <button class="btn-primary" id="btnProfilePaste" data-i18n="import">Importar</button>
       <button class="btn-ghost" id="btnProfileSkip" data-i18n="later">Depois</button>
+    </div>
+    <div class="quick-onb">
+      <p class="sub mono" data-i18n="quickTitle">OU COMECE AGORA, SEM O FORMULÁRIO</p>
+      <form id="quickForm" class="quick-form">
+        <input id="quickName" data-i18n-ph="quickName" required maxlength="60">
+        <input id="quickProf" data-i18n-ph="quickProf" maxlength="80">
+        <button class="btn-primary" type="submit" data-i18n="quickStart">Começar</button>
+      </form>
     </div>
     <p class="muted small mono" id="bridgeHint"></p>
   </div>
@@ -426,6 +450,14 @@
           <button class="btn-ghost" type="button" id="btnReport" data-i18n="reportIssue">Relatar erro (salvar conversa)</button>
           <button class="btn-ghost danger" type="button" id="btnClearChat" data-i18n="clearChat">Limpar conversa</button>
         </div>
+        <p class="sub mono" data-i18n="backupTitle">BACKUP</p>
+        <p class="hint" data-i18n="backupAuto">Um backup automático é feito todo dia (os 7 últimos ficam guardados).</p>
+        <div class="row-btns">
+          <button class="btn-primary" type="button" id="btnBackup" data-i18n="backupNow">Fazer backup agora</button>
+          <button class="btn-ghost" type="button" id="btnRestore" data-i18n="backupRestore">Restaurar backup…</button>
+          <button class="btn-ghost" type="button" id="btnBackupFolder" data-i18n="backupFolder">Abrir pasta de backups</button>
+        </div>
+        <ul class="backup-list mono" id="backupList"></ul>
         <label><span data-i18n="bridgePort">Porta da ponte com a landing page</span><input name="bridge_port" type="number" min="1024" max="65535"></label>
         <p class="hint" data-i18n="restartHint">Vale depois de reabrir o NEXUS.</p>
       </section>

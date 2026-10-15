@@ -8,6 +8,38 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.13.0 — Protótipo · 2026-10-14
+
+**Habilidades com níveis e ranks, e as funções essenciais que faltavam: instância única, entrada rápida, backup
+automático, chave de API criptografada e arquivo de log.**
+
+### Habilidades
+- O NEXUS e 8 áreas (Organização, Finanças, Programação, Estudo, Saúde, Conhecimento, Pesquisa, Voz) **sobem de
+  nível com o uso**: cada assunto (+4 XP), cada ação real feita por ferramenta (+10 XP) e cada fala por voz (+3 XP).
+- Ranks **E → D → C → B → A → S**. Selo "rank + nível" ao lado do nome na barra superior; clique para ver cada área
+  com barra de progresso. Aviso discreto ao subir de nível (sem som no modo foco).
+- **Custo zero**: o XP vem do que já aconteceu na resposta — nenhuma chamada extra à IA. Conversas temporárias não
+  contam.
+
+### Funções essenciais
+- **Só um NEXUS aberto por vez**: abrir de novo mostra "O NEXUS já está aberto" (dois abertos disputavam microfone,
+  banco de dados e IA — aconteceu durante o desenvolvimento).
+- **Começar sem o formulário da landing**: na tela de boas-vindas, nome e profissão bastam.
+- **Backup automático diário** (os 7 últimos ficam) + **Fazer backup agora**, **Restaurar** e **Abrir pasta** em
+  Configurações → Dados. A restauração é aplicada ao reabrir, antes do banco abrir, e os dados atuais ficam guardados.
+- **Chave de API criptografada** com a proteção do Windows (DPAPI, ligada ao seu usuário). Chaves salvas em texto
+  pelas versões 0.10–0.12 são criptografadas na primeira abertura.
+- **Arquivo de log** (`logs/nexus.log`, 3 × 1 MB): erros de segundo plano deixam rastro, e "Relatar erro" anexa o
+  final do log.
+
+### Testes desta versão
+- 149/149 testes unitários (12 novos: curva de níveis e ranks, XP por tópico e ferramenta, aviso de nível, conversa
+  temporária sem XP, backup válido, restauração recusa zip estranho, chave criptografada, log). Restauração testada
+  de ponta a ponta (backup → mudança → reabrir → dado de volta). Instância única testada com dois processos.
+- 28/28 verificações de conversa com qwen3:8b.
+
+---
+
 ## v0.12.0 — Protótipo · 2026-10-14
 
 **Modos offline/híbrido/online, perfis de desempenho medidos, requisitos e a resposta que sumia da tela.**
@@ -140,7 +172,7 @@ Só ~6,2 GB dos 8 GB ficam livres para a IA; o que não cabe vai para o processa
 - Repetir usa a última resposta da conversa aberta.
 
 ### Visual (HUD)
-- Inspirado no HUD do Homem de Ferro, com toques do NEXUS: cantos e réguas laterais da abertura sempre visíveis
+- HUD próprio do NEXUS: cantos e réguas laterais da abertura sempre visíveis
   e discretos, linhas de varredura quase invisíveis e **telemetria ligada ao aro** (modelo e modo, hora e data,
   microfone e voz com indicadores).
 - **Pulso**: uma linha sob o aro que oscila com a sua voz (vermelha) e a do NEXUS (azul).
@@ -437,8 +469,28 @@ NX-VOZ-016, NX-ENV-007).
 
 ## Próximas versões (planejamento)
 
-### v0.13.0 — Protótipo (próxima) · habilidades
-- **Sistema de habilidades estilo Solo Leveling**: nível do NEXUS e de cada habilidade, subindo com o uso; minimalista.
+Prioridades definidas em 2026-10-14 (desempenho primeiro, para o NEXUS rodar em mais computadores):
+
+### v0.14.0 — Protótipo (próxima) · leveza
+1. **Segundo plano / suspenso**: com a janela minimizada ou sem foco, pausar animações, HUD e o aro; liberar o
+   Whisper e a IA da memória após um tempo sem uso (conforme o perfil).
+2. **Escuta de baixo consumo para "Nexus"**: com a palavra de ativação (ou o NEXUS fora de foco), só o detector de voz
+   roda; um trecho curto é checado com um modelo pequeno, e o Whisper completo só entra depois de ouvir "Nexus".
+3. **Caches**: clima, notícias e câmbio por alguns minutos; buscas na base de conhecimento; áudio de frases
+   repetidas (saudação, "Executando em modo…", lembretes).
+4. **Troca rápida IA local ↔ API** em um clique, guardando as duas configurações (com API, quase toda a carga sai
+   do PC).
+
+### v0.15.0 · arquivos
+- Ler **PDF, DOCX, TXT/MD e textos**, **ZIP** (RAR depende de ferramenta externa — avaliar) e **imagens** (OCR do
+  próprio Windows, sem download); arrastar arquivos para o chat.
+
+### v0.16.0 · mídia
+- **Tocar música e controlar apps**: teclas de mídia do Windows (tocar, pausar, próxima), abrir apps e buscar por
+  links de apps de música; verificar como o app pedido pelo usuário aceita comandos.
+
+### v0.17.0 · manutenção
+- Aviso de nova versão (GitHub) e, se aprovado o download do modelo, perfil "máxima inteligência".
 
 ### Versão final do protótipo
 - **Instalador** (Inno Setup) e início automático com o Windows — reservado pelo usuário para a versão final do protótipo.

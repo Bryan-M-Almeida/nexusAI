@@ -204,6 +204,11 @@ def report_issue(description=""):
         lines += [f"**{m['role']}** ({m.get('ts', '')[:16]}):", "", m["content"], ""]
     lines += ["## Recent actions", ""]
     lines += [f"- {a['ts'][:16]} [{a['kind']}] {a['summary']}" for a in memory.recent_actions(30)]
+    from .logs import tail
+
+    log_tail = tail(80)
+    if log_tail:
+        lines += ["", "## Log (end of logs/nexus.log)", "", "```", log_tail, "```"]
     path.write_text("\n".join(lines), encoding="utf-8")
     db.log_action("relatório", f"Conversa salva para relatar erro: {path.name}")
     return {"ok": True, "file": str(path)}

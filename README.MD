@@ -115,6 +115,16 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 
 Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia, `Ctrl+,` Configurações, `Ctrl+Shift+N` nova conversa, `Ctrl+H` conversas, `Ctrl+J` notificações, `Ctrl+T` transcrição.
 
+### Habilidades (v0.13)
+
+O selo ao lado do nome na barra superior mostra o **rank (E → S) e o nível** do NEXUS; clique para ver cada área (Organização, Finanças, Programação, Estudo, Saúde, Conhecimento, Pesquisa, Voz). Elas sobem com o uso — cada assunto, cada ação feita e cada fala por voz — sem nenhuma chamada extra à IA.
+
+### Backup e segurança (v0.13)
+
+- **Backup automático** todo dia (os 7 últimos ficam em `backups/`); *Configurações → Dados* tem **Fazer backup agora** e **Restaurar** (aplicado ao reabrir; os dados atuais ficam guardados).
+- A **chave de API** é guardada criptografada pelo Windows (só o seu usuário consegue ler).
+- Só um NEXUS abre por vez. Erros ficam em `logs/nexus.log`.
+
 ### Conexão e desempenho (v0.12)
 
 *Configurações → Desempenho*:
@@ -275,6 +285,9 @@ nexus/
   workspace.py  área de trabalho: pasta isolada, ferramentas de arquivo, desfazer, comandos confirmados
   hardware.py   detecção de processador, RAM e placa de vídeo (memória real) e o que cabe nela
   performance.py perfis Econômico / Equilibrado / Força total e requisitos
+  skills.py     níveis e ranks das habilidades (XP do que aconteceu, sem chamadas extras à IA)
+  backup.py     backup diário, backup manual e restauração
+  logs.py       arquivo de log (logs/nexus.log)
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -286,4 +299,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.12.0 (protótipo)**.
+Versão atual: **v0.13.0 (protótipo)**.

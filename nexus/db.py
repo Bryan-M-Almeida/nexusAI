@@ -129,6 +129,11 @@ CREATE TABLE IF NOT EXISTS workspace_changes (
     backup TEXT NOT NULL DEFAULT '',
     undone INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS skills (
+    skill TEXT PRIMARY KEY,
+    xp INTEGER NOT NULL DEFAULT 0,
+    updated TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS reminders_sent (
     kind TEXT NOT NULL,
     item_id INTEGER NOT NULL,

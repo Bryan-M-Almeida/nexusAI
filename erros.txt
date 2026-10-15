@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 2.3  ·  Data: 2026-10-14  ·  Versão do app: 0.12.0
+ Versão do documento: 2.4  ·  Data: 2026-10-14  ·  Versão do app: 0.13.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -103,6 +103,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-DAT-009  Conversa antiga não aparece na lista ou ficou sem título/descrição
       NX-DAT-010  Resposta usa assunto de outra conversa
       NX-DAT-011  Lembrete não foi falado / não apareceu / veio só uma vez
+      NX-DAT-012  Restaurar backup: nada mudou / dados "sumiram" depois de restaurar
  UI   NX-UI-001   Fontes diferentes da landing (sem internet)
       NX-UI-002   Janela não abre: WebView2 ausente
       NX-UI-003   Janela abre em branco ou travada no boot
@@ -134,6 +135,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-ENV-008  Cada chamada à IA demorava ~2 s a mais ("localhost" no Windows)
       NX-ENV-009  IA lenta: parte do modelo fora da placa de vídeo / "Força total" indisponível
       NX-ENV-010  Sem placa de vídeo dedicada: respostas muito lentas
+      NX-ENV-011  "O NEXUS já está aberto" ao abrir o programa
+      NX-ENV-012  A chave de API sumiu (outro PC ou outro usuário do Windows)
 
 
 ================================================================================
@@ -834,6 +837,15 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                "Testar notificação". O sino da barra superior mostra tudo que
                já foi avisado.
 
+[NX-DAT-012] Restaurar backup: nada mudou / dados "sumiram" depois de restaurar
+  Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : (1) A restauração só é aplicada quando o NEXUS é REABERTO
+               (substituir o banco aberto não é seguro). (2) Ela traz o estado
+               do dia do backup: o que foi feito depois não está nele.
+  Solução    : Feche e abra o NEXUS. Os dados de antes da restauração ficam
+               em backups/before-restore-<data> (copie o nexus.db de volta
+               para a pasta de dados, com o NEXUS fechado, para desfazer).
+
 ================================================================================
  UI — INTERFACE DESKTOP
 ================================================================================
@@ -1164,6 +1176,21 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Solução    : Use o perfil "Econômico" (contexto 4096, voz mais leve). Veja
                os requisitos no README: mínimo 16 GB de RAM e processador de
                8 threads; recomendado placa de vídeo com 8 GB.
+
+[NX-ENV-011] "O NEXUS já está aberto" ao abrir o programa
+  Severidade : BAIXA            Status: CONHECIDO          Observado: SIM
+  Causa      : Proteção da v0.13: só um NEXUS por vez (dois disputavam o
+               microfone, o banco de dados e a IA). A janela pode estar
+               minimizada ou em outra área de trabalho virtual do Windows.
+  Solução    : Procure o NEXUS na barra de tarefas. Se ele travou, encerre
+               "NEXUS.exe" no Gerenciador de Tarefas e abra de novo.
+
+[NX-ENV-012] A chave de API sumiu (outro PC ou outro usuário do Windows)
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : Desde a v0.13 a chave é criptografada pelo Windows (DPAPI) e só
+               o mesmo usuário no mesmo PC consegue lê-la. Ao copiar a pasta de
+               dados ou restaurar um backup em outro PC, ela não pode ser lida.
+  Solução    : Configurações > Inteligência: cole a chave de novo e salve.
 
 ================================================================================
  HISTÓRICO DE TESTES (2026-10-13)

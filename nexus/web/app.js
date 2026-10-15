@@ -109,6 +109,7 @@ window.nexus = {
       case "profile": return onProfile(p);
       case "conversations": return !$("#convDrawer").hidden && renderConversations();
       case "workspace": return renderWsPanel(p);
+      case "levelup": return onLevelUp(p);
       case "confirm": return askConfirm(p);
       case "confirm_done": return (confirmId === p.id) && closeConfirm(p.ok);
     }
@@ -145,6 +146,7 @@ async function start() {
   $("#modelName").textContent = st.model_name || "NEX-1.0";
   applyInterface();
   api().notifications().then((r) => setBadge(r.unread));
+  api().skills().then(renderLvBadge);
   applyState({ network: settings.network_mode, performance: settings.performance,
     ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: st.stt,
     ai_mode: settings.ai_mode || "assistant", temporary: false });
@@ -699,6 +701,7 @@ async function pickProfile(name) {
 function openSettings(sec) {
   fillSettings();
   renderPerf();
+  renderBackups();
   showSection(typeof sec === "string" ? sec : "general");
   $("#setSaved").textContent = "";
   $("#aiStatus").innerHTML = `<span class="muted">● ${esc(T("checking"))}</span>`;
@@ -905,6 +908,7 @@ function wire() {
   setInterval(tickClock, 1000);
   wireRingDrag();
   wireWorkspace();
+  wireEssentials();
   $("#btnNewConv").onclick = newConversation;
   $("#btnConvs").onclick = () => openConversations("threads");
   $$("#convTabs button").forEach((b) => (b.onclick = () => openConversations(b.dataset.ctab)));
@@ -931,10 +935,14 @@ const ICONS = {  // 24x24 line icons, one per area (pt/en/es category names map 
   body: '<circle cx="12" cy="4.5" r="2"/><path d="M12 7v7M8 9.5h8M12 14l-3 7M12 14l3 7"/>',
   learned: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
   book: '<path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4"/>',
 };
 const CAT_RULES = [[/socorr|first aid|auxilio/, "aid"], [/filosof|philosoph/, "philo"], [/finan/, "money"],
   [/program|codigo|code/, "code"], [/saud|health|salud/, "health"], [/produtiv|productiv/, "focus"],
-  [/anatom/, "body"], [/aprend|learn/, "learned"]];
+  [/anatom/, "body"], [/aprend|learn/, "learned"], [/pesquis|research/, "search"], [/^voz|^voice/, "mic"],
+  [/agenda|organiz/, "calendar"]];
 function catIcon(category) {
   const c = String(category || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const key = (CAT_RULES.find(([rx]) => rx.test(c)) || [null, "book"])[1];
@@ -1184,6 +1192,70 @@ function wireWorkspace() {
   $("#btnAllow").onclick = () => answerConfirm(true);
   $("#btnDeny").onclick = () => answerConfirm(false);
   $("#btnFileCopy").onclick = (e) => copyText($("#fileView").textContent, e.currentTarget);
+}
+
+/* ------------------------------------------------------------------ skills (v0.13) */
+const SKILL_ICON = { organization: "agenda", finance: "finanças", programming: "programação", study: "aprendido",
+  health: "saúde", knowledge: "filosofia", research: "pesquisa", voice: "voz" };
+let skillsData = null;
+
+function renderLvBadge(d) {
+  skillsData = d;
+  $("#lvRank").textContent = d.rank;
+  $("#lvNum").textContent = `LV ${d.level}`;
+  $("#lvBar").style.width = Math.round(d.progress * 100) + "%";
+}
+
+async function openSkills() {
+  const d = await api().skills();
+  renderLvBadge(d);
+  $("#skRank").textContent = d.rank;
+  $("#skLevel").textContent = `N.E.X.U.S · LV ${d.level}`;
+  $("#skBar").style.width = Math.round(d.progress * 100) + "%";
+  $("#skNext").textContent = `${d.total_xp} XP`;
+  $("#skList").innerHTML = d.skills.map((x) => `
+    <li>${catIcon(SKILL_ICON[x.skill] ?? x.skill)}<b>${esc(T("sk_" + x.skill))}</b>
+      <span class="lv"><span>${x.rank}</span>LV ${x.level}</span>
+      <i class="bar" title="${esc(T("skNext", { n: x.next }))}"><em style="width:${Math.round(x.progress * 100)}%"></em></i></li>`).join("");
+  $("#skillsDrawer").hidden = false;
+}
+
+function onLevelUp(ups) {
+  for (const u of ups) {
+    const el = document.createElement("div");
+    el.className = "toast levelup";
+    el.innerHTML = `<b>${esc(T("levelUpTitle"))} · ${esc(u.rank)}</b>${esc(T("levelUp", { skill: T("sk_" + u.skill), level: u.level, rank: u.rank }))}`;
+    $("#toasts").appendChild(el);
+    setTimeout(() => el.remove(), 7000);
+  }
+  if (!state.focus) chime();
+  api().skills().then(renderLvBadge);
+}
+
+/* ------------------------------------------------------------------ backups (v0.13) */
+async function renderBackups(list) {
+  list = list || await api().list_backups();
+  $("#backupList").innerHTML = list.slice(0, 10).map((b) => `<li>${esc(b.name)} · ${fmtSize(b.size)}</li>`).join("")
+    || `<li>${esc(T("backupNone"))}</li>`;
+}
+
+function wireEssentials() {
+  $("#btnSkills").onclick = openSkills;
+  $("#quickForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r = await api().quick_profile($("#quickName").value, $("#quickProf").value, "");
+    importResult(r);
+  });
+  $("#btnBackup").onclick = async () => {
+    const r = await api().create_backup();
+    if (r.ok) { notice(T("backupDone", { file: r.file.split(/[\\/]/).pop() })); renderBackups(r.backups); }
+    else notice(r.error);
+  };
+  $("#btnRestore").onclick = async () => {
+    const r = await api().restore_backup();
+    if (r.ok) notice(T("restoreScheduled")); else if (r.error) notice(r.error);
+  };
+  $("#btnBackupFolder").onclick = () => api().open_backups_folder();
 }
 
 /* ------------------------------------------------------------------ init */

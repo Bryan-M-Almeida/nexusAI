@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 2.3  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.12.0
+ Versión del documento: 2.4  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.13.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -106,6 +106,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-DAT-009  Una conversación antigua no aparece en la lista o no tiene título/descripción
       NX-DAT-010  La respuesta usa un tema de otra conversación
       NX-DAT-011  El recordatorio no se dijo / no apareció / llegó solo una vez
+      NX-DAT-012  Restaurar copia: nada cambió / los datos "desaparecieron" tras restaurar
  UI   NX-UI-001   Fuentes distintas de la landing (sin internet)
       NX-UI-002   La ventana no abre: falta WebView2
       NX-UI-003   La ventana se abre en blanco o se bloquea en el arranque
@@ -137,6 +138,8 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-ENV-008  Cada llamada a la IA tardaba ~2 s más ("localhost" en Windows)
       NX-ENV-009  IA lenta: parte del modelo fuera de la tarjeta gráfica / "Máxima potencia" no disponible
       NX-ENV-010  Sin tarjeta gráfica dedicada: respuestas muy lentas
+      NX-ENV-011  "NEXUS ya está abierto" al abrir el programa
+      NX-ENV-012  La clave de API desapareció (otro PC u otro usuario de Windows)
 
 
 ================================================================================
@@ -869,6 +872,15 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                "Probar notificación". La campana de la barra superior muestra
                todo lo que ya se avisó.
 
+[NX-DAT-012] Restaurar copia: nada cambió / los datos "desaparecieron" tras restaurar
+  Gravedad   : MEDIA            Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : (1) La restauración solo se aplica al REABRIR NEXUS (reemplazar
+               la base de datos abierta no es seguro). (2) Trae el estado del
+               día de la copia: lo hecho después no está en ella.
+  Solución   : Cierra y abre NEXUS. Los datos de antes de restaurar quedan en
+               backups/before-restore-<fecha> (copia nexus.db de vuelta a la
+               carpeta de datos, con NEXUS cerrado, para deshacer).
+
 ================================================================================
  UI — INTERFAZ DE ESCRITORIO
 ================================================================================
@@ -1209,6 +1221,21 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Solución   : Usa el perfil "Económico" (contexto 4096, voz más ligera).
                Mira los requisitos en el README: mínimo 16 GB de RAM y un
                procesador de 8 hilos; recomendado tarjeta gráfica de 8 GB.
+
+[NX-ENV-011] "NEXUS ya está abierto" al abrir el programa
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: SÍ
+  Causa      : Protección de la v0.13: solo un NEXUS a la vez (dos se
+               disputaban el micrófono, la base de datos y la IA). La ventana
+               puede estar minimizada o en otro escritorio virtual de Windows.
+  Solución   : Busca NEXUS en la barra de tareas. Si se colgó, finaliza
+               "NEXUS.exe" en el Administrador de tareas y ábrelo de nuevo.
+
+[NX-ENV-012] La clave de API desapareció (otro PC u otro usuario de Windows)
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : Desde la v0.13 la clave se cifra con Windows (DPAPI) y solo el
+               mismo usuario en el mismo PC puede leerla. Al copiar la carpeta
+               de datos o restaurar una copia en otro PC, no se puede leer.
+  Solución   : Configuración > Inteligencia: pega la clave de nuevo y guarda.
 
 ================================================================================
  HISTORIAL DE PRUEBAS (2026-10-13)

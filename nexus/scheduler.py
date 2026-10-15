@@ -128,6 +128,9 @@ def start(alert):
                 _check(alert)
             except Exception as exc:
                 db.log_action("erro", f"Agendador: {exc}")
+                from .logs import log
+
+                log.exception("scheduler")
             time.sleep(INTERVAL)
 
     threading.Thread(target=loop, daemon=True, name="scheduler").start()

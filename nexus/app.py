@@ -10,7 +10,8 @@ from datetime import datetime, timedelta
 import webview
 
 from . import (MODEL_NAME, __version__, assistant, bridge, control, i18n, knowledge, llm, memory, notify, profile,
-               performance, scheduler, tools, workspace)
+               performance, scheduler, skills, tools, workspace)
+from .logs import log, setup as setup_logs
 from .config import WEB_DIR, settings
 from .db import db
 from .i18n import LANGS, detect, lang
@@ -440,6 +441,53 @@ class Api:
         emit("profile", {"profile": prof, "lang": lang()})
         emit("refresh")
 
+    def quick_profile(self, name, profession="", language=""):
+        """Onboarding without the landing page JSON: name (+ optional profession and language)."""
+        data = {"name": str(name).strip(), "profession": str(profession).strip(),
+                "language": language or {"pt": "pt-BR", "en": "en", "es": "es"}.get(lang(), "pt-BR")}
+        return self.import_profile_text(json.dumps(data, ensure_ascii=False))
+
+    # -- skills, backups, logs (v0.13) ------------------------------------------------------------------------
+    def skills(self):
+        return skills.summary()
+
+    def create_backup(self):
+        from . import backup
+
+        try:
+            path = backup.create()
+        except Exception as exc:
+            log.exception("manual backup failed")
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "file": str(path), "backups": backup.listing()}
+
+    def list_backups(self):
+        from . import backup
+
+        return backup.listing()
+
+    def restore_backup(self):
+        """Pick a backup .zip; it is applied the next time NEXUS opens (current data is kept aside)."""
+        from . import backup
+        from .config import BACKUP_DIR
+
+        paths = _window.create_file_dialog(webview.OPEN_DIALOG, directory=str(BACKUP_DIR),
+                                           file_types=("NEXUS backup (*.zip)",))
+        if not paths:
+            return {"ok": False}
+        result = backup.schedule_restore(paths[0])
+        log.info(f"restore scheduled from {paths[0]}: {result}")
+        return result
+
+    def open_backups_folder(self):
+        from .config import BACKUP_DIR
+
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            os.startfile(BACKUP_DIR)
+        except Exception:
+            pass
+
     def import_profile_text(self, text):
         try:
             prof = profile.import_profile(text)
@@ -612,11 +660,35 @@ def selftest() -> dict:
     return report
 
 
+def _single_instance() -> bool:
+    """Only one NEXUS at a time: two copies would fight over the microphone, the database and the AI (v0.13).
+    The named mutex disappears by itself when the process ends, even after a crash."""
+    if sys.platform != "win32":
+        return True
+    import ctypes
+
+    global _mutex
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    _mutex = kernel32.CreateMutexW(None, False, "Local\\NEXUS-Assistant-single-instance")
+    if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+        ctypes.windll.user32.MessageBoxW(None, i18n.t("already_running"), "N.E.X.U.S", 0x40)
+        return False
+    return True
+
+
+_mutex = None
+
+
 def main():
     global _window
+    setup_logs()
     if "--selftest" in sys.argv:
         selftest()
         return
+    if not _single_instance():
+        return
+    log.info(f"NEXUS {__version__} starting")
+    threading.Thread(target=_daily_backup, daemon=True, name="backup").start()
     api = Api()
     _window = webview.create_window(
         "N.E.X.U.S", str(WEB_DIR / "index.html"), js_api=api,
@@ -625,3 +697,15 @@ def main():
     )
     webview.start(debug=bool(os.environ.get("NEXUS_DEBUG")))
     llm.unload()  # window closed: give the VRAM back to games and other apps
+    log.info("NEXUS closed")
+
+
+def _daily_backup():
+    from . import backup
+
+    try:
+        path = backup.auto_daily()
+        if path:
+            log.info(f"daily backup: {path.name}")
+    except Exception:
+        log.exception("daily backup failed")

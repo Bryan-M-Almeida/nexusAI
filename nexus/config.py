@@ -22,6 +22,34 @@ DATA_DIR = _data_dir()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "nexus.db"
 SETTINGS_PATH = DATA_DIR / "settings.json"
+BACKUP_DIR = DATA_DIR / "backups"
+LOG_DIR = DATA_DIR / "logs"
+RESTORE_PENDING = DATA_DIR / "restore_pending.zip"
+
+
+def _apply_pending_restore():
+    """A backup chosen in Settings > Data is applied here, on the next start, BEFORE the database is opened
+    (replacing an open SQLite file is unsafe). The current data is kept in backups/before-restore-*."""
+    if not RESTORE_PENDING.exists():
+        return
+    import shutil
+    import time
+    import zipfile
+
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    keep = BACKUP_DIR / f"before-restore-{time.strftime('%Y%m%d-%H%M%S')}"
+    keep.mkdir()
+    for name in ("nexus.db", "nexus.db-wal", "nexus.db-shm", "settings.json"):
+        if (DATA_DIR / name).exists():
+            shutil.move(str(DATA_DIR / name), str(keep / name))
+    with zipfile.ZipFile(RESTORE_PENDING) as z:
+        for member in ("nexus.db", "settings.json"):
+            if member in z.namelist():
+                (DATA_DIR / member).write_bytes(z.read(member))
+    RESTORE_PENDING.unlink()
+
+
+_apply_pending_restore()
 INBOX_DIR = DATA_DIR / "inbox"  # drop .md/.txt/.pdf/.json here to be learned on boot
 INBOX_DIR.mkdir(exist_ok=True)
 
@@ -80,6 +108,53 @@ DEFAULTS = {
 }
 
 
+# API keys are stored encrypted with Windows DPAPI (bound to this Windows user), never as plain text (v0.13).
+_KEY_PREFIX = "dpapi:"
+
+
+def _dpapi(data: bytes, encrypt: bool) -> bytes:
+    import ctypes
+    from ctypes import wintypes
+
+    class BLOB(ctypes.Structure):
+        _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+    src = BLOB(len(data), ctypes.cast(ctypes.create_string_buffer(data, len(data)), ctypes.POINTER(ctypes.c_char)))
+    out = BLOB()
+    fn = ctypes.windll.crypt32.CryptProtectData if encrypt else ctypes.windll.crypt32.CryptUnprotectData
+    if encrypt:
+        ok = fn(ctypes.byref(src), "NEXUS", None, None, None, 0x1, ctypes.byref(out))  # 0x1: no UI
+    else:
+        ok = fn(ctypes.byref(src), None, None, None, None, 0x1, ctypes.byref(out))
+    if not ok:
+        raise OSError("DPAPI failed")
+    result = ctypes.string_at(out.pbData, out.cbData)
+    ctypes.windll.kernel32.LocalFree(out.pbData)
+    return result
+
+
+def protect(secret: str) -> str:
+    import base64
+
+    if not secret or secret == "ollama" or secret.startswith(_KEY_PREFIX) or sys.platform != "win32":
+        return secret
+    try:
+        return _KEY_PREFIX + base64.b64encode(_dpapi(secret.encode("utf-8"), True)).decode()
+    except Exception:
+        return secret
+
+
+def unprotect(value: str) -> str:
+    import base64
+
+    if not str(value).startswith(_KEY_PREFIX):
+        return value
+    try:
+        return _dpapi(base64.b64decode(value[len(_KEY_PREFIX):]), False).decode("utf-8")
+    except Exception:
+        return ""  # another Windows user / machine: the key must be typed again
+
+
 class Settings(dict):
     def __init__(self):
         super().__init__(DEFAULTS)
@@ -88,9 +163,13 @@ class Settings(dict):
                 self.update(json.loads(SETTINGS_PATH.read_text("utf-8")))
             except json.JSONDecodeError:
                 pass
+        self["llm_api_key"] = unprotect(self["llm_api_key"])
+        if self["llm_api_key"] not in ("", "ollama") and '"dpapi:' not in SETTINGS_PATH.read_text("utf-8"):
+            self.save()  # a key saved as plain text by v0.10-v0.12 is encrypted now
 
     def save(self):
-        SETTINGS_PATH.write_text(json.dumps(self, indent=2, ensure_ascii=False), "utf-8")
+        data = {**self, "llm_api_key": protect(self["llm_api_key"])}
+        SETTINGS_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), "utf-8")
 
     def apply(self, changes: dict):
         for k, v in changes.items():

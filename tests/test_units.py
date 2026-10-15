@@ -351,6 +351,54 @@ check("profiles: economy is lighter than balanced",
 check("profiles: full power never picks a context that spills off the GPU",
       performance.settings_for("max")["llm_context"] <= max(hardware.max_context(), 8192))
 
+# -- v0.13: skills, backups, encrypted API key, log file ---------------------------------------------------------
+from nexus import backup, skills  # noqa: E402
+from nexus.config import DB_PATH, protect, unprotect  # noqa: E402
+
+db.execute("DELETE FROM skills")
+check("skills: level curve (1 at 0 XP, 2 at 60, 3 at 180)",
+      (skills.level_of(0), skills.level_of(60), skills.level_of(179), skills.level_of(180)) == (1, 2, 2, 3))
+check("skills: ranks go from E to S", (skills.rank_of(1), skills.rank_of(10), skills.rank_of(21)) == ("E", "B", "S"))
+skills.award("me lembra da reunião amanhã", {"set_reminder"})
+check("skills: a reminder credits Organization (topic + tool)",
+      db.one("SELECT xp FROM skills WHERE skill = 'organization'")["xp"] == skills.XP_TOPIC + skills.XP_TOOL)
+ups = []
+for _ in range(6):
+    ups += skills.award("crie uma função em python", {"write_file"}, workspace=True)
+check("skills: a level-up is reported", any(u["skill"] == "programming" for u in ups), str(ups))
+check("skills: summary lists every area", {x["skill"] for x in skills.summary()["skills"]} >= {"organization", "voice"})
+memory.new_conversation()
+before = sum(r["xp"] for r in db.all("SELECT xp FROM skills"))
+memory.set_temporary(True)
+script = iter([[("token", "Claro."), ("done", None)]])
+_llm.stream_chat = lambda *a, **k: iter(next(script))
+assistant.Assistant(lambda e, p: None).ask("como foi a reunião de ontem?")
+_llm.stream_chat = real_stream
+memory.set_temporary(False)
+check("skills: temporary chats earn no XP", sum(r["xp"] for r in db.all("SELECT xp FROM skills")) == before)
+
+zip_path = backup.create()
+import zipfile  # noqa: E402
+
+with zipfile.ZipFile(zip_path) as z:
+    names = z.namelist()
+    head = z.read("nexus.db")[:16]
+check("backup: zip has a valid database copy and settings", "nexus.db" in names and head == b"SQLite format 3\x00", str(names))
+check("backup: a real backup can be scheduled for restore", backup.schedule_restore(str(zip_path))["ok"])
+from nexus.config import RESTORE_PENDING  # noqa: E402
+
+RESTORE_PENDING.unlink()
+bad = zip_path.parent / "bad.zip"
+with zipfile.ZipFile(bad, "w") as z:
+    z.writestr("x.txt", "x")
+check("backup: an unrelated zip is refused", not backup.schedule_restore(str(bad))["ok"])
+check("API key: encrypted at rest and decrypted back", protect("sk-abc").startswith("dpapi:") and unprotect(protect("sk-abc")) == "sk-abc")
+check("API key: local placeholder stays as is", protect("ollama") == "ollama")
+from nexus import logs  # noqa: E402
+
+logs.setup().info("unit-test-marker")
+check("log file written", "unit-test-marker" in logs.tail(5))
+
 # migration of pre-v0.9 messages: a 2 h gap splits them into two conversations
 import sqlite3  # noqa: E402
 import tempfile  # noqa: E402

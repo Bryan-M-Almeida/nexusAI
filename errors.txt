@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 2.3  ·  Date: 2026-10-14  ·  App version: 0.12.0
+ Document version: 2.4  ·  Date: 2026-10-14  ·  App version: 0.13.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -105,6 +105,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-DAT-009  Old conversation missing from the list or without title/description
       NX-DAT-010  Answer uses a topic from another conversation
       NX-DAT-011  Reminder not spoken / not shown / came only once
+      NX-DAT-012  Restore backup: nothing changed / data "vanished" after restoring
  UI   NX-UI-001   Fonts differ from the landing page (offline)
       NX-UI-002   Window doesn't open: WebView2 missing
       NX-UI-003   Window opens blank or stuck at boot
@@ -136,6 +137,8 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-ENV-008  Each AI call took ~2 s longer ("localhost" on Windows)
       NX-ENV-009  Slow AI: part of the model off the graphics card / "Full power" unavailable
       NX-ENV-010  No dedicated graphics card: very slow answers
+      NX-ENV-011  "NEXUS is already open" when starting the program
+      NX-ENV-012  The API key is gone (another PC or Windows user)
 
 
 ================================================================================
@@ -834,6 +837,15 @@ QUICK DIAGNOSTICS (run these before investigating)
                notification". The bell on the top bar lists everything that
                was announced.
 
+[NX-DAT-012] Restore backup: nothing changed / data "vanished" after restoring
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : (1) A restore is only applied when NEXUS is REOPENED (replacing
+               the open database is unsafe). (2) It brings back the state of
+               the backup's day: anything done afterwards isn't in it.
+  Solution   : Close and reopen NEXUS. The data from before the restore is kept
+               in backups/before-restore-<date> (copy nexus.db back to the data
+               folder, with NEXUS closed, to undo).
+
 ================================================================================
  UI — DESKTOP INTERFACE
 ================================================================================
@@ -1164,6 +1176,21 @@ QUICK DIAGNOSTICS (run these before investigating)
   Solution   : Use the "Economy" profile (context 4096, lighter voice). See
                the requirements in the README: minimum 16 GB of RAM and an
                8-thread processor; recommended a graphics card with 8 GB.
+
+[NX-ENV-011] "NEXUS is already open" when starting the program
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Cause      : v0.13 protection: only one NEXUS at a time (two fought over the
+               microphone, the database and the AI). The window may be
+               minimized or on another Windows virtual desktop.
+  Solution   : Look for NEXUS on the taskbar. If it froze, end "NEXUS.exe" in
+               Task Manager and open it again.
+
+[NX-ENV-012] The API key is gone (another PC or Windows user)
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : Since v0.13 the key is encrypted by Windows (DPAPI) and only the
+               same user on the same PC can read it. When the data folder is
+               copied or a backup is restored on another PC, it can't be read.
+  Solution   : Settings > Intelligence: paste the key again and save.
 
 ================================================================================
  TEST HISTORY (2026-10-13)

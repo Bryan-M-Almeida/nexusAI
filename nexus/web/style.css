@@ -310,7 +310,7 @@ button, .dock, .rail, .topbar, .core-label { user-select: none; }
 }
 
 /* ---------------------------------------------------------------- v0.9 HUD
-   Iron Man-style heads-up display with NEXUS's own touches: the landing page's red/blue palette, readouts tied
+   NEXUS heads-up display: the landing page's red/blue palette, readouts tied
    to the ring by bracket lines, and a live "pulse" trace under the ring. Everything is static CSS except the
    pulse (one SVG polyline updated in the ring's animation frame), so the idle cost stays ~0. */
 .hud-frame { position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .55; }
@@ -508,6 +508,36 @@ button, .dock, .rail, .topbar, .core-label { user-select: none; }
 #chipNet { color: var(--silver); }
 #chipNet.offline { color: #f2b33d; border-color: rgba(242, 179, 61, .5); }
 @media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------- v0.13 skills, quick profile, backups */
+.lv-badge { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; padding: 2px 8px; background: none;
+  border: 1px solid var(--line); font-size: 10px; letter-spacing: .12em; color: var(--muted); align-self: center; }
+.lv-badge:hover { border-color: var(--line-strong); color: var(--text); }
+.lv-badge b { color: var(--red); font-weight: 600; }
+.lv-badge i { width: 34px; height: 2px; background: var(--line); display: block; }
+.lv-badge em { display: block; height: 100%; width: 0; background: var(--blue-bright); }
+.skills-box { width: min(560px, 96vw); }
+.sk-head { display: flex; align-items: center; gap: 18px; }
+.sk-rank { width: 64px; height: 64px; display: grid; place-items: center; font-size: 30px; color: var(--red);
+  border: 1px solid var(--red-soft); box-shadow: inset 0 0 18px rgba(229, 50, 45, .18); }
+.sk-head h2 { margin: 0 0 6px; font-family: var(--f-display); font-weight: 400; font-size: 17px; letter-spacing: .06em; }
+.sk-bar { width: min(320px, 50vw); height: 3px; background: var(--line); margin-bottom: 4px; }
+.sk-bar em { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--blue), var(--blue-bright)); }
+.sk-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.sk-list li { display: grid; grid-template-columns: 22px 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 2px;
+  border-bottom: 1px solid rgba(74, 144, 226, .08); }
+.sk-list .cat-ico { width: 18px; height: 18px; grid-row: 1 / span 2; }
+.sk-list b { font-weight: 600; font-size: 15px; }
+.sk-list .lv { font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; color: var(--muted); text-align: right; }
+.sk-list .lv span { color: var(--red); margin-right: 6px; }
+.sk-list .bar { grid-column: 2 / span 2; height: 2px; background: var(--line); }
+.sk-list .bar em { display: block; height: 100%; background: var(--blue-bright); }
+.toast.levelup { border-color: rgba(61, 139, 219, .7); border-left-color: var(--blue-bright); box-shadow: 0 0 24px rgba(61, 139, 219, .3); }
+.toast.levelup b { color: var(--blue-bright); }
+.quick-onb { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.quick-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
+.backup-list { list-style: none; margin: 8px 0 14px; padding: 0; font-size: 11px; color: var(--muted); max-height: 140px; overflow-y: auto; }
+.backup-list li { padding: 3px 0; border-bottom: 1px solid rgba(74, 144, 226, .08); }
 
 /* ---------------------------------------------------------------- modals & toasts */
 .modal { position: fixed; inset: 0; z-index: 20; background: rgba(3, 5, 8, .78); display: grid; place-items: center; padding: 20px; backdrop-filter: blur(4px); }
