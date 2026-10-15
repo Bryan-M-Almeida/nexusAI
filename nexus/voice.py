@@ -291,6 +291,8 @@ class Listener:
         try:
             from faster_whisper import WhisperModel
 
+            if download and settings["network_mode"] == "offline":
+                raise RuntimeError("offline mode: the voice model can't be downloaded (Settings > Performance)")
             self.model = WhisperModel(settings["stt_model"], device="cpu", compute_type="int8",
                                       local_files_only=not download)
             self.model_state = "ready"
@@ -410,7 +412,8 @@ class Listener:
         except Exception:
             name = ""
         segments, _ = self.model.transcribe(
-            normalize_audio(audio), language=self.stt_language(), beam_size=1 if during_speech else 5,
+            normalize_audio(audio), language=self.stt_language(),
+            beam_size=1 if during_speech else max(1, int(settings["stt_beam"])),
             vad_filter=False, condition_on_previous_text=False, initial_prompt=initial_prompt(name))
         # drop segments Whisper itself flags as non-speech (hallucinations on noise: "Obrigado.", "Legendas...")
         text = " ".join(s.text for s in segments if s.no_speech_prob < 0.6 or s.avg_logprob > -0.6).strip()

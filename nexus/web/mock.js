@@ -12,7 +12,7 @@ if (!window.pywebview && location.search.includes("mock")) {
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, tts_volume: 100, llm_preset: "ollama", llm_api_key: "ollama",
     llm_temperature: 0.3, llm_context: 8192, history_turns: 12, auto_title: true, greet_on_start: true, start_fullscreen: true,
     mic_device: "", vad_threshold: 0.5, vad_silence: 0.7, reminder_leads: "60,10,0", speak_reminders: true,
-    desktop_notifications: true, notify_sound: true, quiet_hours: "", daily_briefing: "", show_hud: true, show_captions: true, reduce_motion: false, auto_memory: true, voice_enabled: true, bridge_port: 47800,
+    network_mode: "hybrid", performance: "balanced", stt_beam: 5, llm_keep_alive: "2h", llm_num_gpu: -1, desktop_notifications: true, notify_sound: true, quiet_hours: "", daily_briefing: "", show_hud: true, show_captions: true, reduce_motion: false, auto_memory: true, voice_enabled: true, bridge_port: 47800,
     integrations: true, home_city: "São Paulo", calendar_ics_url: "", ai_mode: "assistant",
     ui_mode: "audio", mic_muted: false, require_wake_word: false };
   const llm = { online: true, model_ready: true, model: "qwen3:8b", models: ["qwen3:8b"] };
@@ -74,6 +74,10 @@ if (!window.pywebview && location.search.includes("mock")) {
       { id: 5, role: "user", content: "Me dê uma aula para o USMLE", ts: iso(15), conversation_id: 3, title: "Simulado USMLE" }],
     open_conversation: async (id) => ({ ok: true, messages: [{ role: "user", content: "Quanto pesa o coração de um homem adulto?" }, { role: "assistant", content: "Em média de 280 a 340 gramas." }], ...state() }),
     new_conversation: async () => state(), delete_conversation: async () => ({}), rename_conversation: async () => ({}),
+    performance_info: async () => ({ hardware: { cpu: "AMD Ryzen 5 5600G with Radeon Graphics", cores: 12, ram_gb: 15.8,
+      gpus: [{ name: "AMD Radeon RX 6600 XT", vram_gb: 8 }], vram_gb: 8 }, max_allowed: true, max_reason: "", max_context: 8192, minimum: true, recommended: true }),
+    set_performance: async (p) => { settings.performance = p; return { settings, llm, state: state(), perf: {} }; },
+    set_network: async (m) => { settings.network_mode = m; return state(); },
     set_focus: async (on) => ({ ...state(), focus: on }),
     workspaces: async () => [{ id: 1, name: "App de Finanças", description: "Controle de gastos em Python com gráficos.", files: 4, updated: iso(16) }],
     open_workspace: async () => ({ ...state(), focus: true, workspace: { id: 1, name: "App de Finanças" }, messages: [

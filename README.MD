@@ -18,6 +18,22 @@ Landing page: https://nexus-landing-dun.vercel.app
 | Aprende coisas novas | Pelo chat ("aprenda que…"), pelo botão Ensinar, importando .md/.txt/.pdf, ou soltando arquivos na pasta `inbox` |
 | Idiomas | Português, English e Español (interface, respostas, voz e conhecimento) |
 
+## Requisitos
+
+Medidos no PC de referência com `tests/bench_hardware.py` (Ryzen 5 5600G, 16 GB, RX 6600 XT 8 GB, qwen3:8b).
+
+| | Mínimo | Recomendado | Força total |
+|---|---|---|---|
+| Sistema | Windows 10/11 64 bits | Windows 11 64 bits | Windows 11 64 bits |
+| Processador | 8 threads (ex.: Ryzen 5 / Core i5 recentes) | 8+ threads | 8+ threads |
+| RAM | 16 GB | 16 GB | 16 GB ou mais |
+| Placa de vídeo | nenhuma (só processador) | 8 GB (AMD RX 6600 XT, NVIDIA RTX 3060 8 GB ou melhor) | 8 GB+ (12 GB+ para contextos maiores) |
+| Disco livre | ~10 GB | ~12 GB em SSD | ~13 GB em SSD |
+| Velocidade da IA | ~7,5 tokens/s (respostas de 15–60 s) | ~35–40 tok/s (respostas de 2–10 s) | igual, com mais contexto quando a placa permite |
+
+Espaço em disco: modelo qwen3:8b 5,2 GB, Ollama ~2,8 GB, NEXUS ~0,3 GB, voz Whisper small ~0,5 GB (medium ~1,5 GB).
+Também é preciso o WebView2 (já vem no Windows 11). O NEXUS mostra em *Configurações → Desempenho* se o seu PC atende.
+
 ## Instalação (desenvolvimento)
 
 Requisitos: Windows 10/11, Python 3.12+ e microfone.
@@ -98,6 +114,12 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 - "Na próxima vez que eu abrir, me lembra de continuar o projeto do app" → no próximo início: *"Olá, Alex, vamos continuar o projeto do app?"*
 
 Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia, `Ctrl+,` Configurações, `Ctrl+Shift+N` nova conversa, `Ctrl+H` conversas, `Ctrl+J` notificações, `Ctrl+T` transcrição.
+
+### Conexão e desempenho (v0.12)
+
+*Configurações → Desempenho*:
+- **Offline**: nada sai do computador (sem clima, notícias, câmbio, Wikipédia, calendário, IA na nuvem nem fontes do Google). **Híbrido** (padrão): IA local + serviços online. **Online**: permite IA na nuvem.
+- Perfis **Econômico**, **Equilibrado** (padrão) e **Força total** (só se a IA inteira couber na placa de vídeo com 16 GB de RAM). A seção mostra o seu hardware e se ele atende aos requisitos.
 
 ### Área de trabalho (v0.11)
 
@@ -214,6 +236,7 @@ Os testes **sempre** usam uma pasta de dados temporária, então nunca tocam nos
 .\.venv\Scripts\python tests\workspace_eval.py      # área de trabalho com a IA real (arquivos e comandos)
 .\.venv\Scripts\python tests\bench_latency.py --warm # tempos de resposta
 .\.venv\Scripts\python tests\bench_voice.py         # fim de fala e precisão do reconhecimento
+.\.venv\Scripts\python tests\bench_hardware.py      # IA por tamanho de contexto (placa x processador) e voz
 ```
 
 ## Gerar o executável
@@ -250,6 +273,8 @@ nexus/
   scheduler.py  lembretes com antecedências, resumo do dia, sincronização do calendário
   notify.py     central de notificações, notificação do Windows, horário silencioso
   workspace.py  área de trabalho: pasta isolada, ferramentas de arquivo, desfazer, comandos confirmados
+  hardware.py   detecção de processador, RAM e placa de vídeo (memória real) e o que cabe nela
+  performance.py perfis Econômico / Equilibrado / Força total e requisitos
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -261,4 +286,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.11.0 (protótipo)**.
+Versão atual: **v0.12.0 (protótipo)**.

@@ -71,6 +71,12 @@ DEFAULTS = {
     # v0.11 ----------------------------------------------------------------------------------------------------
     "focus_mode": False,          # no distractions: reminders only in the bell, minimal interface
     "focus_in_workspace": True,   # focus mode turns on by itself while a workspace is open
+    # v0.12 ----------------------------------------------------------------------------------------------------
+    "network_mode": "hybrid",     # offline (nothing leaves the PC) | hybrid (local AI + online services) | online
+    "performance": "balanced",    # economy | balanced | max ("Força total", only if the hardware allows)
+    "stt_beam": 5,                # Whisper beam size (1 = fastest)
+    "llm_keep_alive": "2h",       # how long the model stays in VRAM after the last message
+    "llm_num_gpu": -1,            # layers on the GPU (-1 = Ollama decides, 999 = all, 0 = CPU only)
 }
 
 

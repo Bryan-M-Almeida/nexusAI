@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 2.2  ·  Data: 2026-10-14  ·  Versão do app: 0.11.0
+ Versão do documento: 2.3  ·  Data: 2026-10-14  ·  Versão do app: 0.12.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -74,6 +74,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-024  Simulado/quiz: respostas guardadas, corrigidas errado ou nunca corrigidas
       NX-LLM-025  "Não entendi" sem explicação (ex.: piada repetida em vez de explicada)
       NX-LLM-026  Provedor na nuvem: "sem conexão", chave recusada ou modelo não usa ferramentas
+      NX-LLM-027  Registrou "dados" que o usuário não pediu (ex.: "vamos estudar JS")
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -112,6 +113,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-UI-008   Texto não selecionável / sem copiar / conversa invisível no modo áudio
       NX-UI-009   Botões Interromper/Repetir clicáveis sem nada para fazer
       NX-UI-010   Notificação do Windows não aparece
+      NX-UI-011   Resposta some da tela enquanto a voz continua falando
  WRK  NX-WRK-001  A IA diz que criou/alterou um arquivo, mas nada mudou
       NX-WRK-002  "Fora da área de trabalho": caminho recusado
       NX-WRK-003  Comando não roda, demora ou fica esperando confirmação
@@ -130,6 +132,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-ENV-006  Porta 11434 ocupada ou dois Ollama rodando
       NX-ENV-007  Dados de teste apareceram nos dados reais do usuário
       NX-ENV-008  Cada chamada à IA demorava ~2 s a mais ("localhost" no Windows)
+      NX-ENV-009  IA lenta: parte do modelo fora da placa de vídeo / "Força total" indisponível
+      NX-ENV-010  Sem placa de vídeo dedicada: respostas muito lentas
 
 
 ================================================================================
@@ -510,6 +514,17 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                contexto saem do computador (aviso em amarelo na tela). A chave
                fica em texto no settings.json da pasta de dados.
 
+[NX-LLM-027] Registrou "dados" que o usuário não pediu (ex.: "vamos estudar JS")
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.12)  Observado: SIM
+  Sintoma    : Em 2026-10-14, "vamos estudar JS" virou "Registrei suas
+               estratégias de estudo na coleção 'estudos'".
+  Causa      : O modelo tratou o pedido de estudo como algo a guardar.
+  Correção   : Regra explícita: só guardar o que o usuário pediu; aulas,
+               explicações, planos, perguntas e respostas de simulado são
+               conversa, não dados. Também: quando o usuário diz o próprio
+               nome, a IA atualiza o perfil. Verificado em
+               tests\conversation_eval.py ("vamos estudar JS").
+
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE
 ================================================================================
@@ -829,6 +844,9 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                Fonts; sem internet, o app usa fontes do sistema.
   Solução    : Baixar os arquivos .woff2 (licença OFL), colocar em
                nexus/web/fonts e declarar com @font-face no style.css.
+  Atualização: (v0.12) No modo Offline as fontes do Google não são nem
+               solicitadas (nenhum acesso à internet); o NEXUS usa
+               Bahnschrift / Segoe UI / Consolas do Windows.
 
 [NX-UI-002] Janela não abre: WebView2 ausente
   Severidade : CRÍTICA          Status: CONHECIDO          Observado: PREVISTO
@@ -924,6 +942,20 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Solução    : Configurações do Windows > Sistema > Notificações: desative o
                "Não perturbe" e permita o "Windows PowerShell". O aviso continua
                no NEXUS (som, voz e sino) mesmo sem a notificação do Windows.
+
+[NX-UI-011] Resposta some da tela enquanto a voz continua falando
+  Severidade : ALTA             Status: CORRIGIDO (v0.12)  Observado: SIM
+  Sintoma    : No modo áudio com transcrição, a resposta sobre JavaScript
+               apareceu, foi falada, e de repente o texto foi trocado por
+               uma frase curta ("Registrei..."); a voz continuou lendo a aula,
+               mas ela não podia mais ser lida.
+  Causa      : Todo texto escrito antes de uma chamada de ferramenta era
+               tratado como "narração" ("vou verificar...") e apagado da tela;
+               o áudio, já na fila, continuava.
+  Correção   : Só frases curtas (< 120 caracteres) antes de uma ferramenta
+               são removidas. Uma resposta de verdade fica na tela, é salva
+               no histórico e a parte depois da ferramenta é acrescentada.
+               Testado em tests\test_units.py.
 
 ================================================================================
  WRK — ÁREA DE TRABALHO
@@ -1109,6 +1141,29 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                antigas).
   Dicas      : Use sempre 127.0.0.1 ao configurar servidores locais (LM
                Studio: http://127.0.0.1:1234/v1).
+
+[NX-ENV-009] IA lenta: parte do modelo fora da placa de vídeo / "Força total" indisponível
+  Severidade : MÉDIA            Status: CONHECIDO          Observado: SIM
+  Medição    : tests\bench_hardware.py, RX 6600 XT 8 GB, qwen3:8b:
+               contexto 8192 -> 5,75 GB, 100% na placa, escreve 35 tok/s;
+               12288 -> 92% na placa, 31 tok/s; 16384 -> 85%, 25 tok/s e
+               leitura 2x mais lenta. Só ~6,2 GB dos 8 GB ficam livres.
+  Causa      : Se modelo + contexto não cabem na memória da placa, o Ollama
+               coloca camadas no processador e tudo fica mais lento.
+  Solução    : Configurações > Desempenho: "Equilibrado" usa 8192 (cabe em
+               placas de 8 GB). "Força total" só aparece se o modelo inteiro
+               couber com pelo menos 8192 (placas de ~8 GB ou mais) e com
+               16 GB de RAM; em placas de 12 GB+ ela usa contextos maiores.
+               Feche jogos/editores de vídeo para liberar memória da placa.
+
+[NX-ENV-010] Sem placa de vídeo dedicada: respostas muito lentas
+  Severidade : ALTA             Status: CONHECIDO          Observado: SIM
+  Medição    : Só no processador (Ryzen 5 5600G): escreve 7,5 tok/s e lê
+               47 tok/s, ~5x mais lento que na placa (40 tok/s). Uma resposta
+               típica leva ~15-60 s.
+  Solução    : Use o perfil "Econômico" (contexto 4096, voz mais leve). Veja
+               os requisitos no README: mínimo 16 GB de RAM e processador de
+               8 threads; recomendado placa de vídeo com 8 GB.
 
 ================================================================================
  HISTÓRICO DE TESTES (2026-10-13)

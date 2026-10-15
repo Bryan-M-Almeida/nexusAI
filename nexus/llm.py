@@ -58,6 +58,9 @@ def _ollama_root():
 
 def status() -> dict:
     """Is the server reachable and is the configured model available?"""
+    if offline_blocked():
+        return {"online": False, "model": settings["llm_model"], "models": [], "offline_mode": True,
+                "error": "offline mode: this provider is on the internet"}
     try:
         r = httpx.get(f"{_base()}/models", headers=_headers(), timeout=3)
         r.raise_for_status()
@@ -76,6 +79,8 @@ def stream_chat(messages: list, tools: list | None = None, temperature: float | 
     `messages` use the OpenAI shape (tool call arguments as JSON strings); tool calls come back as
     {"id", "name", "arguments": <json string>} whichever backend is used."""
     temperature = settings["llm_temperature"] if temperature is None else temperature
+    if offline_blocked():
+        raise LLMOffline("offline mode: the AI server is on the internet - choose Ollama or LM Studio")
     stream = _stream_ollama if _is_ollama() else _stream_openai
     try:
         yield from stream(messages, tools, temperature, max_tokens)
@@ -85,7 +90,17 @@ def stream_chat(messages: list, tools: list | None = None, temperature: float | 
 
 # While the app is open the model stays in VRAM (reloading costs ~7 s + re-processing the prompt ~20 s);
 # unload() releases it when the window closes. 2 h is a safety net if the app crashes.
-KEEP_ALIVE = "2h"
+KEEP_ALIVE = "2h"  # default; Settings > Performance changes it (settings["llm_keep_alive"])
+
+
+def is_local_url(url: str | None = None) -> bool:
+    url = (url or settings["llm_base_url"]).lower()
+    return any(h in url for h in ("//127.0.0.1", "//localhost", "//[::1]", "//0.0.0.0"))
+
+
+def offline_blocked() -> bool:
+    """Offline mode: a cloud AI server is never contacted."""
+    return settings["network_mode"] == "offline" and not is_local_url()
 
 
 def _native_body(messages, tools, temperature, stream=True, **options):
@@ -103,10 +118,12 @@ def _native_body(messages, tools, temperature, stream=True, **options):
         "model": settings["llm_model"],
         "messages": native,
         "stream": stream,
-        "keep_alive": KEEP_ALIVE,
+        "keep_alive": settings.get("llm_keep_alive") or KEEP_ALIVE,
         "think": False,  # reasoning models (qwen3, deepseek-r1) answer directly: much faster for an assistant
         "options": {"temperature": temperature, "num_ctx": settings["llm_context"], **options},
     }
+    if int(settings.get("llm_num_gpu", -1)) >= 0:
+        body["options"]["num_gpu"] = int(settings["llm_num_gpu"])
     if tools:
         body["tools"] = tools
     return body

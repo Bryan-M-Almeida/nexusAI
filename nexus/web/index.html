@@ -4,8 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>N.E.X.U.S</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <!-- Web fonts are loaded by app.js unless NEXUS is in offline mode (offline = not even a font request leaves the PC) -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -34,6 +33,7 @@
     <div class="chips">
       <span class="chip" id="chipAi"><i class="dot"></i><span data-i18n="ai">IA</span></span>
       <span class="chip" id="chipVoice"><i class="dot"></i><span data-i18n="voice">VOZ</span></span>
+      <span class="chip mono" id="chipNet" title=""></span>
       <span class="chip mono" id="clock">--:--</span>
     </div>
     <div class="top-actions">
@@ -278,6 +278,7 @@
       <button type="button" data-sec="ai" data-i18n="secAi">Inteligência</button>
       <button type="button" data-sec="voice" data-i18n="secVoice">Voz do NEXUS</button>
       <button type="button" data-sec="mic" data-i18n="secMic">Microfone</button>
+      <button type="button" data-sec="perf" data-i18n="secPerf">Desempenho</button>
       <button type="button" data-sec="notif" data-i18n="secNotif">Notificações</button>
       <button type="button" data-sec="integ" data-i18n="secInteg">Integrações</button>
       <button type="button" data-sec="ui" data-i18n="secUi">Interface</button>
@@ -351,6 +352,27 @@
         </div>
         <p class="hint" data-i18n="vadHint">Valor menor de sensibilidade capta vozes mais baixas (e mais ruído). Aumente a pausa se o NEXUS corta você no meio da frase.</p>
         <label class="check"><input type="checkbox" name="require_wake_word"><span data-i18n="requireWake">Só responder quando eu disser "Nexus"</span></label>
+      </section>
+
+      <!-- PERFORMANCE & CONNECTION (v0.12) -->
+      <section class="set-sec" data-sec="perf" hidden>
+        <h2 data-i18n="secPerf">Desempenho</h2>
+        <p class="sub mono" data-i18n="netTitle">CONEXÃO</p>
+        <div class="cards" id="netCards">
+          <button type="button" class="card-opt" data-net="offline"><b data-i18n="netOffline">Offline</b><small data-i18n="netOfflineHint">Nada sai do computador. IA, voz e memória locais; sem clima, notícias, câmbio, Wikipédia e calendário.</small></button>
+          <button type="button" class="card-opt" data-net="hybrid"><b data-i18n="netHybrid">Híbrido</b><small data-i18n="netHybridHint">IA local + serviços online (clima, notícias, câmbio, calendário). Recomendado.</small></button>
+          <button type="button" class="card-opt" data-net="online"><b data-i18n="netOnline">Online</b><small data-i18n="netOnlineHint">Permite IA na nuvem (OpenAI, Claude, Gemini...) além dos serviços online. Escolha o provedor em Inteligência.</small></button>
+        </div>
+        <input type="hidden" name="network_mode">
+        <p class="sub mono" data-i18n="perfTitle">PERFIL</p>
+        <div class="cards" id="perfCards">
+          <button type="button" class="card-opt" data-perf="economy"><b data-i18n="perfEconomy">Econômico</b><small data-i18n="perfEconomyHint">Para PCs mais simples: contexto menor, voz mais rápida, menos animações, IA liberada da memória após 10 min.</small></button>
+          <button type="button" class="card-opt" data-perf="balanced"><b data-i18n="perfBalanced">Equilibrado</b><small data-i18n="perfBalancedHint">O padrão: boa memória de conversa e voz precisa sem pesar.</small></button>
+          <button type="button" class="card-opt" data-perf="max"><b data-i18n="perfMax">Força total</b><small data-i18n="perfMaxHint">Máximo do seu hardware: contexto maior que ainda cabe na placa de vídeo, Whisper medium, IA sempre carregada.</small><i class="why" id="maxWhy"></i></button>
+        </div>
+        <p class="hint" data-i18n="perfHint">O perfil ajusta várias opções de uma vez; você ainda pode mudar cada uma nas outras seções.</p>
+        <p class="sub mono" data-i18n="hwTitle">SEU COMPUTADOR</p>
+        <div class="hw-box mono" id="hwBox"></div>
       </section>
 
       <!-- NOTIFICATIONS -->

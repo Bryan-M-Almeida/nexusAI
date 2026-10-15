@@ -491,6 +491,24 @@ button, .dock, .rail, .topbar, .core-label { user-select: none; }
 .app.focus .chip .dot { animation: none; }
 .rail-btn#btnFocus.on { color: #f2b33d; border-color: rgba(242, 179, 61, .6); background: rgba(242, 179, 61, .1); }
 
+/* ---------------------------------------------------------------- v0.12 performance & connection */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 14px; }
+.card-opt { position: relative; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px; background: rgba(3, 5, 8, .5);
+  border: 1px solid var(--line); color: var(--muted); transition: border-color .2s, background .2s; }
+.card-opt b { font-size: 15px; font-weight: 600; color: var(--text); }
+.card-opt small { font-size: 12.5px; line-height: 1.4; }
+.card-opt:hover { border-color: var(--line-strong); }
+.card-opt.on { border-color: rgba(61, 139, 219, .8); background: rgba(61, 139, 219, .12); }
+.card-opt.on::after { content: ""; position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--blue-bright); box-shadow: 0 0 8px var(--blue-bright); }
+.card-opt:disabled { opacity: .5; cursor: not-allowed; }
+.card-opt .why { font-style: normal; font-size: 11.5px; color: #f2b33d; }
+.hw-box { font-size: 12px; line-height: 1.8; border: 1px solid var(--line); padding: 10px 12px; color: var(--silver); }
+.hw-box .ok { color: var(--blue-bright); } .hw-box .bad { color: #ffb3b0; }
+#chipNet { color: var(--silver); }
+#chipNet.offline { color: #f2b33d; border-color: rgba(242, 179, 61, .5); }
+@media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+
 /* ---------------------------------------------------------------- modals & toasts */
 .modal { position: fixed; inset: 0; z-index: 20; background: rgba(3, 5, 8, .78); display: grid; place-items: center; padding: 20px; backdrop-filter: blur(4px); }
 .modal-box { width: min(560px, 100%); max-height: 92vh; overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line-strong); padding: 26px; position: relative; animation: rise .4s var(--ease-out); }

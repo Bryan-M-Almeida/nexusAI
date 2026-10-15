@@ -122,7 +122,8 @@ def start(alert):
     def loop():
         while True:
             try:
-                if settings["integrations"] and integrations.calendar_due():  # ICS calendar feed, every 30 min
+                online = settings["integrations"] and settings["network_mode"] != "offline"
+                if online and integrations.calendar_due():  # ICS calendar feed, every 30 min
                     integrations.sync_calendar()
                 _check(alert)
             except Exception as exc:

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import webview
 
 from . import (MODEL_NAME, __version__, assistant, bridge, control, i18n, knowledge, llm, memory, notify, profile,
-               scheduler, tools, workspace)
+               performance, scheduler, tools, workspace)
 from .config import WEB_DIR, settings
 from .db import db
 from .i18n import LANGS, detect, lang
@@ -209,7 +209,8 @@ class Api:
                 "stt_error": self._listener.model_error, "ai_mode": settings["ai_mode"],
                 "temporary": memory.temporary, "can_repeat": bool(assistant.last_reply()),
                 "conversation": memory.current_conversation(), "focus": self.focus(),
-                "workspace": workspace.active}
+                "workspace": workspace.active, "network": settings["network_mode"],
+                "performance": settings["performance"]}
 
     def interrupt(self):
         """Dock "interrupt" / Esc: stop speaking and cancel the answer being generated."""
@@ -274,6 +275,22 @@ class Api:
 
     def clear_history(self):
         memory.clear_history()
+
+    # -- connection modes and performance profiles (v0.12) --------------------------------------------------------
+    def performance_info(self):
+        return performance.check()
+
+    def set_network(self, mode):
+        settings.apply({"network_mode": mode if mode in ("offline", "hybrid", "online") else "hybrid"})
+        return {**self.state(), "llm": llm.status()}
+
+    def set_performance(self, profile):
+        """Apply a profile's settings at once (Settings > Performance). Returns the new settings."""
+        old_stt = settings["stt_model"]
+        settings.apply(performance.settings_for(profile if profile in performance.PROFILES else "balanced"))
+        if settings["stt_model"] != old_stt:
+            self._listener.reload_model() if settings["network_mode"] != "offline" else None
+        return {**self.get_settings(), "state": self.state(), "perf": performance.check()}
 
     # -- focus mode and workspace (v0.11) -------------------------------------------------------------------------
     @staticmethod

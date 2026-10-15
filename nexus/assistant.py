@@ -11,6 +11,7 @@ from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
 
 MAX_TOOL_ROUNDS = 6
+NARRATION_MAX = 120  # chars: shorter text before a tool call is narration ("vou verificar...")
 MAX_WORKSPACE_ROUNDS = 14  # multi-file work needs more tool rounds
 KB_MIN_SCORE = -7.5  # calibrated on the seed books: real matches score below this, noise above
 ACTIONS_WINDOW_MIN = 15
@@ -26,7 +27,10 @@ Rules:
   log money/expenses/any measurement -> `record_data` (collection e.g. "gastos"/"expenses", one call per item);
   totals or "how much" questions -> `query_data` then add the numbers yourself;
   durable facts about the user (allergies, preferences, people, habits) -> `remember`;
-  "learn/aprenda/aprende" -> `learn_knowledge`; reminders -> `set_reminder`; appointments -> `add_event`; to-dos -> `add_task`.
+  "learn/aprenda/aprende" -> `learn_knowledge`; reminders -> `set_reminder`; appointments -> `add_event`; to-dos -> `add_task`;
+  the user tells you their name -> `update_profile` (field "name").
+- NEVER store anything the user did not ask to store: "let's study X", questions, explanations, lessons, plans
+  and quiz answers are conversation, not data - just answer (teach, explain, ask). No `record_data` for them.
 - Resolve relative dates with the calendar below; never compute weekdays yourself. Use ISO datetimes.
 - Never show JSON, tool names or internal steps to the user; just give the final answer.
 - Questions about agenda, schedule, commitments or pending items: answer from BOTH the "Upcoming
@@ -265,7 +269,8 @@ LIVE = [
 
 def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None = None) -> str | None:
     for rx, expected, tool in LIVE:
-        if rx.search(user_text) and not (called or set()) & expected and settings["integrations"]:
+        if (rx.search(user_text) and not (called or set()) & expected and settings["integrations"]
+                and settings["network_mode"] != "offline"):
             return (f"This needs LIVE data that you do not know. Call `{tool}` now; never say it is unavailable and "
                     f"never invent headlines, rates or forecasts. Then answer briefly from the tool result.")
     for rx, expected, tool in INTENTS:
@@ -366,6 +371,7 @@ class Assistant:
         previous = last_reply()
         memory.add_message("user", text)
         reply, changed, nudged, finished, round_text, called = "", False, False, False, "", set()
+        kept = ""  # real answer text written before a tool call: stays on screen and in the reply (v0.12)
         try:
             schemas = turn_tools()
             for _ in range(MAX_WORKSPACE_ROUNDS if workspace.active else MAX_TOOL_ROUNDS):
@@ -388,13 +394,19 @@ class Assistant:
                                                  else _needs_tool(round_text, changed, text, called))
                     if nudge:  # the model claimed/deferred an action without calling a tool: ask again once
                         nudged = True
-                        self.emit("reset", None)
+                        self.emit("reset", {"keep": kept})
                         messages += [{"role": "assistant", "content": round_text}, {"role": "user", "content": nudge}]
                         continue
                     reply = round_text
                     break
-                if round_text:  # narration before a tool call ("let me check...") is not part of the answer
-                    self.emit("reset", None)
+                # A short line before a tool call ("let me check...") is narration and is removed; a real answer
+                # (the user already read/heard it) stays - v0.11 wiped a whole JS lesson from the screen while the
+                # voice kept reading it.
+                if len(round_text.strip()) >= NARRATION_MAX:
+                    kept += round_text.strip() + "\n\n"
+                    self.emit("token", "\n\n")
+                elif round_text:
+                    self.emit("reset", {"keep": kept})
                 for c in calls:
                     c["id"] = c["id"] or f"call_{uuid.uuid4().hex[:8]}"
                 messages.append({"role": "assistant", "content": "", "tool_calls": [
@@ -427,6 +439,8 @@ class Assistant:
             return
         interrupted = self.cancel.is_set()
         reply = (reply or ("" if finished or interrupted else round_text)).strip()
+        if kept and not finished:
+            reply = (kept + reply).strip()
         if topic and reply:
             reply = emergency.guard(topic, reply, detect(text) or lang())
         if reply:

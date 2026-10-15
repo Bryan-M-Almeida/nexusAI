@@ -8,6 +8,49 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.12.0 — Protótipo · 2026-10-14
+
+**Modos offline/híbrido/online, perfis de desempenho medidos, requisitos e a resposta que sumia da tela.**
+
+### Corrigido (da conversa real de 2026-10-14)
+- **A resposta sumia da tela enquanto a voz continuava** (NX-UI-011): "vamos estudar JS" — a aula apareceu, foi
+  falada e o texto foi trocado por "Registrei suas estratégias...". Todo texto antes de uma ferramenta era apagado
+  como se fosse "vou verificar...". Agora só frases curtas (< 120 caracteres) somem; a resposta de verdade fica na
+  tela e no histórico, e o resto é acrescentado.
+- **Registrar "dados" sem pedido** (NX-LLM-027): aulas, explicações, planos e respostas de simulado são conversa,
+  não dados. Quando você diz seu nome, ele vai para o perfil.
+
+### Conexão (Configurações → Desempenho)
+- **Offline**: nada sai do computador — IA, voz e memória locais; clima, notícias, câmbio, Wikipédia, calendário,
+  provedores na nuvem, download de modelos de voz e até as fontes do Google ficam bloqueados.
+- **Híbrido** (padrão): IA local + serviços online. **Online**: permite também IA na nuvem.
+- Chip na barra superior mostra o modo (OFFLINE em âmbar).
+
+### Perfis de desempenho (medidos com `tests/bench_hardware.py`)
+| qwen3:8b na RX 6600 XT 8 GB | na placa | lê | escreve |
+|---|---|---|---|
+| contexto 4096 | 100% | 260 tok/s | 40 tok/s |
+| contexto 8192 | 100% | 245 tok/s | 35 tok/s |
+| contexto 12288 | 92% | 146 tok/s | 31 tok/s |
+| contexto 16384 | 85% | 119 tok/s | 25 tok/s |
+| só processador (Ryzen 5 5600G) | 0% | 47 tok/s | 7,5 tok/s |
+
+Só ~6,2 GB dos 8 GB ficam livres para a IA; o que não cabe vai para o processador e fica até 2× mais lento.
+- **Econômico**: contexto 4096, Whisper base, voz mais rápida, menos animações, IA liberada após 10 min.
+- **Equilibrado** (padrão): contexto 8192 — o maior que cabe inteiro numa placa de 8 GB.
+- **Força total**: tudo na placa, o maior contexto que **ainda cabe nela** (8192 em 8 GB, 32k em 12 GB+), mais
+  histórico, Whisper medium e IA sempre carregada. Só aparece com 16 GB de RAM e placa de ~8 GB ou mais
+  (detecção pela memória real da placa no registro do Windows; o WMI mostra no máximo 4 GB).
+- Seção "Seu computador": processador, RAM, placa, maior contexto que cabe e se atende aos requisitos.
+
+### Testes desta versão
+- 137/137 testes unitários (8 novos: offline bloqueia serviços e IA na nuvem, IA local continua, tabela de memória
+  da placa, perfis; 3 do texto mantido na tela).
+- 28/28 verificações de conversa (nova: "vamos estudar JS" ensina e não registra dados) e 7/7 da área de trabalho
+  com qwen3:8b.
+
+---
+
 ## v0.11.0 — Protótipo · 2026-10-14
 
 **Área de trabalho do NEXUS, modo foco e modo estudo.**
@@ -394,20 +437,14 @@ NX-VOZ-016, NX-ENV-007).
 
 ## Próximas versões (planejamento)
 
-### v0.12.0 — Protótipo (próxima) · conexão e desempenho
-- **Modos offline, internet e híbrido** (hoje o NEXUS já funciona como híbrido: IA, voz e memória locais; internet só
-  para clima, notícias, câmbio, Wikipédia, calendário e provedores na nuvem).
-- **Perfis de desempenho**: econômico, equilibrado (padrão) e **força total**, liberado só se o PC aguentar
-  (detecção de hardware).
-- **Requisitos mínimos e recomendados**, medidos com GPU e só com CPU.
-
-### v0.13.0 — Protótipo · habilidades
+### v0.13.0 — Protótipo (próxima) · habilidades
 - **Sistema de habilidades estilo Solo Leveling**: nível do NEXUS e de cada habilidade, subindo com o uso; minimalista.
 
 ### Versão final do protótipo
 - **Instalador** (Inno Setup) e início automático com o Windows — reservado pelo usuário para a versão final do protótipo.
 
 ### Versões seguintes (a definir com o usuário)
-Candidatos já levantados: formulário real na landing (NX-INT-001), seleção de microfone (NX-VOZ-002),
+Candidatos já levantados: perfil "máxima inteligência" (modelo maior, ex. 14B, dividido entre placa e RAM: mais
+lento, porém melhor; medir antes), formulário real na landing (NX-INT-001),
 fontes offline (NX-UI-001), e-mail e calendário com login (OAuth), cancelamento de eco, busca semântica com
 embeddings, casa inteligente.

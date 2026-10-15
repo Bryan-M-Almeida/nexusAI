@@ -1,3 +1,14 @@
+/* Fonts from Google only when not offline (v0.12). The last known mode is cached so the boot animation doesn't
+   flash fallback fonts; offline it falls back to Bahnschrift / Segoe UI / Consolas, already in the CSS. */
+function loadFonts(mode) {
+  try { localStorage.setItem("nexus.net", mode); } catch (e) { /* ignore */ }
+  if (mode === "offline" || document.getElementById("gfonts")) return;
+  const l = Object.assign(document.createElement("link"), { id: "gfonts", rel: "stylesheet",
+    href: "https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" });
+  document.head.appendChild(l);
+}
+try { loadFonts(localStorage.getItem("nexus.net") || "hybrid"); } catch (e) { loadFonts("hybrid"); }
+
 /* N.E.X.U.S interface. Talks to Python through window.pywebview.api; Python pushes events via nexus.on(). */
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -83,7 +94,7 @@ window.nexus = {
     switch (event) {
       case "boot": return bootLine(p);
       case "token": return onToken(p);
-      case "reset": if (streaming) { streaming.text = ""; streaming.el.querySelector(".txt").innerHTML = ""; } return;
+      case "reset": if (streaming) { streaming.text = (p && p.keep) || ""; streaming.el.querySelector(".txt").innerHTML = md(streaming.text); } return;
       case "tool": return onTool(p);
       case "done": return onDone(p);
       case "error": return onError(p);
@@ -134,7 +145,8 @@ async function start() {
   $("#modelName").textContent = st.model_name || "NEX-1.0";
   applyInterface();
   api().notifications().then((r) => setBadge(r.unread));
-  applyState({ ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: st.stt,
+  applyState({ network: settings.network_mode, performance: settings.performance,
+    ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: st.stt,
     ai_mode: settings.ai_mode || "assistant", temporary: false });
   await new Promise((r) => setTimeout(r, Math.max(0, BOOT_MIN_MS - (Date.now() - t0))));
   $("#boot").classList.add("leaving");
@@ -363,6 +375,11 @@ function applyState(st) {
   if (ws) $("#wsName").textContent = ws.name;
   $("#app").classList.toggle("focus", !!state.focus);
   $("#btnFocus").classList.toggle("on", !!state.focus);
+  if (state.network) {
+    $("#chipNet").textContent = T("netChip_" + state.network);
+    $("#chipNet").classList.toggle("offline", state.network === "offline");
+    loadFonts(state.network);
+  }
   if (state.ui_mode === "text") setTimeout(() => $("#prompt").focus(), 300);
   setVoiceState(voiceState === "speaking" ? "speaking" : "idle");
 }
@@ -605,6 +622,7 @@ function fillSettings() {
     if (!el || el.type === "hidden" || el.tagName === "SELECT" && k === "llm_preset" && !presets.length) continue;
     if (el.type === "checkbox") el.checked = !!v; else el.value = v;
   }
+  f.elements.network_mode.value = settings.network_mode || "hybrid";
   const leads = String(settings.reminder_leads || "").split(",").map(Number);
   $("#leadChips").innerHTML = LEADS.map((m) => `<button type="button" class="chip-opt ${leads.includes(m) ? "on" : ""}" data-lead="${m}">${esc(leadLabel(m))}</button>`).join("")
     + `<span class="chip-opt on fixed">${esc(T("leadNow"))}</span>`;
@@ -654,8 +672,33 @@ function aiStatusHTML(llm) {
     : `<span class="bad">● ${esc(T("connNoModel", { model: llm.model }))}</span>`;
 }
 
+async function renderPerf() {
+  const f = $("#settingsForm"), info = await api().performance_info();
+  $$("#netCards [data-net]").forEach((b) => b.classList.toggle("on", b.dataset.net === (f.elements.network_mode.value || settings.network_mode)));
+  $$("#perfCards [data-perf]").forEach((b) => b.classList.toggle("on", b.dataset.perf === settings.performance));
+  const maxBtn = $('#perfCards [data-perf="max"]'), [kind, v] = (info.max_reason || ":").split(":");
+  maxBtn.disabled = !info.max_allowed;
+  $("#maxWhy").textContent = info.max_allowed ? "" : T(kind === "ram" ? "maxNoRam" : "maxNoVram", { v });
+  const hw = info.hardware, gpu = hw.gpus.map((g) => `${g.name} · ${g.vram_gb} GB`).join(", ") || T("hwNone");
+  const yes = (ok) => `<span class="${ok ? "ok" : "bad"}">${esc(T(ok ? "hwOk" : "hwNo"))}</span>`;
+  $("#hwBox").innerHTML = `${esc(T("hwCpu"))}: ${esc(hw.cpu)} · ${hw.cores} threads<br>${esc(T("hwRam"))}: ${hw.ram_gb} GB<br>`
+    + `${esc(T("hwGpu"))}: ${esc(gpu)}<br>${esc(T("hwCtx"))}: ${info.max_context || "—"}<br>`
+    + `${esc(T("hwMin"))}: ${yes(info.minimum)} · ${esc(T("hwRec"))}: ${yes(info.recommended)}`;
+}
+
+async function pickProfile(name) {
+  const r = await api().set_performance(name);
+  settings = r.settings;
+  fillSettings();
+  applyInterface();
+  applyState(r.state);
+  renderPerf();
+  showTip(T("perfApplied", { name: T({ economy: "perfEconomy", balanced: "perfBalanced", max: "perfMax" }[name]) }));
+}
+
 function openSettings(sec) {
   fillSettings();
+  renderPerf();
   showSection(typeof sec === "string" ? sec : "general");
   $("#setSaved").textContent = "";
   $("#aiStatus").innerHTML = `<span class="muted">● ${esc(T("checking"))}</span>`;
@@ -816,6 +859,7 @@ function wire() {
     setAi(r.llm);
     applyLang(r.lang);
     applyInterface();
+    applyState({ network: settings.network_mode, performance: settings.performance });
     $("#settings").hidden = true;
   });
   $$("#setNav [data-sec]").forEach((b) => (b.onclick = () => showSection(b.dataset.sec)));
@@ -841,6 +885,13 @@ function wire() {
   $("#btnOpenData").onclick = () => api().open_data_folder();
   $("#btnCenterRing").onclick = () => setRingPos(0, 0);
   $("#btnNotif").onclick = openNotifications;
+  $("#netCards").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-net]");
+    if (!b) return;
+    $("#settingsForm").elements.network_mode.value = b.dataset.net;
+    $$("#netCards [data-net]").forEach((x) => x.classList.toggle("on", x === b));
+  });
+  $("#perfCards").addEventListener("click", (e) => { const b = e.target.closest("[data-perf]"); if (b && !b.disabled) pickProfile(b.dataset.perf); });
   $("#btnNotifClear").onclick = async () => { await api().clear_notifications(); openNotifications(); };
   $("#btnReimport").onclick = () => { $("#settings").hidden = true; openOnboarding(); };
   $("#btnClearChat").onclick = async () => { await api().clear_history(); $("#chat").innerHTML = ""; $("#settings").hidden = true; };

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 2.2  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.11.0
+ Versión del documento: 2.3  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.12.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -77,6 +77,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-LLM-024  Simulacro/quiz: respuestas guardadas, mal corregidas o nunca corregidas
       NX-LLM-025  "No entendí" sin explicación (ej.: chiste repetido en vez de explicado)
       NX-LLM-026  Proveedor en la nube: "sin conexión", clave rechazada o el modelo no usa herramientas
+      NX-LLM-027  Registró "datos" que el usuario no pidió (ej.: "vamos a estudiar JS")
  VOZ  NX-VOZ-001  El micrófono no responde en el primer uso (descarga Whisper)
       NX-VOZ-002  Micrófono equivocado seleccionado (p. ej. DroidCam)
       NX-VOZ-003  Palabra de activación "Nexus" no reconocida / falsos disparos
@@ -115,6 +116,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-UI-008   Texto no seleccionable / sin copiar / conversación invisible en modo audio
       NX-UI-009   Botones Interrumpir/Repetir clicables sin nada que hacer
       NX-UI-010   La notificación de Windows no aparece
+      NX-UI-011   La respuesta desaparece de la pantalla mientras la voz sigue hablando
  WRK  NX-WRK-001  La IA dice que creó/cambió un archivo, pero nada cambió
       NX-WRK-002  "Fuera del área de trabajo": ruta rechazada
       NX-WRK-003  El comando no se ejecuta, tarda o espera confirmación
@@ -133,6 +135,8 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-ENV-006  Puerto 11434 ocupado o dos instancias de Ollama
       NX-ENV-007  Datos de prueba aparecieron en los datos reales del usuario
       NX-ENV-008  Cada llamada a la IA tardaba ~2 s más ("localhost" en Windows)
+      NX-ENV-009  IA lenta: parte del modelo fuera de la tarjeta gráfica / "Máxima potencia" no disponible
+      NX-ENV-010  Sin tarjeta gráfica dedicada: respuestas muy lentas
 
 
 ================================================================================
@@ -539,6 +543,17 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                clave se guarda como texto en settings.json en la carpeta de
                datos.
 
+[NX-LLM-027] Registró "datos" que el usuario no pidió (ej.: "vamos a estudiar JS")
+  Gravedad   : MEDIA            Estado: CORREGIDO (v0.12)  Observado: SÍ
+  Síntoma    : El 2026-10-14, "vamos estudar JS" se convirtió en "Registré
+               tus estrategias de estudio en la colección 'estudos'".
+  Causa      : El modelo trató la petición de estudio como algo a guardar.
+  Corrección : Regla explícita: solo guardar lo que el usuario pidió; clases,
+               explicaciones, planes, preguntas y respuestas de simulacro son
+               conversación, no datos. Además: cuando el usuario dice su
+               nombre, la IA actualiza el perfil. Verificado en
+               tests\conversation_eval.py ("vamos estudar JS").
+
 ================================================================================
  VOZ — RECONOCIMIENTO Y SÍNTESIS
 ================================================================================
@@ -864,6 +879,9 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                Google Fonts; sin internet, la app usa fuentes del sistema.
   Solución   : Descargar los archivos .woff2 (licencia OFL), colocarlos en
                nexus/web/fonts y declararlos con @font-face en style.css.
+  Actualización: (v0.12) En el modo Sin conexión las fuentes de Google ni
+               se solicitan (ningún acceso a internet); NEXUS usa Bahnschrift /
+               Segoe UI / Consolas de Windows.
 
 [NX-UI-002] La ventana no abre: falta WebView2
   Gravedad   : CRÍTICA          Estado: CONOCIDO           Observado: PREVISTO
@@ -962,6 +980,20 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Solución   : Configuración de Windows > Sistema > Notificaciones: desactiva
                "No molestar" y permite "Windows PowerShell". El aviso sigue
                dentro de NEXUS (sonido, voz y campana) sin la de Windows.
+
+[NX-UI-011] La respuesta desaparece de la pantalla mientras la voz sigue hablando
+  Gravedad   : ALTA             Estado: CORREGIDO (v0.12)  Observado: SÍ
+  Síntoma    : En modo audio con transcripción, la respuesta sobre
+               JavaScript apareció, se dijo, y de repente el texto se cambió
+               por una frase corta ("Registré..."); la voz siguió leyendo la
+               clase, pero ya no se podía leer.
+  Causa      : Todo texto escrito antes de una llamada a herramienta se
+               trataba como "narración" ("voy a verificar...") y se borraba de
+               la pantalla; el audio ya en cola seguía sonando.
+  Corrección : Solo se quitan frases cortas (< 120 caracteres) antes de una
+               herramienta. Una respuesta de verdad se queda en pantalla, se
+               guarda en el historial y la parte posterior se añade. Probado
+               en tests\test_units.py.
 
 ================================================================================
  WRK — ÁREA DE TRABAJO
@@ -1154,6 +1186,29 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                configuraciones antiguas).
   Consejos   : Usa siempre 127.0.0.1 para servidores locales (LM Studio:
                http://127.0.0.1:1234/v1).
+
+[NX-ENV-009] IA lenta: parte del modelo fuera de la tarjeta gráfica / "Máxima potencia" no disponible
+  Gravedad   : MEDIA            Estado: CONOCIDO           Observado: SÍ
+  Medición   : tests\bench_hardware.py, RX 6600 XT 8 GB, qwen3:8b: contexto
+               8192 -> 5,75 GB, 100% en la tarjeta, escribe 35 tok/s; 12288 ->
+               92% en la tarjeta, 31 tok/s; 16384 -> 85%, 25 tok/s y lectura
+               2x más lenta. Solo ~6,2 GB de los 8 GB quedan libres.
+  Causa      : Si modelo + contexto no caben en la memoria de la tarjeta,
+               Ollama pone capas en el procesador y todo se ralentiza.
+  Solución   : Configuración > Rendimiento: "Equilibrado" usa 8192 (cabe en
+               tarjetas de 8 GB). "Máxima potencia" solo aparece si el modelo
+               entero cabe con al menos 8192 (tarjetas de ~8 GB o más) y con
+               16 GB de RAM; en tarjetas de 12 GB+ usa contextos mayores.
+               Cierra juegos/editores de vídeo para liberar memoria.
+
+[NX-ENV-010] Sin tarjeta gráfica dedicada: respuestas muy lentas
+  Gravedad   : ALTA             Estado: CONOCIDO           Observado: SÍ
+  Medición   : Solo procesador (Ryzen 5 5600G): escribe 7,5 tok/s y lee
+               47 tok/s, ~5x más lento que en la tarjeta (40 tok/s). Una
+               respuesta típica tarda ~15-60 s.
+  Solución   : Usa el perfil "Económico" (contexto 4096, voz más ligera).
+               Mira los requisitos en el README: mínimo 16 GB de RAM y un
+               procesador de 8 hilos; recomendado tarjeta gráfica de 8 GB.
 
 ================================================================================
  HISTORIAL DE PRUEBAS (2026-10-13)

@@ -215,6 +215,8 @@ def _online(fn):
     def wrapper(**kwargs):
         if not settings["integrations"]:
             return {"error": "online integrations are disabled in Settings"}
+        if settings["network_mode"] == "offline":
+            return {"error": "NEXUS is in offline mode: no internet access (Settings > Performance)"}
         return fn(**kwargs)
     return wrapper
 

@@ -140,6 +140,12 @@ check("piada: explica em vez de repetir", explained.strip() != joke.strip()
 tool_calls.clear()
 ask("Salve essa conversa para relatar erros: a IA errou o simulado.")
 check("relatar erro: chama report_issue", "report_issue" in tool_calls, str(tool_calls))
+# 8) v0.12: "vamos estudar JS" is a lesson, not data to store (it logged a "estudos" collection in v0.11)
+memory.new_conversation()
+tool_calls.clear()
+lesson = ask("vamos estudar JS")
+check("estudar JS: não registra dados", "record_data" not in tool_calls, str(tool_calls))
+check("estudar JS: ensina algo de JavaScript", bool(re.search(r"(javascript|vari[aá]ve|fun[cç][aã]o|let|const)", lesson.lower())), lesson)
 settings["language"] = "auto"
 
 passed = sum(ok for _, ok in results)

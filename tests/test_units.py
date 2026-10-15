@@ -302,6 +302,55 @@ check("workspace: leaving restores normal tools", "record_data" in {x["function"
 workspace.delete(ws["id"])
 check("workspace: delete moves the folder to .trash", any((workspace.ROOT / ".trash").iterdir()))
 
+# -- v0.12: a real answer written before a tool call is kept (not wiped from the screen) -------------------------
+from nexus import llm as _llm  # noqa: E402
+
+LESSON = "JavaScript é a linguagem da web. Vamos começar por variáveis: let, const e var, e depois funções. " * 2
+script = iter([[("token", LESSON), ("tool_calls", [{"id": "c1", "name": "get_datetime", "arguments": "{}"}])],
+               [("token", "Quer começar por variáveis?"), ("done", None)]])
+real_stream = _llm.stream_chat
+_llm.stream_chat = lambda *a, **k: iter(next(script))
+seen = []
+brain = assistant.Assistant(lambda e, p: seen.append((e, p)))
+memory.new_conversation()
+brain.ask("vamos estudar JS")
+_llm.stream_chat = real_stream
+final = memory.history(1)[-1]["content"]
+check("long answer before a tool call stays in the saved reply", LESSON.strip() in final and final.endswith("variáveis?"), final)
+check("...and is not wiped from the screen (no reset)", not any(e == "reset" for e, _ in seen), str([e for e, _ in seen]))
+script = iter([[("token", "Vou verificar."), ("tool_calls", [{"id": "c2", "name": "get_datetime", "arguments": "{}"}])],
+               [("token", "São 10h."), ("done", None)]])
+_llm.stream_chat = lambda *a, **k: iter(next(script))
+seen.clear(); brain.ask("que horas são?")
+_llm.stream_chat = real_stream
+check("short narration before a tool call is still removed",
+      any(e == "reset" for e, _ in seen) and memory.history(1)[-1]["content"] == "São 10h.", memory.history(1)[-1]["content"])
+
+# -- v0.12: connection modes, performance profiles, hardware fit ------------------------------------------------
+from nexus import hardware, performance  # noqa: E402
+
+cfg["network_mode"] = "offline"
+check("offline: online tools refuse without touching the network", "offline" in str(tools.execute("get_weather", {})))
+cfg["llm_base_url"], saved_url = "https://api.openai.com/v1", cfg["llm_base_url"]
+check("offline: a cloud AI server is never contacted", _llm.status().get("offline_mode") is True)
+try:
+    list(_llm.stream_chat([{"role": "user", "content": "oi"}]))
+    blocked = False
+except _llm.LLMOffline:
+    blocked = True
+check("offline: chat with a cloud provider is blocked", blocked)
+cfg["llm_base_url"] = saved_url
+check("offline: local AI (Ollama) is still allowed", not _llm.offline_blocked())
+cfg["network_mode"] = "hybrid"
+check("live-data nudge only outside offline mode",
+      assistant._needs_tool("", False, "vai chover hoje?", set()) is not None)
+check("VRAM fit uses the measured table (8 GB -> 8192, 12 GB -> 32768, 6 GB -> none)",
+      (hardware.max_context(8), hardware.max_context(12), hardware.max_context(6)) == (8192, 32768, 0))
+check("profiles: economy is lighter than balanced",
+      performance.settings_for("economy")["llm_context"] < performance.settings_for("balanced")["llm_context"])
+check("profiles: full power never picks a context that spills off the GPU",
+      performance.settings_for("max")["llm_context"] <= max(hardware.max_context(), 8192))
+
 # migration of pre-v0.9 messages: a 2 h gap splits them into two conversations
 import sqlite3  # noqa: E402
 import tempfile  # noqa: E402

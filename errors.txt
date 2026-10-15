@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 2.2  ·  Date: 2026-10-14  ·  App version: 0.11.0
+ Document version: 2.3  ·  Date: 2026-10-14  ·  App version: 0.12.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -76,6 +76,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-024  Quiz/mock exam: answers stored, graded wrong or never graded
       NX-LLM-025  "I didn't understand" without an explanation (e.g. joke repeated)
       NX-LLM-026  Cloud provider: "no connection", key rejected or model doesn't use tools
+      NX-LLM-027  Stored "data" the user didn't ask for (e.g. "let's study JS")
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -114,6 +115,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-UI-008   Text not selectable / no copy / conversation hidden in audio mode
       NX-UI-009   Interrupt/Repeat buttons clickable with nothing to do
       NX-UI-010   Windows notification doesn't appear
+      NX-UI-011   Answer disappears from the screen while the voice keeps talking
  WRK  NX-WRK-001  The AI says it created/changed a file, but nothing changed
       NX-WRK-002  "Outside the workspace": path refused
       NX-WRK-003  Command doesn't run, takes long or waits for confirmation
@@ -132,6 +134,8 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-ENV-006  Port 11434 busy or two Ollama instances running
       NX-ENV-007  Test data showed up in the user's real data
       NX-ENV-008  Each AI call took ~2 s longer ("localhost" on Windows)
+      NX-ENV-009  Slow AI: part of the model off the graphics card / "Full power" unavailable
+      NX-ENV-010  No dedicated graphics card: very slow answers
 
 
 ================================================================================
@@ -512,6 +516,17 @@ QUICK DIAGNOSTICS (run these before investigating)
                the computer (yellow warning on screen). The key is stored as
                text in settings.json in the data folder.
 
+[NX-LLM-027] Stored "data" the user didn't ask for (e.g. "let's study JS")
+  Severity   : MEDIUM           Status: FIXED (v0.12)      Observed: YES
+  Symptom    : On 2026-10-14, "vamos estudar JS" (let's study JS) became "I
+               saved your study strategies in the 'estudos' collection".
+  Cause      : The model treated a study request as something to store.
+  Fix        : Explicit rule: only store what the user asked to store;
+               lessons, explanations, plans, questions and quiz answers are
+               conversation, not data. Also: when the user says their name,
+               the AI updates the profile. Verified in
+               tests\conversation_eval.py ("vamos estudar JS").
+
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS
 ================================================================================
@@ -829,6 +844,9 @@ QUICK DIAGNOSTICS (run these before investigating)
                offline, the app falls back to system fonts.
   Solution   : Download the .woff2 files (OFL license), place them in
                nexus/web/fonts and declare them with @font-face in style.css.
+  Update     : (v0.12) In Offline mode the Google fonts aren't even requested
+               (no internet access at all); NEXUS uses Windows' Bahnschrift /
+               Segoe UI / Consolas.
 
 [NX-UI-002] Window doesn't open: WebView2 missing
   Severity   : CRITICAL         Status: KNOWN              Observed: EXPECTED
@@ -925,6 +943,20 @@ QUICK DIAGNOSTICS (run these before investigating)
   Solution   : Windows Settings > System > Notifications: turn off Do Not
                Disturb and allow "Windows PowerShell". The alert still happens
                inside NEXUS (sound, voice and bell) without the Windows one.
+
+[NX-UI-011] Answer disappears from the screen while the voice keeps talking
+  Severity   : HIGH             Status: FIXED (v0.12)      Observed: YES
+  Symptom    : In audio mode with the transcript, the JavaScript answer
+               appeared, was spoken, then the text was suddenly replaced by a
+               short sentence ("I saved..."); the voice kept reading the
+               lesson, but it could no longer be read.
+  Cause      : All text written before a tool call was treated as
+               "narration" ("let me check...") and wiped from the screen; the
+               already queued audio kept playing.
+  Fix        : Only short sentences (< 120 characters) before a tool are
+               removed. A real answer stays on screen, is saved in the history
+               and the part after the tool is appended. Tested in
+               tests\test_units.py.
 
 ================================================================================
  WRK — WORKSPACE
@@ -1109,6 +1141,29 @@ QUICK DIAGNOSTICS (run these before investigating)
                replaces "localhost" automatically (old settings included).
   Tips       : Always use 127.0.0.1 for local servers (LM Studio:
                http://127.0.0.1:1234/v1).
+
+[NX-ENV-009] Slow AI: part of the model off the graphics card / "Full power" unavailable
+  Severity   : MEDIUM           Status: KNOWN              Observed: YES
+  Measured   : tests\bench_hardware.py, RX 6600 XT 8 GB, qwen3:8b: context
+               8192 -> 5.75 GB, 100% on the card, writes 35 tok/s; 12288 ->
+               92% on the card, 31 tok/s; 16384 -> 85%, 25 tok/s and reading
+               2x slower. Only ~6.2 GB of the 8 GB are free.
+  Cause      : If model + context don't fit in the card's memory, Ollama puts
+               layers on the processor and everything slows down.
+  Solution   : Settings > Performance: "Balanced" uses 8192 (fits 8 GB
+               cards). "Full power" only appears if the whole model fits with
+               at least 8192 (cards of ~8 GB or more) and with 16 GB of RAM;
+               on 12 GB+ cards it uses larger contexts. Close games/video
+               editors to free the card's memory.
+
+[NX-ENV-010] No dedicated graphics card: very slow answers
+  Severity   : HIGH             Status: KNOWN              Observed: YES
+  Measured   : Processor only (Ryzen 5 5600G): writes 7.5 tok/s and reads
+               47 tok/s, ~5x slower than on the card (40 tok/s). A typical
+               answer takes ~15-60 s.
+  Solution   : Use the "Economy" profile (context 4096, lighter voice). See
+               the requirements in the README: minimum 16 GB of RAM and an
+               8-thread processor; recommended a graphics card with 8 GB.
 
 ================================================================================
  TEST HISTORY (2026-10-13)
