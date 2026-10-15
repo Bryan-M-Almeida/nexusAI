@@ -146,6 +146,35 @@ tool_calls.clear()
 lesson = ask("vamos estudar JS")
 check("estudar JS: não registra dados", "record_data" not in tool_calls, str(tool_calls))
 check("estudar JS: ensina algo de JavaScript", bool(re.search(r"(javascript|vari[aá]ve|fun[cç][aã]o|let|const)", lesson.lower())), lesson)
+# 9) v0.15: music in the browser, attached files, library podcast (the browser is NOT really opened)
+import tempfile  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from samples import make_epub, make_pdf  # noqa: E402
+
+from nexus import browser, files, library  # noqa: E402
+
+opened = []
+browser.OPEN = lambda url, new=0: opened.append(url)
+tool_calls.clear()
+ask("Toca Bohemian Rhapsody do Queen no YouTube")
+check("música: usa play_music e abre um vídeo do YouTube", "play_music" in tool_calls
+      and any("youtube.com/watch" in u or "youtube.com/results" in u for u in opened), f"{tool_calls} {opened}")
+tmp = Path(tempfile.mkdtemp())
+pdf = make_pdf(tmp / "orcamento.pdf", ["Orcamento 2026", "Aluguel: 1800 reais", "Mercado: 950 reais", "Total: 2750 reais"])
+att = [{"name": "orcamento.pdf", "text": files.read(pdf)["text"]}]
+t0 = time.time()
+brain.ask("Quanto é o aluguel no arquivo que te mandei?", False, att)
+reply = memory.history(1)[-1]["content"]
+print(f"\n> (anexo) Quanto é o aluguel?\n  ({time.time() - t0:.1f}s) {reply[:200]}")
+check("anexo: responde com o valor do PDF", "1800" in reply.replace(".", ""), reply)
+book = library.add(make_epub(tmp / "Dom Robo.epub", [("Capítulo 1", "Era uma vez um robô que lia livros. " * 30)]))
+started = []
+library.player = lambda bid, pos: started.append((bid, pos))
+tool_calls.clear()
+ask("Lê o livro Dom Robo para mim")
+check("biblioteca: 'lê o livro' inicia o podcast", "read_book" in tool_calls and started and started[0][0] == book["id"],
+      f"{tool_calls} {started}")
 settings["language"] = "auto"
 
 passed = sum(ok for _, ok in results)

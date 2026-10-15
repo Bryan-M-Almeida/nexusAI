@@ -10,7 +10,8 @@ from datetime import datetime, timedelta
 import webview
 
 from . import (MODEL_NAME, __version__, assistant, bridge, control, i18n, knowledge, llm, memory, notify, profile,
-               performance, scheduler, skills, tools, workspace)
+               library, netprobe, performance, scheduler, skills, tools, workspace)
+from . import files as filereader
 from .logs import log, setup as setup_logs
 from .config import WEB_DIR, settings
 from .db import db
@@ -46,10 +47,14 @@ class Api:
         self._listener = Listener(self._on_voice_text, lambda s: emit("voice", s), self._speaker,
                                   on_level=lambda level: emit("mic_level", level))
         scheduler.start(self._on_alert)
+        netprobe.start(lambda st: emit("network", {"effective": netprobe.effective(), "quality": st}))
         bridge.start(settings["bridge_port"], self._on_profile)
         self._tts_buf, self._tts_streamed, self._reply_lang = "", False, None
         self.ai_state = "cold"  # cold | warming | ready | offline
         self._hidden_since = None  # v0.14: when the window was minimized (None = visible)
+        self._podcast = None  # v0.15: {"id", "pos", "title"} while a book is being read aloud
+        self._attachments: list[dict] = []  # v0.15: files attached to the next message
+        library.player = self.podcast_start
         threading.Thread(target=self._background_watch, daemon=True, name="background").start()
 
     def _confirm_command(self, command: str) -> bool:
@@ -213,6 +218,7 @@ class Api:
                 "temporary": memory.temporary, "can_repeat": bool(assistant.last_reply()),
                 "conversation": memory.current_conversation(), "focus": self.focus(),
                 "workspace": workspace.active, "network": settings["network_mode"],
+                "network_effective": netprobe.effective(), "net_quality": netprobe.state,
                 "performance": settings["performance"], "ai_target": settings["ai_target"]}
 
     def interrupt(self):
@@ -270,7 +276,8 @@ class Api:
             self._handle_control(action, text)
             return {"control": action}
         self._reply_lang = detect(text) or lang()
-        threading.Thread(target=self._brain.ask, args=(text, spoken), daemon=True).start()
+        attachments, self._attachments = self._attachments, []
+        threading.Thread(target=self._brain.ask, args=(text, spoken, attachments), daemon=True).start()
         return {"control": None}
 
     def history(self):
@@ -278,6 +285,121 @@ class Api:
 
     def clear_history(self):
         memory.clear_history()
+
+    # -- library and podcast (v0.15) ---------------------------------------------------------------------------
+    def books(self):
+        return library.listing()
+
+    def add_books(self, paths=None):
+        """Settings-free import: file dialog (or paths dropped on the window)."""
+        if not paths:
+            paths = _window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True,
+                                               file_types=("Books (*.pdf;*.epub;*.docx;*.txt;*.md)",)) or []
+        results = []
+        for path in paths:
+            try:
+                results.append({"ok": True, **library.add(path)})
+            except filereader.FileError as exc:
+                results.append({"ok": False, "file": str(path), "error": str(exc)})
+        return {"results": results, "books": library.listing()}
+
+    def delete_book(self, bid):
+        if self._podcast and self._podcast["id"] == int(bid):
+            self.podcast_stop()
+        library.delete(int(bid))
+        return library.listing()
+
+    def book_page(self, bid, position=None):
+        book = library.get(int(bid))
+        if not book:
+            return {"error": "not found"}
+        return {**library.page(book["id"], book["position"] if position is None else int(position)), "book": book}
+
+    def podcast_start(self, bid, position=None):
+        """Read a book aloud from a position, part by part; each finished part saves the position."""
+        book = library.get(int(bid))
+        if not book:
+            return {"error": "not found"}
+        self._speaker.stop()
+        pos = book["position"] if position is None else int(position)
+        self._podcast = {"id": book["id"], "pos": pos, "title": book["title"], "lang": book["language"] or None}
+        self._podcast_next()
+        return self.podcast_state()
+
+    def _podcast_next(self):
+        pod = self._podcast
+        if not pod:
+            return
+        part, end = library.next_part(pod["id"], pod["pos"])
+        if not part:
+            emit("podcast", {**self.podcast_state(), "finished": True})
+            self._podcast = None
+            return
+
+        def done():
+            if self._podcast is pod:
+                pod["pos"] = end
+                library.set_position(pod["id"], end)
+                emit("podcast", self.podcast_state())
+                self._podcast_next()
+
+        self._speaker.say(part, force=True, remember=False, lang_code=pod["lang"], on_done=done)
+        emit("podcast", {**self.podcast_state(), "reading": part[:200]})
+
+    def podcast_state(self):
+        pod = self._podcast
+        if not pod:
+            return {"active": False}
+        book = library.get(pod["id"]) or {"chars": 1}
+        return {"active": True, "id": pod["id"], "title": pod["title"], "position": pod["pos"],
+                "progress": round(pod["pos"] / max(book["chars"], 1), 4), "paused": self._speaker.paused.is_set()}
+
+    def podcast_stop(self):
+        self._podcast = None
+        self._speaker.stop()
+        emit("podcast", {"active": False})
+        return {"active": False}
+
+    def podcast_toggle(self):
+        if self._speaker.paused.is_set():
+            self._speaker.resume()
+        else:
+            self._speaker.pause()
+        return self.podcast_state()
+
+    # -- attachments (v0.15) -----------------------------------------------------------------------------------------
+    def attach_files(self, paths=None):
+        if not paths:
+            paths = _window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True) or []
+        out = []
+        for path in paths:
+            try:
+                data = filereader.read(path)
+                item = {"name": data["name"], "kind": data["kind"], "text": data["text"], "chars": len(data["text"])}
+                self._attachments.append(item)
+                out.append({"ok": True, "name": item["name"], "kind": item["kind"], "chars": item["chars"]})
+            except filereader.FileError as exc:
+                out.append({"ok": False, "name": pathlib_name(path), "error": str(exc)})
+        return {"results": out, "pending": [{"name": a["name"], "kind": a["kind"]} for a in self._attachments]}
+
+    def attach_blob(self, name, b64):
+        """Drag & drop without a file path (the WebView gives only the bytes): saved to a temp file and read."""
+        import base64
+
+        from .config import DATA_DIR
+
+        tmp = DATA_DIR / "tmp"
+        tmp.mkdir(exist_ok=True)
+        path = pathlib_safe(tmp, name)
+        path.write_bytes(base64.b64decode(b64.split(",", 1)[-1]))
+        try:
+            return self.attach_files([str(path)])
+        finally:
+            path.unlink(missing_ok=True)
+
+    def clear_attachments(self):
+        self._attachments = []
+        return {"pending": []}
 
     # -- background / suspended (v0.14) ----------------------------------------------------------------------------
     def set_background(self, state):
@@ -320,7 +442,7 @@ class Api:
         old_stt = settings["stt_model"]
         settings.apply(performance.settings_for(profile if profile in performance.PROFILES else "balanced"))
         if settings["stt_model"] != old_stt:
-            self._listener.reload_model() if settings["network_mode"] != "offline" else None
+            self._listener.reload_model() if netprobe.effective() != "offline" else None
         return {**self.get_settings(), "state": self.state(), "perf": performance.check()}
 
     # -- focus mode and workspace (v0.11) -------------------------------------------------------------------------
@@ -654,6 +776,18 @@ class Api:
         if new_mic:
             self._listener.reopen()
         return self.get_settings()
+
+
+def pathlib_name(path) -> str:
+    from pathlib import Path
+
+    return Path(str(path)).name
+
+
+def pathlib_safe(folder, name: str):
+    import re as _re
+
+    return folder / (_re.sub(r"[^\w.\- ]+", "_", str(name))[:120] or "file")
 
 
 def selftest() -> dict:

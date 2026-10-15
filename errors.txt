@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 2.5  ·  Date: 2026-10-14  ·  App version: 0.14.0
+ Document version: 2.6  ·  Date: 2026-10-15  ·  App version: 0.15.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -107,6 +107,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-DAT-010  Answer uses a topic from another conversation
       NX-DAT-011  Reminder not spoken / not shown / came only once
       NX-DAT-012  Restore backup: nothing changed / data "vanished" after restoring
+      NX-DAT-013  File or book doesn't open / "no text found"
  UI   NX-UI-001   Fonts differ from the landing page (offline)
       NX-UI-002   Window doesn't open: WebView2 missing
       NX-UI-003   Window opens blank or stuck at boot
@@ -118,6 +119,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-UI-009   Interrupt/Repeat buttons clickable with nothing to do
       NX-UI-010   Windows notification doesn't appear
       NX-UI-011   Answer disappears from the screen while the voice keeps talking
+      NX-UI-012   Song or link didn't open in the browser / wrong video opened
  WRK  NX-WRK-001  The AI says it created/changed a file, but nothing changed
       NX-WRK-002  "Outside the workspace": path refused
       NX-WRK-003  Command doesn't run, takes long or waits for confirmation
@@ -140,6 +142,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-ENV-010  No dedicated graphics card: very slow answers
       NX-ENV-011  "NEXUS is already open" when starting the program
       NX-ENV-012  The API key is gone (another PC or Windows user)
+      NX-ENV-013  Automatic mode picked the wrong mode (unstable internet)
 
 
 ================================================================================
@@ -856,6 +859,16 @@ QUICK DIAGNOSTICS (run these before investigating)
                in backups/before-restore-<date> (copy nexus.db back to the data
                folder, with NEXUS closed, to undo).
 
+[NX-DAT-013] File or book doesn't open / "no text found"
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : (1) Scanned PDF (images only): it has no text; turn the pages
+               into images and attach them (Windows OCR reads images).
+               (2) Formats not supported yet: RAR, old .doc, .xlsx.
+               (3) Password-protected PDF. (4) Image text in a language
+               without the Windows OCR pack (Settings > Time & language).
+  Solution   : Save as a text PDF, DOCX or TXT. Big files are reduced to the
+               passages that match the question.
+
 ================================================================================
  UI — DESKTOP INTERFACE
 ================================================================================
@@ -979,6 +992,15 @@ QUICK DIAGNOSTICS (run these before investigating)
                removed. A real answer stays on screen, is saved in the history
                and the part after the tool is appended. Tested in
                tests\test_units.py.
+
+[NX-UI-012] Song or link didn't open in the browser / wrong video opened
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : (1) Offline mode (nothing is opened). (2) No default browser set
+               in Windows. (3) "Play X" opens the first YouTube search result;
+               ambiguous names may bring another video. (4) If YouTube changes
+               its page, the results list opens instead.
+  Solution   : Say artist + song; for Spotify/YouTube Music name the service
+               ("play X on Spotify").
 
 ================================================================================
  WRK — WORKSPACE
@@ -1201,6 +1223,15 @@ QUICK DIAGNOSTICS (run these before investigating)
                same user on the same PC can read it. When the data folder is
                copied or a backup is restored on another PC, it can't be read.
   Solution   : Settings > Intelligence: paste the key again and save.
+
+[NX-ENV-013] Automatic mode picked the wrong mode (unstable internet)
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : Automatic mode measures the internet every 5 minutes (and again
+               when a lookup fails); short drops between measurements aren't
+               seen right away.
+  Solution   : Hover the chip on the top bar to see the last measurement
+               (latency and speed). To fix the behaviour, choose Offline,
+               Hybrid or Online in Settings > Performance.
 
 ================================================================================
  TEST HISTORY (2026-10-13)

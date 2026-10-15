@@ -446,6 +446,76 @@ check("AI switch: the API configuration (and key) is remembered",
 _llm.switch_target("local")
 cfg["network_mode"] = "hybrid"
 
+# -- v0.15: files, library + podcast, browser, automatic network mode ---------------------------------------------
+import tempfile as _tf  # noqa: E402
+from pathlib import Path as _P  # noqa: E402
+
+from samples import make_docx, make_epub, make_pdf  # noqa: E402
+
+from nexus import browser, files, library, netprobe  # noqa: E402
+
+tmpd = _P(_tf.mkdtemp())
+pdf = make_pdf(tmpd / "relatorio.pdf", ["Receita total: 42 mil", "Despesas: 30 mil"])
+check("files: PDF text", "Receita total" in files.read(pdf)["text"] and files.read(pdf)["pages"] == 1)
+check("files: DOCX text", files.read(make_docx(tmpd / "a.docx", ["Primeiro", "Segundo"]))["text"] == "Primeiro\n\nSegundo")
+epub = make_epub(tmpd / "livro.epub", [("Capítulo 1", "Era uma vez um robô. " * 80), ("Capítulo 2", "Ele aprendeu a ler. " * 80)])
+check("files: EPUB chapters in order", files.read(epub)["text"].index("Capítulo 1") < files.read(epub)["text"].index("Capítulo 2"))
+(tmpd / "x.bin").write_bytes(b"\x00\x01\x02" * 100)
+try:
+    files.read(tmpd / "x.bin"); unsupported = False
+except files.FileError:
+    unsupported = True
+check("files: binary files are refused with a clear error", unsupported)
+
+book = library.add(epub)
+check("library: book added with its text and language", book["chars"] > 1000 and book["title"] == "livro")
+pg = library.page(book["id"], 0)
+check("library: a page ends at a sentence/paragraph", pg["end"] <= library.PAGE_CHARS and pg["text"].rstrip().endswith((".", "1", "2")))
+part, end = library.next_part(book["id"], 0)
+check("library: podcast parts are short and end on a sentence", len(part) <= library.PODCAST_CHARS and part.endswith("."))
+check("library: find by part of the title", library.find("livr")["id"] == book["id"])
+
+from nexus import app as _app  # noqa: E402
+
+
+class FakeSpeaker:
+    def __init__(self):
+        self.said, self.paused = [], __import__("threading").Event()
+
+    def say(self, text, force=False, remember=True, lang_code=None, on_done=None):
+        self.said.append(text)
+        if on_done and len(self.said) < 3:
+            on_done()  # pretend the part was spoken to the end
+
+    def stop(self):
+        pass
+
+
+api = _app.Api.__new__(_app.Api)
+api._speaker, api._podcast = FakeSpeaker(), None
+api.podcast_start(book["id"], 0)
+check("podcast: reads part after part and saves the position",
+      len(api._speaker.said) == 3 and library.get(book["id"])["position"] > 0)
+api.podcast_stop()
+check("podcast: stop clears the player", api.podcast_state() == {"active": False})
+
+opened = []
+browser.OPEN = lambda url, new=0: opened.append(url)
+cfg["network_mode"] = "hybrid"
+check("browser: bare domains get https://", browser.open_url("python.org")["opened"] == "https://python.org")
+cfg["network_mode"] = "offline"
+check("browser: nothing opens in offline mode", "error" in browser.open_url("https://python.org") and len(opened) == 1)
+cfg["network_mode"] = "auto"
+for q, exp in (("offline", "offline"), ("slow", "hybrid"), ("fast", "online"), (None, "hybrid")):
+    netprobe.state["quality"] = q
+    check(f"auto network: {q} connection -> {exp}", netprobe.effective() == exp)
+netprobe.state["quality"] = None
+cfg["network_mode"] = "hybrid"
+big = "Introdução. " * 300 + " O capítulo sobre fotossíntese explica a clorofila. " + "texto irrelevante " * 3000
+ctx = assistant.attachment_context("o que diz sobre fotossíntese?", [{"name": "livro.pdf", "text": big}])
+check("attachments: big files send the start plus the passages that match the question",
+      "fotossíntese" in ctx and len(ctx) <= assistant.ATTACH_CHARS + 400)
+
 # migration of pre-v0.9 messages: a 2 h gap splits them into two conversations
 import sqlite3  # noqa: E402
 import tempfile  # noqa: E402

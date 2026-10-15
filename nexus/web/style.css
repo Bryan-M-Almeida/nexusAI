@@ -573,3 +573,89 @@ button, .dock, .rail, .topbar, .core-label { user-select: none; }
 .toast b { display: block; font-family: var(--f-mono); font-size: 10px; color: var(--red); letter-spacing: .16em; margin-bottom: 2px; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; } }
+
+/* ================================================================ v0.15 design
+   Softer and calmer: the same blue/red identity, a little less saturated (blue #4c9be8, red -> coral #e4574c),
+   gentle rounded corners, soft shadows, slower easing and a more readable body font. Declared last so it
+   refines everything above without touching each rule. */
+:root {
+  --bg: #04070c; --bg-2: #0a0f17;
+  --panel: rgba(15, 22, 33, .74);
+  --line: rgba(122, 170, 230, .13); --line-strong: rgba(122, 170, 230, .3);
+  --blue: #4c9be8; --blue-bright: #82bdf6; --blue-deep: #16324f;
+  --red: #e4574c; --red-soft: rgba(228, 87, 76, .45);
+  --text: #e9eef5; --silver: #c6d0dc; --muted: #8a96a7;
+  --f-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --radius: 10px; --radius-sm: 6px;
+  --shadow: 0 12px 34px rgba(0, 0, 0, .38);
+  --ease-out: cubic-bezier(.22, .8, .26, 1);
+}
+body { font-size: 15.5px; letter-spacing: .005em; }
+
+/* Shapes */
+.panel, .msg, .composer, .card-opt, .conv-card, .notif-item, .book-card, .att-chip, .hw-box, .ai-status,
+.inline-form input, .search, .teach-form input, .teach-form textarea, .modal-box input, .modal-box textarea,
+.modal-box select, .ws-new input, .quick-form input, .cmd, .file-view, .records { border-radius: var(--radius-sm); }
+.modal-box, .conv-box, .drawer-box, .rail, .dock, .ws-panel, .ws-bar, .toast, .podcast-bar, .temp-badge,
+.chatview, .reader-box { border-radius: var(--radius); }
+.btn-primary, .btn-ghost, .btn-send, .btn-mini, .icon-btn, .dock-btn, .rail-btn, .chip, .chip-opt, .tag, .seg,
+.lv-badge, .tool-chip, .clip-btn, .lang-switch { border-radius: var(--radius-sm); }
+.lang-switch button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.lang-switch button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.modal-box, .conv-box, .drawer-box, .rail, .dock, .toast, .podcast-bar { box-shadow: var(--shadow); }
+/* the red corner marks stay, but quieter */
+.panel::before, .dock::before, .rail::before, .modal-box::before, .conv-box::before, .drawer-box::before { opacity: .55; }
+
+/* Motion: a little slower and smoother */
+button, .card-opt, .conv-card, .rail-btn, .dock-btn, .msg-copy { transition: color .18s ease, background .18s ease,
+  border-color .18s ease, transform .18s var(--ease-out), opacity .18s ease; }
+.btn-primary:hover, .btn-ghost:hover { transform: translateY(-1px); }
+.btn-primary { background: linear-gradient(180deg, rgba(76, 155, 232, .42), rgba(22, 50, 79, .6)); border-color: rgba(76, 155, 232, .7); }
+.edge-bar { transition: transform .45s var(--ease-out), opacity .45s ease; }
+
+/* Messages: calmer bubbles */
+.msg { background: rgba(15, 22, 33, .82); border-color: rgba(122, 170, 230, .1); line-height: 1.55; }
+.msg.user { background: rgba(228, 87, 76, .08); border-color: rgba(228, 87, 76, .24); }
+.msg.nexus { border-left: 2px solid rgba(76, 155, 232, .75); }
+.composer { padding: 5px; background: rgba(15, 22, 33, .9); }
+.composer input { font-size: 15.5px; }
+
+/* Selection: only what is worth copying - messages, the book reader, file contents, commands and inputs.
+   NEXUS itself (ring, wordmark, bars, cards) can't be selected, so dragging the ring never highlights text. */
+body, .list .body, .caption, .records, .profile-card, .modal-box p, .conv-card .t, .conv-card .d, .notif-item,
+.notif-item span, .ws-files, .ws-changes, .hint { -webkit-user-select: none; user-select: none; }
+.msg .txt, .reader-text, .file-view, .cmd, .tl-msg span, input, textarea { -webkit-user-select: text; user-select: text; cursor: auto; }
+svg, img { -webkit-user-drag: none; }
+.msg .txt, .reader-text, .file-view { cursor: text; }
+
+/* ---------------------------------------------------------------- v0.15 attachments, library, podcast */
+.clip-btn { display: grid; place-items: center; width: 38px; background: none; border: 1px solid transparent; color: var(--muted); }
+.clip-btn:hover { color: var(--text); border-color: var(--line-strong); }
+.attach-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.att-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 13px; border: 1px solid var(--line-strong);
+  background: rgba(76, 155, 232, .1); color: var(--silver); }
+.book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-content: start; }
+.book-card { display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--panel); border: 1px solid var(--line); }
+.book-card:hover { border-color: var(--line-strong); }
+.book-spine { display: flex; justify-content: space-between; align-items: center; color: var(--blue-bright); font-size: 10px; letter-spacing: .14em; }
+.book-card .t { font-size: 15px; font-weight: 600; line-height: 1.3; min-height: 2.6em; }
+.book-progress, .pod-progress, .reader-progress { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.book-progress em, .pod-progress em, .reader-progress em { display: block; height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--blue), var(--blue-bright)); transition: width .4s var(--ease-out); }
+.book-card .m { font-size: 10.5px; color: var(--muted); }
+.book-acts { display: flex; gap: 6px; align-items: center; }
+.book-acts .btn-ghost, .book-acts .btn-primary { padding: 5px 12px; }
+.book-acts .link-btn { margin-left: auto; }
+.modal-box.reader-box { width: min(780px, 100%); display: flex; flex-direction: column; gap: 12px; max-height: 90vh; }
+.reader-text { flex: 1; min-height: 0; overflow-y: auto; white-space: pre-wrap; font-size: 17px; line-height: 1.75;
+  color: var(--text); padding: 4px 14px 4px 2px; max-height: 64vh; font-family: Georgia, "Times New Roman", serif; }
+.reader-bar { display: flex; align-items: center; gap: 10px; }
+.reader-bar .reader-progress { flex: 1; }
+.podcast-bar { position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%); z-index: 7; display: flex; align-items: center;
+  gap: 12px; padding: 8px 10px 8px 14px; min-width: min(420px, 90vw); background: rgba(10, 15, 23, .94);
+  border: 1px solid var(--line-strong); color: var(--blue-bright); backdrop-filter: blur(10px); }
+.pod-info { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.pod-info b { color: var(--text); font-weight: 600; font-size: 14px; }
+.drop-zone { position: fixed; inset: 14px; z-index: 40; display: grid; place-items: center; border: 2px dashed rgba(130, 189, 246, .6);
+  border-radius: 16px; background: rgba(4, 7, 12, .72); color: var(--blue-bright); font-size: 13px; letter-spacing: .12em;
+  pointer-events: none; }

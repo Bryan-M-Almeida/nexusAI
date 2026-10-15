@@ -215,6 +215,44 @@ def report_issue(description=""):
     return {"ok": True, "file": str(path)}
 
 
+# ---------------------------------------------------------------- library and browser (v0.15)
+def list_books():
+    from . import library
+
+    return {"books": [{"title": b["title"], "progress": f"{round(b['progress'] * 100)}%"} for b in library.listing()]}
+
+
+def read_book(title, from_start=False):
+    """Start reading a library book aloud (podcast mode) from where the user stopped."""
+    from . import library
+
+    book = library.find(title)
+    if not book:
+        return {"error": f"no book matching '{title}' in the library", "books": list_books()["books"]}
+    if library.player is None:
+        return {"error": "the voice is not available"}
+    library.player(book["id"], 0 if from_start else book["position"])
+    return {"ok": True, "reading": book["title"], "from": "start" if from_start else f"{round(book['position'] / max(book['chars'], 1) * 100)}%"}
+
+
+def open_url(url):
+    from . import browser
+
+    return browser.open_url(url)
+
+
+def web_search(query):
+    from . import browser
+
+    return browser.web_search(query)
+
+
+def play_music(query, service="youtube"):
+    from . import browser
+
+    return browser.music_search(query, service)
+
+
 # ---------------------------------------------------------------- online integrations (v0.6)
 # v0.14: online answers are reused for a while (weather and news change slowly; rates once a day), so asking
 # twice doesn't wait for the network again. Errors are never cached.
@@ -227,7 +265,9 @@ def _online(fn):
     def wrapper(**kwargs):
         if not settings["integrations"]:
             return {"error": "online integrations are disabled in Settings"}
-        if settings["network_mode"] == "offline":
+        from . import netprobe
+
+        if netprobe.effective() == "offline":
             return {"error": "NEXUS is in offline mode: no internet access (Settings > Performance)"}
         ttl = ONLINE_TTL.get(fn.__name__)
         key = (fn.__name__, json.dumps(kwargs, sort_keys=True, default=str), settings["home_city"], settings["language"])
@@ -235,6 +275,8 @@ def _online(fn):
         if ttl and hit and time.time() - hit[0] < ttl:
             return hit[1]
         result = fn(**kwargs)
+        if isinstance(result, dict) and "error" in result:
+            netprobe.report_failure()  # auto mode: the connection may have changed - measure again soon
         if ttl and isinstance(result, dict) and "error" not in result:
             _online_cache[key] = (time.time(), result)
         return result
@@ -313,6 +355,15 @@ SCHEMAS = [
         "Save this whole conversation to a report file when the user wants to report an error/bug/problem of "
         "NEXUS to the developers (e.g. 'salve essa conversa para relatar erros', 'report this bug').",
         {"description": {"type": "string", "description": "what went wrong, in the user's words"}}),
+    _fn("list_books", "List the books in the user's library with their reading progress."),
+    _fn("read_book", "Read a library book aloud (podcast mode), continuing where the user stopped.",
+        {"title": S, "from_start": {"type": "boolean"}}, ["title"]),
+    _fn("open_url", "Open a web page in the user's default browser.", {"url": S}, ["url"]),
+    _fn("web_search", "Open a Google search in the user's browser (when they want to see results themselves).",
+        {"query": S}, ["query"]),
+    _fn("play_music", "Play a song/artist/video: opens the first YouTube result in the browser (or a Spotify / "
+        "YouTube Music search when the user names that service).",
+        {"query": S, "service": {"type": "string", "enum": ["youtube", "youtube music", "spotify"]}}, ["query"]),
     _fn("get_datetime", "Get the current local date and time."),
     _fn("get_weather", "Current weather and forecast (internet). City defaults to the user's city.",
         {"city": S, "days": {"type": "integer", "description": "1-7"}}),

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 2.5  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.14.0
+ Versión del documento: 2.6  ·  Fecha: 2026-10-15  ·  Versión de la app: 0.15.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -108,6 +108,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-DAT-010  La respuesta usa un tema de otra conversación
       NX-DAT-011  El recordatorio no se dijo / no apareció / llegó solo una vez
       NX-DAT-012  Restaurar copia: nada cambió / los datos "desaparecieron" tras restaurar
+      NX-DAT-013  El archivo o libro no se abre / "no se encontró texto"
  UI   NX-UI-001   Fuentes distintas de la landing (sin internet)
       NX-UI-002   La ventana no abre: falta WebView2
       NX-UI-003   La ventana se abre en blanco o se bloquea en el arranque
@@ -119,6 +120,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-UI-009   Botones Interrumpir/Repetir clicables sin nada que hacer
       NX-UI-010   La notificación de Windows no aparece
       NX-UI-011   La respuesta desaparece de la pantalla mientras la voz sigue hablando
+      NX-UI-012   La música o el enlace no se abrió en el navegador / se abrió otro vídeo
  WRK  NX-WRK-001  La IA dice que creó/cambió un archivo, pero nada cambió
       NX-WRK-002  "Fuera del área de trabajo": ruta rechazada
       NX-WRK-003  El comando no se ejecuta, tarda o espera confirmación
@@ -141,6 +143,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-ENV-010  Sin tarjeta gráfica dedicada: respuestas muy lentas
       NX-ENV-011  "NEXUS ya está abierto" al abrir el programa
       NX-ENV-012  La clave de API desapareció (otro PC u otro usuario de Windows)
+      NX-ENV-013  El modo automático eligió mal (internet inestable)
 
 
 ================================================================================
@@ -891,6 +894,16 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                backups/before-restore-<fecha> (copia nexus.db de vuelta a la
                carpeta de datos, con NEXUS cerrado, para deshacer).
 
+[NX-DAT-013] El archivo o libro no se abre / "no se encontró texto"
+  Gravedad   : MEDIA            Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : (1) PDF escaneado (solo imágenes): no tiene texto; convierte las
+               páginas en imágenes y adjúntalas (el OCR de Windows lee
+               imágenes). (2) Formatos aún no soportados: RAR, .doc antiguo,
+               .xlsx. (3) PDF con contraseña. (4) Texto de imagen en un idioma
+               sin el paquete OCR de Windows (Configuración > Hora e idioma).
+  Solución   : Guarda como PDF con texto, DOCX o TXT. Los archivos grandes se
+               reducen a los fragmentos que coinciden con la pregunta.
+
 ================================================================================
  UI — INTERFAZ DE ESCRITORIO
 ================================================================================
@@ -1016,6 +1029,15 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                herramienta. Una respuesta de verdad se queda en pantalla, se
                guarda en el historial y la parte posterior se añade. Probado
                en tests\test_units.py.
+
+[NX-UI-012] La música o el enlace no se abrió en el navegador / se abrió otro vídeo
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : (1) Modo sin conexión (no se abre nada). (2) Sin navegador
+               predeterminado en Windows. (3) "Pon X" abre el primer resultado
+               de YouTube; nombres ambiguos pueden traer otro vídeo. (4) Si
+               YouTube cambia su página, se abre la lista de resultados.
+  Solución   : Di artista + canción; para Spotify/YouTube Music di el nombre
+               del servicio ("pon X en Spotify").
 
 ================================================================================
  WRK — ÁREA DE TRABAJO
@@ -1246,6 +1268,16 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                mismo usuario en el mismo PC puede leerla. Al copiar la carpeta
                de datos o restaurar una copia en otro PC, no se puede leer.
   Solución   : Configuración > Inteligencia: pega la clave de nuevo y guarda.
+
+[NX-ENV-013] El modo automático eligió mal (internet inestable)
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : El modo Automático mide internet cada 5 minutos (y de nuevo
+               cuando falla una consulta); las caídas cortas entre mediciones
+               no se ven al momento.
+  Solución   : Pasa el ratón por el chip de la barra superior para ver la
+               última medición (latencia y velocidad). Para fijar el
+               comportamiento, elige Sin conexión, Híbrido o En línea en
+               Configuración > Rendimiento.
 
 ================================================================================
  HISTORIAL DE PRUEBAS (2026-10-13)

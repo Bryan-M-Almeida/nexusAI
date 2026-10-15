@@ -115,6 +115,13 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 
 Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia, `Ctrl+,` Configurações, `Ctrl+Shift+N` nova conversa, `Ctrl+H` conversas, `Ctrl+J` notificações, `Ctrl+T` transcrição.
 
+### Arquivos, Biblioteca e navegador (v0.15)
+
+- **Anexar** (clipe ao lado do campo de texto, ou arrastar para a janela): PDF, DOCX, EPUB, TXT/MD/código, ZIP e imagens (o texto da imagem é reconhecido pelo próprio Windows). Pergunte sobre o arquivo na mesma mensagem.
+- **Biblioteca** (borda direita): adicione livros, acompanhe o progresso, leia na tela ou diga **"lê o livro X"** para ouvir como podcast — pausa, continua e para por voz ou pelo mini-player; o NEXUS lembra onde parou.
+- **Navegador**: "toca *música* no YouTube" abre o primeiro vídeo; também abre links e pesquisas.
+- **Conexão automática** (padrão): mede a internet e alterna entre offline, híbrido e online sozinho.
+
 ### Leveza (v0.14)
 
 - Fora de foco ou minimizado, as animações param e só "Nexus…" vale como comando; minimizado com o microfone desligado, a voz sai da memória (−258 MB) e volta sozinha.
@@ -296,6 +303,10 @@ nexus/
   skills.py     níveis e ranks das habilidades (XP do que aconteceu, sem chamadas extras à IA)
   backup.py     backup diário, backup manual e restauração
   logs.py       arquivo de log (logs/nexus.log)
+  files.py      leitura de PDF, DOCX, EPUB, textos, ZIP e imagens (OCR do Windows)
+  library.py    biblioteca de livros, páginas e partes do podcast
+  browser.py    abrir links, pesquisas e músicas no navegador padrão
+  netprobe.py   conexão automática (mede latência e velocidade)
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -307,4 +318,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.14.0 (protótipo)**.
+Versão atual: **v0.15.0 (protótipo)**.

@@ -5,7 +5,7 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import emergency, knowledge, llm, memory, profile, skills, tools, workspace
+from . import emergency, knowledge, llm, memory, netprobe, profile, skills, tools, workspace
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
@@ -208,6 +208,10 @@ def build_context(user_text: str, emergency_topic: str | None = None) -> str:
         parts.append(f"\nReply ONLY in {name}.")
     if MODES.get(settings["ai_mode"]):
         parts.append(MODES[settings["ai_mode"]])
+    if netprobe.effective() == "online" and settings["integrations"] and not hits:
+        # v0.15 auto/online mode with a fast connection: online lookups first when the local base has nothing
+        parts.append("Internet is fast right now: for current events or facts the local base doesn't cover, call "
+                     "`wikipedia` or `get_news` (they answer in about a second) instead of guessing.")
     parts.append("Requests to store, log, remember, learn, schedule or look up something need the matching tool call.")
     return "\n".join(parts)
 
@@ -270,7 +274,7 @@ LIVE = [
 def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None = None) -> str | None:
     for rx, expected, tool in LIVE:
         if (rx.search(user_text) and not (called or set()) & expected and settings["integrations"]
-                and settings["network_mode"] != "offline"):
+                and netprobe.effective() != "offline"):
             return (f"This needs LIVE data that you do not know. Call `{tool}` now; never say it is unavailable and "
                     f"never invent headlines, rates or forecasts. Then answer briefly from the tool result.")
     for rx, expected, tool in INTENTS:
@@ -307,6 +311,33 @@ def _needs_file_tool(reply: str, acted: bool) -> str | None:
     return None
 
 
+ATTACH_CHARS = 7000  # ~2k tokens of files per message (the whole prompt must stay inside the 8k context)
+
+
+def attachment_context(question: str, attachments: list[dict]) -> str:
+    """Files attached to this message (v0.15). Small files go in whole; big ones contribute their beginning plus
+    the passages that best match the question (word overlap) - no extra AI call, no change to the knowledge base."""
+    words = {w for w in re.findall(r"\w{4,}", question.lower())}
+    budget = ATTACH_CHARS // max(len(attachments), 1)
+    parts = ["## Files attached by the user (read them to answer)"]
+    for a in attachments:
+        body = a["text"]
+        if len(body) > budget:
+            head = body[: budget // 3]
+            chunks = [body[i:i + 600] for i in range(len(head), len(body), 600)]
+            ranked = sorted(chunks, key=lambda c: -len(words & set(re.findall(r"\w{4,}", c.lower()))))
+            picked, used = [], len(head)
+            for c in ranked:
+                if used + len(c) > budget:
+                    break
+                picked.append(c)
+                used += len(c)
+            picked.sort(key=body.find)
+            body = head + "\n[...]\n" + "\n[...]\n".join(picked) + f"\n[file has {len(a['text'])} characters; excerpts]"
+        parts.append(f"### {a['name']}\n{body}")
+    return "\n".join(parts)
+
+
 def _history_messages():
     return [{"role": m["role"], "content": m["content"]} for m in memory.history(settings["history_turns"])]
 
@@ -331,13 +362,14 @@ class Assistant:
         self.cancel = threading.Event()
         self.emergencies = emergency.Tracker()
 
-    def ask(self, text: str, spoken: bool = False):
-        """Handle one user message (blocking; call from a worker thread)."""
+    def ask(self, text: str, spoken: bool = False, attachments: list | None = None):
+        """Handle one user message (blocking; call from a worker thread). attachments: [{"name", "text"}]."""
         text = text.strip()
         if not text:
             return
         with self.lock:
             self.cancel.clear()
+            self.attachments = attachments or []
             self._ask(text, spoken)
 
     def interrupt(self):
@@ -367,10 +399,16 @@ class Assistant:
         # Context travels inside the current user turn (many chat templates drop extra system messages);
         # history keeps only the raw text, so the cached prompt prefix stays valid on the next turn.
         context = build_context(text, emergency_topic=topic)
+        if getattr(self, "attachments", None):
+            context += "\n" + attachment_context(text, self.attachments)
+            names = ", ".join(a["name"] for a in self.attachments)
+            text_for_history = f"{text}\n[{names}]"
+        else:
+            text_for_history = text
         messages = [{"role": "system", "content": build_system()}, *_history_messages(),
                     {"role": "user", "content": f"<context>\n{context}\n</context>\n\n{text}"}]
         previous = last_reply()
-        memory.add_message("user", text)
+        memory.add_message("user", text_for_history)
         reply, changed, nudged, finished, round_text, called = "", False, False, False, "", set()
         kept = ""  # real answer text written before a tool call: stays on screen and in the reply (v0.12)
         used: set = set()  # every tool that ran this turn (skills XP)

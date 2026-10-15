@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 2.5  ·  Data: 2026-10-14  ·  Versão do app: 0.14.0
+ Versão do documento: 2.6  ·  Data: 2026-10-15  ·  Versão do app: 0.15.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -105,6 +105,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-DAT-010  Resposta usa assunto de outra conversa
       NX-DAT-011  Lembrete não foi falado / não apareceu / veio só uma vez
       NX-DAT-012  Restaurar backup: nada mudou / dados "sumiram" depois de restaurar
+      NX-DAT-013  Arquivo ou livro não abre / "nenhum texto encontrado"
  UI   NX-UI-001   Fontes diferentes da landing (sem internet)
       NX-UI-002   Janela não abre: WebView2 ausente
       NX-UI-003   Janela abre em branco ou travada no boot
@@ -116,6 +117,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-UI-009   Botões Interromper/Repetir clicáveis sem nada para fazer
       NX-UI-010   Notificação do Windows não aparece
       NX-UI-011   Resposta some da tela enquanto a voz continua falando
+      NX-UI-012   Música ou link não abriu no navegador / abriu o vídeo errado
  WRK  NX-WRK-001  A IA diz que criou/alterou um arquivo, mas nada mudou
       NX-WRK-002  "Fora da área de trabalho": caminho recusado
       NX-WRK-003  Comando não roda, demora ou fica esperando confirmação
@@ -138,6 +140,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-ENV-010  Sem placa de vídeo dedicada: respostas muito lentas
       NX-ENV-011  "O NEXUS já está aberto" ao abrir o programa
       NX-ENV-012  A chave de API sumiu (outro PC ou outro usuário do Windows)
+      NX-ENV-013  Modo automático escolheu o modo errado (internet instável)
 
 
 ================================================================================
@@ -856,6 +859,16 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                em backups/before-restore-<data> (copie o nexus.db de volta
                para a pasta de dados, com o NEXUS fechado, para desfazer).
 
+[NX-DAT-013] Arquivo ou livro não abre / "nenhum texto encontrado"
+  Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : (1) PDF escaneado (só imagens): não tem texto; converta as
+               páginas em imagens e anexe-as (o OCR do Windows lê imagens).
+               (2) Formatos ainda não suportados: RAR, .doc antigo, .xlsx.
+               (3) PDF com senha. (4) Imagem com texto em idioma sem o pacote
+               de OCR do Windows (Configurações > Hora e idioma > Idioma).
+  Solução    : Salve como PDF com texto, DOCX ou TXT. Arquivos grandes são
+               resumidos aos trechos que combinam com a pergunta.
+
 ================================================================================
  UI — INTERFACE DESKTOP
 ================================================================================
@@ -978,6 +991,15 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                são removidas. Uma resposta de verdade fica na tela, é salva
                no histórico e a parte depois da ferramenta é acrescentada.
                Testado em tests\test_units.py.
+
+[NX-UI-012] Música ou link não abriu no navegador / abriu o vídeo errado
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : (1) Modo offline (nada é aberto). (2) Sem navegador padrão
+               definido no Windows. (3) "Tocar X" abre o primeiro resultado
+               da busca do YouTube; nomes ambíguos podem trazer outro vídeo.
+               (4) Se o YouTube mudar a página, abre a lista de resultados.
+  Solução    : Diga artista + música; para Spotify/YouTube Music diga o nome
+               do serviço ("toca X no Spotify").
 
 ================================================================================
  WRK — ÁREA DE TRABALHO
@@ -1201,6 +1223,16 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                o mesmo usuário no mesmo PC consegue lê-la. Ao copiar a pasta de
                dados ou restaurar um backup em outro PC, ela não pode ser lida.
   Solução    : Configurações > Inteligência: cole a chave de novo e salve.
+
+[NX-ENV-013] Modo automático escolheu o modo errado (internet instável)
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : O modo Automático mede a internet a cada 5 minutos (e de novo
+               quando uma consulta falha); quedas curtas entre medições não
+               são vistas na hora.
+  Solução    : Passe o mouse no chip da barra superior para ver a última
+               medição (latência e velocidade). Para fixar o comportamento,
+               escolha Offline, Híbrido ou Online em Configurações >
+               Desempenho.
 
 ================================================================================
  HISTÓRICO DE TESTES (2026-10-13)

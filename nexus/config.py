@@ -100,7 +100,7 @@ DEFAULTS = {
     "focus_mode": False,          # no distractions: reminders only in the bell, minimal interface
     "focus_in_workspace": True,   # focus mode turns on by itself while a workspace is open
     # v0.12 ----------------------------------------------------------------------------------------------------
-    "network_mode": "hybrid",     # offline (nothing leaves the PC) | hybrid (local AI + online services) | online
+    "network_mode": "auto",       # auto (by measured speed) | offline | hybrid (local AI + online services) | online
     "performance": "balanced",    # economy | balanced | max ("Força total", only if the hardware allows)
     "stt_beam": 5,                # Whisper beam size (1 = fastest)
     "llm_keep_alive": "2h",       # how long the model stays in VRAM after the last message
@@ -171,6 +171,12 @@ class Settings(dict):
             except json.JSONDecodeError:
                 pass
         self["llm_api_key"] = unprotect(self["llm_api_key"])
+        if not self.get("v15_auto_net"):  # v0.15: the automatic connection mode becomes the default once
+            if self.get("network_mode") == "hybrid":
+                self["network_mode"] = "auto"
+            self["v15_auto_net"] = True
+            if SETTINGS_PATH.exists():
+                self.save()
         for slot in ("ai_local", "ai_api"):  # v0.14: the saved API configuration keeps its key encrypted too
             if isinstance(self.get(slot), dict) and self[slot].get("llm_api_key"):
                 self[slot] = {**self[slot], "llm_api_key": unprotect(self[slot]["llm_api_key"])}

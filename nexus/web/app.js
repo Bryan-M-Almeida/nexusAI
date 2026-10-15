@@ -4,7 +4,7 @@ function loadFonts(mode) {
   try { localStorage.setItem("nexus.net", mode); } catch (e) { /* ignore */ }
   if (mode === "offline" || document.getElementById("gfonts")) return;
   const l = Object.assign(document.createElement("link"), { id: "gfonts", rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" });
+    href: "https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" });
   document.head.appendChild(l);
 }
 try { loadFonts(localStorage.getItem("nexus.net") || "hybrid"); } catch (e) { loadFonts("hybrid"); }
@@ -110,6 +110,8 @@ window.nexus = {
       case "conversations": return !$("#convDrawer").hidden && renderConversations();
       case "workspace": return renderWsPanel(p);
       case "levelup": return onLevelUp(p);
+      case "podcast": return onPodcast(p);
+      case "network": return applyState({ network_effective: p.effective, net_quality: p.quality });
       case "confirm": return askConfirm(p);
       case "confirm_done": return (confirmId === p.id) && closeConfirm(p.ok);
     }
@@ -308,8 +310,11 @@ function onAlert(a) {
 
 async function send(text) {
   text = text.trim();
+  if (!text && pendingFiles.length) text = T("attachDefault");
   if (!text) return;
-  addMsg("user", text);
+  addMsg("user", text + (pendingFiles.length ? "\n📎 " + pendingFiles.map((f) => f.name).join(", ") : ""));
+  pendingFiles = [];
+  renderAttachChips();
   const r = await api().send(text, false);
   if (r && r.control) setVoiceState("idle");
 }
@@ -379,9 +384,12 @@ function applyState(st) {
   $("#btnFocus").classList.toggle("on", !!state.focus);
   if (state.ai_target) renderAiTarget();
   if (state.network) {
-    $("#chipNet").textContent = T("netChip_" + state.network);
-    $("#chipNet").classList.toggle("offline", state.network === "offline");
-    loadFonts(state.network);
+    const eff = state.network === "auto" ? (state.network_effective || "hybrid") : state.network;
+    $("#chipNet").textContent = (state.network === "auto" ? T("netChip_auto") + " · " : "") + T("netChip_" + eff);
+    $("#chipNet").classList.toggle("offline", eff === "offline");
+    const q = state.net_quality || {};
+    $("#chipNet").title = q.latency_ms ? `${q.latency_ms} ms · ${q.mbps ?? "?"} Mbit/s` : "";
+    loadFonts(eff);
   }
   if (state.ui_mode === "text") setTimeout(() => $("#prompt").focus(), 300);
   setVoiceState(voiceState === "speaking" ? "speaking" : "idle");
@@ -913,6 +921,7 @@ function wire() {
   wireWorkspace();
   wireEssentials();
   wireLightness();
+  wireLibrary();
   $("#btnNewConv").onclick = newConversation;
   $("#btnConvs").onclick = () => openConversations("threads");
   $$("#convTabs button").forEach((b) => (b.onclick = () => openConversations(b.dataset.ctab)));
@@ -1310,6 +1319,121 @@ function wireLightness() {
   $("#aiSeg").addEventListener("click", (e) => {
     const b = e.target.closest("[data-target]");
     if (b && b.dataset.target !== (state.ai_target || "local")) switchAi(b.dataset.target);
+  });
+}
+
+/* ------------------------------------------------------------------ attachments (v0.15) */
+let pendingFiles = [];
+function renderAttachChips() {
+  const box = $("#attachChips");
+  box.hidden = !pendingFiles.length;
+  box.innerHTML = pendingFiles.map((f) => `<span class="att-chip">${catIcon(f.kind === "image" ? "" : f.kind)}${esc(f.name)}</span>`).join("")
+    + (pendingFiles.length ? `<button class="link-btn" id="btnClearAtt">✕</button>` : "");
+  const c = $("#btnClearAtt");
+  if (c) c.onclick = async () => { await api().clear_attachments(); pendingFiles = []; renderAttachChips(); };
+}
+
+function afterAttach(r) {
+  for (const x of r.results) if (!x.ok) notice(`${x.name}: ${x.error}`);
+  pendingFiles = r.pending || [];
+  renderAttachChips();
+  if (pendingFiles.length) $("#prompt").focus();
+}
+
+async function attachDropped(fileList) {
+  const paths = [...fileList].map((f) => f.pywebviewFullPath).filter(Boolean);
+  if (paths.length) return afterAttach(await api().attach_files(paths));
+  for (const f of fileList) {  // no path from the WebView: send the bytes
+    if (f.size > 25 * 1024 * 1024) { notice(`${f.name}: > 25 MB`); continue; }
+    const data = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f); });
+    afterAttach(await api().attach_blob(f.name, data));
+  }
+}
+
+/* ------------------------------------------------------------------ library & podcast (v0.15) */
+let readerBook = null, readerPage = null;
+async function openLibrary() {
+  renderBooks(await api().books());
+  $("#libDrawer").hidden = false;
+}
+
+function renderBooks(books) {
+  $("#libList").innerHTML = books.map((b) => `
+    <div class="book-card">
+      <div class="book-spine">${catIcon(b.kind === "pdf" ? "" : "aprendido")}<span class="mono">${esc(b.kind.toUpperCase())}</span></div>
+      <b class="t">${esc(b.title)}</b>
+      <div class="book-progress"><em style="width:${Math.round(b.progress * 100)}%"></em></div>
+      <span class="m mono">${Math.round(b.progress * 100)}% · ${Math.round(b.chars / 1000)}k</span>
+      <div class="book-acts"><button class="btn-ghost" data-bread="${b.id}">${esc(T("libRead"))}</button>
+        <button class="btn-primary" data-blisten="${b.id}">${esc(T("libListen"))}</button>
+        <button class="link-btn" data-bdel="${b.id}">✕</button></div>
+    </div>`).join("") || `<p class="muted">${esc(T("libEmpty"))}</p>`;
+}
+
+async function addBooks(paths) {
+  const r = await api().add_books(paths || null);
+  for (const x of r.results) if (!x.ok) notice(`${x.file.split(/[\\/]/).pop()}: ${x.error}`);
+  const ok = r.results.filter((x) => x.ok).length;
+  if (ok) showTip(T("libAdded", { n: ok }));
+  renderBooks(r.books);
+}
+
+async function openReader(bid, position) {
+  const r = await api().book_page(bid, position ?? null);
+  if (r.error) return;
+  readerBook = r.book; readerPage = r;
+  $("#readerTitle").textContent = r.book.title;
+  $("#readerText").textContent = r.text;
+  $("#readerText").scrollTop = 0;
+  const pct = Math.round((r.start / Math.max(r.chars, 1)) * 100);
+  $("#readerProgress").style.width = pct + "%";
+  $("#readerPct").textContent = pct + "%";
+  $("#btnPrevPage").disabled = r.start <= 0;
+  $("#btnNextPage").disabled = r.end >= r.chars;
+  $("#readerModal").hidden = false;
+}
+
+function onPodcast(p) {
+  const bar = $("#podcastBar");
+  if (!p.active) { bar.hidden = true; if (p.finished) notice(T("podFinished", { title: p.title || "" })); return; }
+  bar.hidden = false;
+  $("#podTitle").textContent = p.title;
+  $("#podProgress").style.width = Math.round(p.progress * 1000) / 10 + "%";
+  $("#btnPodToggle").textContent = p.paused ? "▶" : "❚❚";
+  if (p.finished) { bar.hidden = true; notice(T("podFinished", { title: p.title })); }
+}
+
+function wireLibrary() {
+  $("#btnLibrary").onclick = openLibrary;
+  $("#btnAddBooks").onclick = () => addBooks();
+  $("#libList").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-bread],[data-blisten],[data-bdel]");
+    if (!b) return;
+    if (b.dataset.bread) openReader(b.dataset.bread);
+    else if (b.dataset.blisten) { onPodcast(await api().podcast_start(b.dataset.blisten, null)); $("#libDrawer").hidden = true; }
+    else if (b.dataset.bdel && confirm(T("libDelete"))) renderBooks(await api().delete_book(b.dataset.bdel));
+  });
+  $("#btnPrevPage").onclick = () => readerPage && openReader(readerBook.id, Math.max(0, readerPage.start - 2400));
+  $("#btnNextPage").onclick = () => readerPage && openReader(readerBook.id, readerPage.end);
+  $("#btnListenHere").onclick = async () => { onPodcast(await api().podcast_start(readerBook.id, readerPage.start)); $("#readerModal").hidden = true; };
+  $("#btnPodToggle").onclick = async () => onPodcast(await api().podcast_toggle());
+  $("#btnPodStop").onclick = async () => onPodcast(await api().podcast_stop());
+  $("#btnAttach").onclick = async () => afterAttach(await api().attach_files(null));
+
+  // Drag & drop: on the Library -> books; anywhere else -> attach to the next message.
+  let depth = 0;
+  document.addEventListener("dragenter", (e) => { if (e.dataTransfer?.types?.includes("Files")) { depth++; $("#dropZone").hidden = false; } });
+  document.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; $("#dropZone").hidden = true; } });
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", async (e) => {
+    e.preventDefault(); depth = 0; $("#dropZone").hidden = true;
+    const fl = e.dataTransfer?.files;
+    if (!fl || !fl.length) return;
+    if (!$("#libDrawer").hidden) {
+      const paths = [...fl].map((f) => f.pywebviewFullPath).filter(Boolean);
+      if (paths.length) return addBooks(paths);
+    }
+    attachDropped(fl);
   });
 }
 

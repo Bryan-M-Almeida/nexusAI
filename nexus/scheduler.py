@@ -122,7 +122,9 @@ def start(alert):
     def loop():
         while True:
             try:
-                online = settings["integrations"] and settings["network_mode"] != "offline"
+                from . import netprobe
+
+                online = settings["integrations"] and netprobe.effective() != "offline"
                 if online and integrations.calendar_due():  # ICS calendar feed, every 30 min
                     integrations.sync_calendar()
                 _check(alert)

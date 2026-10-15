@@ -13,7 +13,7 @@ RATE = 16000
 FRAME = 512  # 32 ms: the window Silero VAD expects at 16 kHz
 FRAMES_PER_SECOND = RATE / FRAME
 # "Nexus" as Whisper tends to write it in pt/en/es: nexus, néxus, nécsus, neksus, nexos, nexis, next us, nex us...
-WAKE_RE = re.compile(r"\b(n[eéêiy]?[xk]+s?[ iuoe]*[sz]|n[eé]c?k?s[uo]s|nexo|next? us|nex us|nek us)\b[\s,.!?:;-]*",
+WAKE_RE = re.compile(r"\b(n[eéêiy]?[xk]+s?[ iuoe]*[sz]|n[eé]c?k?s[uo]s|nexo|next? ?us|nex us|nek us)\b[\s,.!?:;-]*",
                      re.IGNORECASE)
 ENV_STEP = 0.04  # seconds per point of the speech envelope sent to the UI ring
 MAX_CONTROL_SECONDS = 4  # while NEXUS speaks, only short utterances ("pausa", "stop") are considered
@@ -75,7 +75,8 @@ class Speaker:
         threading.Thread(target=self._run, daemon=True, name="tts").start()
 
     # -- control -------------------------------------------------------------
-    def say(self, text: str, force: bool = False, remember: bool = True, lang_code: str | None = None):
+    def say(self, text: str, force: bool = False, remember: bool = True, lang_code: str | None = None,
+            on_done=None):
         """Queue text. The voice follows the text's language (pt/en/es), else the app language."""
         text = clean_for_speech(text)
         if not text or not (speech_allowed() or force):
@@ -83,7 +84,7 @@ class Speaker:
         if remember:
             self.last_text = text
         self.interrupt.clear()
-        self.q.put((text, lang_code))
+        self.q.put((text, lang_code, on_done))  # on_done(): called only if the text was spoken to the end
 
     def repeat(self, intro: str = ""):
         if not self.last_text:
@@ -168,7 +169,7 @@ class Speaker:
         self.voices = [v.as_dict() for v in engine.voices]
         self._ready.set()
         while True:
-            text, code = self.q.get()
+            text, code, on_done = self.q.get()
             code = code or detect(text) or lang()  # streamed chunks carry the reply language: no voice flips
             voice, pitch = engine.pick(code, settings["voice_gender"])
             self.speaking.set()
@@ -193,6 +194,11 @@ class Speaker:
                         i += 1
             except Exception as exc:
                 self.error = str(exc)
+            if on_done and i >= len(sentences) and not self.interrupt.is_set():
+                try:
+                    on_done()  # e.g. the podcast queues its next part here, so the voice never goes idle in between
+                except Exception as exc:
+                    self.error = str(exc)
             if self.q.empty():
                 time.sleep(0.25)  # let the room echo die before the mic goes back to full listening
                 self.speaking.clear()
@@ -320,7 +326,6 @@ class Listener:
         self.awake_until = 0.0
         self.background = False  # window minimized/unfocused (v0.14): only "Nexus ..." is accepted
         self.released = False  # Whisper freed while minimized (reloaded when the window comes back)
-        self.prechecks = self.full_runs = 0  # counters for the low-power wake check (diagnostics/tests)
         self._stream = None
         self._frames: queue.Queue = queue.Queue()
         self._lock = threading.Lock()
@@ -334,7 +339,9 @@ class Listener:
         try:
             from faster_whisper import WhisperModel
 
-            if download and settings["network_mode"] == "offline":
+            from . import netprobe
+
+            if download and netprobe.effective() == "offline":
                 raise RuntimeError("offline mode: the voice model can't be downloaded (Settings > Performance)")
             self.model = WhisperModel(settings["stt_model"], device="cpu", compute_type="int8",
                                       local_files_only=not download)
@@ -467,12 +474,6 @@ class Listener:
             name = ((db.get_profile() or {}).get("name") or "").split()[0]
         except Exception:
             name = ""
-        gated = not (was_ptt or during_speech) and self.wake_required() and time.time() >= self.awake_until
-        if gated and self._wake_model() is not None and not self._heard_wake_word(audio, name):
-            if not during_speech:
-                self.on_state("standby" if self.mode == "live" else "idle")
-            return  # no "Nexus" at the start: the full transcription never runs (TV, people around)
-        self.full_runs += 1
         segments, _ = self.model.transcribe(
             normalize_audio(audio), language=self.stt_language(),
             beam_size=1 if during_speech else max(1, int(settings["stt_beam"])),
@@ -488,32 +489,10 @@ class Listener:
             return
         self._wake_check(text)
 
-    WAKE_WINDOW = 2.0  # seconds: "Nexus" is said at the start of a command
-    _tiny = None  # Whisper "tiny" for the wake word check, or False when it isn't on this PC
-
-    def _wake_model(self):
-        """Measured (tests/bench_voice.py, part 3): Whisper always encodes a fixed 30 s window, so checking only
-        the first 2 s with the SAME model costs ~1.8 s vs ~2.3 s for everything - no saving, and twice the cost
-        when "Nexus" was said. Only a much smaller model makes the pre-check worth it: "tiny" is used when it is
-        already downloaded (never downloaded automatically); otherwise there is no pre-check."""
-        if Listener._tiny is None:
-            try:
-                from faster_whisper import WhisperModel
-
-                Listener._tiny = WhisperModel("tiny", device="cpu", compute_type="int8", local_files_only=True)
-            except Exception:
-                Listener._tiny = False
-        return Listener._tiny or None
-
-    def _heard_wake_word(self, audio, name="") -> bool:
-        """Cheap first pass with the tiny model over the first 2 s; the main model only runs if "Nexus" is there."""
-        self.prechecks += 1
-        head = normalize_audio(audio[: int(self.WAKE_WINDOW * RATE)])
-        segments, _ = self._wake_model().transcribe(head, language=self.stt_language(), beam_size=1,
-                                                    without_timestamps=True, max_new_tokens=12, vad_filter=False,
-                                                    condition_on_previous_text=False,
-                                                    initial_prompt=initial_prompt(name))
-        return bool(WAKE_RE.search(" ".join(s.text for s in segments)))
+    # v0.14/v0.15 measured (CHANGELOG v0.15.0): pre-checking "Nexus" with a smaller Whisper doesn't pay off. With the
+    # same model it saves nothing (fixed 30 s encoder window); with "tiny" it is 4-7x cheaper but misses the wake
+    # word (8/8 in digital silence, 7/8 at 43 dB SNR, 2/8 with a fan). A missed command is worse than CPU time, so
+    # every utterance gets the full model; real savings need a dedicated keyword spotter (future).
 
     def _wake_check(self, text):
         m = WAKE_RE.search(text)

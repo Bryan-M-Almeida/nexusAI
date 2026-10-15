@@ -8,6 +8,61 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.15.0 — Protótipo · 2026-10-15
+
+**Arquivos, Biblioteca com modo podcast, navegador, conexão automática e um visual mais suave.**
+
+> A partir desta versão, o número reflete o peso da mudança: +0.0.1–0.0.2 para correções e otimizações,
+> +0.0.5–0.0.8 para mudanças grandes com funções novas, e 0.(N+1).0 quando quase tudo muda. As partes mais
+> difíceis deste pacote (modo treinamento, importar memórias de outras IAs, instalação mínima) vêm na 0.15.x.
+
+### Arquivos (clipe no chat ou arrastar e soltar)
+- Lê **PDF, DOCX, EPUB, TXT/MD/CSV/JSON e código, ZIP** (lista e lê os textos de dentro) e **imagens** (texto
+  reconhecido pelo próprio Windows — sem download). Tudo no seu PC.
+- Arquivos pequenos vão inteiros para a IA; grandes mandam o começo + os trechos que mais combinam com a pergunta
+  (~7 mil caracteres, para caber no contexto). Na avaliação: "quanto é o aluguel no arquivo?" → valor do PDF.
+- RAR fica para depois (precisa de uma ferramenta externa).
+
+### Biblioteca e modo podcast (borda direita → *Biblioteca*)
+- Adicione livros (PDF, EPUB, DOCX, TXT, MD — por botão ou arrastando), veja a lista com o progresso e leia na tela
+  (leitor com páginas e tipografia de livro).
+- **Podcast**: "lê o livro X" (ou o botão *Ouvir*) e o NEXUS lê em voz alta, parte por parte, continuando de onde
+  você parou; pausar, continuar e parar pelo mini-player ou por voz ("pausa", "continua", "para").
+
+### Navegador
+- "Toca Bohemian Rhapsody no YouTube" abre o **primeiro vídeo encontrado** no navegador padrão (~0,8 s para achar);
+  também abre links, pesquisas no Google e buscas no Spotify / YouTube Music.
+
+### Conexão automática (novo padrão)
+- **Automático** mede a internet a cada 5 min (latência + ~250 KB): sem internet → offline; lenta (> 1,2 s ou
+  < 1,5 Mbit/s) → híbrido; rápida → **online primeiro** (consulta Wikipédia/notícias quando a base local não
+  tem a resposta). Mede de novo quando uma consulta falha. O chip mostra "AUTO · ONLINE" e a medição.
+  Neste PC: 180–240 ms, ~8 Mbit/s → online.
+
+### Visual
+- Mais suave e calmo: azul e vermelho menos saturados (vermelho → coral), cantos levemente arredondados, sombras
+  suaves, transições mais lentas e fonte **Inter** no texto (mais legível).
+- **Só o essencial é selecionável**: mensagens, o texto do leitor, conteúdo de arquivos e comandos. O NEXUS (aro,
+  nome, barras, cartões) não seleciona mais — arrastar o aro não marca texto.
+
+### Medido e descartado
+- **Pré-checar "Nexus" com o Whisper tiny** (baixado com autorização): é 4–7× mais barato, mas perde o nome —
+  8/8 em silêncio digital, 7/8 a 43 dB, 4/8 com ruído leve e 2/8 com ventilador; o small acerta 8/8 em todos.
+  Ignorar o próprio nome é pior do que gastar processador, então toda fala usa o modelo completo. Economia de
+  verdade aqui pede um detector de palavra-chave dedicado ("Nexus"), registrado para o futuro.
+
+### Testes desta versão
+- 178/178 testes unitários (17 novos: leitura de PDF/DOCX/EPUB, arquivo binário recusado, biblioteca, páginas e
+  partes que terminam em frase, podcast encadeado salvando posição, navegador e modo offline, modo automático por
+  qualidade da conexão, anexos grandes).
+- Avaliação de conversa com qwen3:8b interrompida em 24/32 (o PC precisou ser desligado).
+
+### Problema conhecido (corrigido na próxima versão, só de correções)
+- Num simulado, depois de "Registra que gastei 30 reais em livros" na mesma conversa, a resposta "Letra A"
+  foi tratada como registro do gasto em vez de ser corrigida. Passava na v0.14.
+
+---
+
 ## v0.14.0 — Protótipo · 2026-10-14
 
 **Leveza: menos trabalho em segundo plano, caches, troca IA local ⇄ API em um clique — e links falados pelo nome.**
@@ -525,9 +580,14 @@ Prioridades definidas em 2026-10-14 (desempenho primeiro, para o NEXUS rodar em 
 4. **Troca rápida IA local ↔ API** em um clique, guardando as duas configurações (com API, quase toda a carga sai
    do PC).
 
-### v0.15.0 — Protótipo (próxima) · arquivos
-- Ler **PDF, DOCX, TXT/MD e textos**, **ZIP** (RAR depende de ferramenta externa — avaliar) e **imagens** (OCR do
-  próprio Windows, sem download); arrastar arquivos para o chat.
+### v0.15.x — Protótipo (próxima)
+- **Modo treinamento**: aprende enquanto está ativo; ao terminar, compara o que aprendeu com pesquisas online,
+  mostrando o progresso no aro (anéis ondulando e a porcentagem no lugar de "NEXUS"), diz "Análise completa" e
+  registra o resumo (aprendido, deixado de fora, % de concordância) na aba **Aprendizados**.
+- **Importar memórias de outras IAs**: um prompt pronto para colar no ChatGPT, Claude etc.; memórias separadas por
+  origem e um resumo unificado que vira a memória do NEXUS.
+- **Instalação mínima** (só o idioma escolhido, conhecimento básico ou nenhum, com dupla confirmação) — junto com o
+  instalador. RAR.
 
 ### v0.16.0 · mídia
 - **Tocar música e controlar apps**: teclas de mídia do Windows (tocar, pausar, próxima), abrir apps e buscar por

@@ -120,7 +120,9 @@ def switch_target(target: str) -> bool:
 
 def offline_blocked() -> bool:
     """Offline mode: a cloud AI server is never contacted."""
-    return settings["network_mode"] == "offline" and not is_local_url()
+    from . import netprobe
+
+    return netprobe.effective() == "offline" and not is_local_url()
 
 
 def _native_body(messages, tools, temperature, stream=True, **options):

@@ -75,6 +75,8 @@
 
   <aside class="rail rail-right edge-bar" id="railRight">
     <p class="rail-title mono" data-i18n="wsRail">TRABALHO</p>
+    <button class="rail-btn" id="btnLibrary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4v16H4zM10 4h4v16h-4zM16.5 5l3.5-.8 3 15.6-3.5.8z"/></svg>
+      <span><b data-i18n="libTitle">Biblioteca</b><small data-i18n="libHint">seus livros · ler ou ouvir como podcast</small></span></button>
     <button class="rail-btn" id="btnWorkspaces"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="1"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>
       <span><b data-i18n="wsTitle">Área de trabalho</b><small data-i18n="wsHint">projetos isolados · a IA cria e edita arquivos</small></span></button>
     <p class="rail-title mono rail-sep" data-i18n="convTitle">CONVERSA</p>
@@ -123,7 +125,9 @@
 
   <section class="chatview" id="chatView">
     <div class="chat" id="chat" aria-live="polite"></div>
+    <div class="attach-chips" id="attachChips" hidden></div>
     <form class="composer" id="composer">
+      <button type="button" class="clip-btn" id="btnAttach" data-i18n-title="attach" aria-label="Attach"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg></button>
       <input id="prompt" autocomplete="off" data-i18n-ph="ask">
       <button type="submit" class="btn-send" data-i18n="send">ENVIAR</button>
     </form>
@@ -269,6 +273,41 @@
   </div>
 </div>
 
+<!-- ============ LIBRARY (v0.15) ============ -->
+<div class="drawer" id="libDrawer" hidden>
+  <div class="conv-box">
+    <button class="icon-btn drawer-close" data-close aria-label="Close">✕</button>
+    <div class="notif-head"><h2 class="mono" data-i18n="libTitleCaps">BIBLIOTECA</h2>
+      <button class="btn-primary" id="btnAddBooks" data-i18n="libAdd">Adicionar livros</button></div>
+    <p class="hint" data-i18n="libExplain">PDF, EPUB, DOCX, TXT ou MD — também dá para arrastar os arquivos para cá. Leia na tela ou peça "lê o livro X" para ouvir como podcast; o NEXUS lembra onde você parou.</p>
+    <div class="conv-body book-grid" id="libList"></div>
+  </div>
+</div>
+
+<div class="modal" id="readerModal" hidden>
+  <div class="modal-box reader-box">
+    <button class="icon-btn drawer-close" data-close aria-label="Close">✕</button>
+    <p class="mono kicker" id="readerTitle"></p>
+    <div class="reader-text" id="readerText"></div>
+    <div class="reader-bar">
+      <button class="btn-ghost" id="btnPrevPage">‹</button>
+      <div class="reader-progress"><em id="readerProgress"></em></div>
+      <span class="mono muted small" id="readerPct"></span>
+      <button class="btn-ghost" id="btnNextPage">›</button>
+      <button class="btn-primary" id="btnListenHere" data-i18n="listenHere">Ouvir daqui</button>
+    </div>
+  </div>
+</div>
+
+<div class="podcast-bar" id="podcastBar" hidden>
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 12v0M8 8v8M12 5v14M16 8v8M20 12v0"/></svg>
+  <div class="pod-info"><b id="podTitle"></b><div class="pod-progress"><em id="podProgress"></em></div></div>
+  <button class="icon-btn" id="btnPodToggle" data-i18n-title="pauseResume">❚❚</button>
+  <button class="icon-btn" id="btnPodStop" data-i18n-title="stop">■</button>
+</div>
+
+<div class="drop-zone mono" id="dropZone" hidden><span data-i18n="dropHere">Solte para anexar à conversa (ou na Biblioteca, para guardar livros)</span></div>
+
 <!-- ============ ONBOARDING ============ -->
 <div class="modal" id="onboarding" hidden>
   <div class="modal-box">
@@ -390,6 +429,7 @@
         <h2 data-i18n="secPerf">Desempenho</h2>
         <p class="sub mono" data-i18n="netTitle">CONEXÃO</p>
         <div class="cards" id="netCards">
+          <button type="button" class="card-opt" data-net="auto"><b data-i18n="netAuto">Automático</b><small data-i18n="netAutoHint">Mede a internet e escolhe sozinho: sem internet = offline, lenta = híbrido, rápida = online primeiro.</small></button>
           <button type="button" class="card-opt" data-net="offline"><b data-i18n="netOffline">Offline</b><small data-i18n="netOfflineHint">Nada sai do computador. IA, voz e memória locais; sem clima, notícias, câmbio, Wikipédia e calendário.</small></button>
           <button type="button" class="card-opt" data-net="hybrid"><b data-i18n="netHybrid">Híbrido</b><small data-i18n="netHybridHint">IA local + serviços online (clima, notícias, câmbio, calendário). Recomendado.</small></button>
           <button type="button" class="card-opt" data-net="online"><b data-i18n="netOnline">Online</b><small data-i18n="netOnlineHint">Permite IA na nuvem (OpenAI, Claude, Gemini...) além dos serviços online. Escolha o provedor em Inteligência.</small></button>

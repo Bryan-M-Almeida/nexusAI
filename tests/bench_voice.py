@@ -131,29 +131,25 @@ for name, cfg in CONFIGS.items():
     print(f"   {name:<32}: erro de palavras (WER) {np.mean(errs) * 100:5.1f}% | 'Nexus' reconhecido "
           f"{wake_hits}/{wake_total} | {secs / len(clips):.2f}s por frase")
 
-# ---------------------------------------------------------------- 3) low-power wake word (v0.14)
-print("\n3) PALAVRA 'NEXUS' EXIGIDA — custo por fala de ~6 s (conversa ao redor / TV)")
-LONG = ["Ontem eu fui ao mercado e comprei arroz, feijão, café e um pouco de fruta para a semana inteira.",
-        "Nexus, me lembra de ligar para a minha mãe amanhã de manhã, antes de sair para o trabalho."]
-listener = voice.Listener.__new__(voice.Listener)  # only the transcription helpers, no microphone/threads
-listener.model, listener.prechecks, listener.full_runs = model, 0, 0
-if listener._wake_model() is None:
-    print("   (Whisper 'tiny' não está no PC: sem pré-checagem; com o próprio 'small' ela não economiza — v0.14)")
-    raise SystemExit
-for vname in ("Microsoft Maria", "Microsoft Daniel"):
-    for phrase in LONG:
-        speech = to16k(engine.render(phrase, voices[vname], 0))
-        audio = speech / np.abs(speech).max() * 0.3 + noise(len(speech), 0.012)
-        t0 = time.time()
-        segs, _ = model.transcribe(voice.normalize_audio(audio), language="pt", beam_size=5, vad_filter=False,
-                                   condition_on_previous_text=False, initial_prompt=voice.initial_prompt("Bryan"))
-        full_text = " ".join(x.text for x in segs)
-        full = time.time() - t0
-        t0 = time.time()
-        heard = listener._heard_wake_word(audio, "Bryan")
-        pre = time.time() - t0
-        kind = "com 'Nexus'" if phrase.startswith("Nexus") else "sem 'Nexus'"
-        cost_v08 = full
-        cost_v14 = pre + (full if heard else 0)
-        print(f"   [{vname.split()[1]:<6}] {kind}: v0.13 {cost_v08:.2f}s | v0.14 {cost_v14:.2f}s "
-              f"(checagem {pre:.2f}s, ouviu 'Nexus': {heard}) | {len(audio) / SR:.1f}s de áudio")
+# ---------------------------------------------------------------- 3) wake word pre-check with Whisper tiny (v0.15)
+print("\n3) 'NEXUS' COM WHISPER TINY (pré-checagem barata) x SMALL — 8 frases com o nome, por nível de ruído")
+try:
+    tiny = WhisperModel("tiny", device="cpu", compute_type="int8", local_files_only=True)
+except Exception:
+    raise SystemExit("   (Whisper tiny não está no PC)")
+named = [c for c in clips if c[1].startswith("Nexus")] + [c for c in clips if not c[1].startswith("Nexus")][:2]
+named = [(v, p, to16k(engine.render(tts.pronounce(p, "pt", "female" if "Maria" in v else "male"), voices[v], 0)))
+         for v, p, _ in named if p.startswith("Nexus")]
+for level in (0.0, 0.002, 0.012):
+    for label, m in (("tiny", tiny), ("small", model)):
+        hits, secs = 0, 0.0
+        for _, _, a in named:
+            a = a / np.abs(a).max() * 0.3
+            x = voice.normalize_audio((a + noise(len(a), level)) if level else a)[: 3 * SR]
+            t0 = time.time()
+            segs, _ = m.transcribe(x, language="pt", beam_size=1, without_timestamps=True, max_new_tokens=12,
+                                   vad_filter=False, condition_on_previous_text=False,
+                                   initial_prompt=voice.initial_prompt("Bryan"))
+            secs += time.time() - t0
+            hits += bool(voice.WAKE_RE.search(" ".join(s.text for s in segs)))
+        print(f"   ruído {level:<6} {label:<6}: 'Nexus' {hits}/{len(named)} | {secs / len(named):.2f}s por checagem")
