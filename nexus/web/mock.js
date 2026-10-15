@@ -12,7 +12,7 @@ if (!window.pywebview && location.search.includes("mock")) {
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, tts_volume: 100, llm_preset: "ollama", llm_api_key: "ollama",
     llm_temperature: 0.3, llm_context: 8192, history_turns: 12, auto_title: true, greet_on_start: true, start_fullscreen: true,
     mic_device: "", vad_threshold: 0.5, vad_silence: 0.7, reminder_leads: "60,10,0", speak_reminders: true,
-    network_mode: "hybrid", performance: "balanced", stt_beam: 5, llm_keep_alive: "2h", llm_num_gpu: -1, desktop_notifications: true, notify_sound: true, quiet_hours: "", daily_briefing: "", show_hud: true, show_captions: true, reduce_motion: false, auto_memory: true, voice_enabled: true, bridge_port: 47800,
+    ai_target: "local", bg_wake_only: true, bg_release_minutes: 10, pause_when_unfocused: true, network_mode: "hybrid", performance: "balanced", stt_beam: 5, llm_keep_alive: "2h", llm_num_gpu: -1, desktop_notifications: true, notify_sound: true, quiet_hours: "", daily_briefing: "", show_hud: true, show_captions: true, reduce_motion: false, auto_memory: true, voice_enabled: true, bridge_port: 47800,
     integrations: true, home_city: "São Paulo", calendar_ics_url: "", ai_mode: "assistant",
     ui_mode: "audio", mic_muted: false, require_wake_word: false };
   const llm = { online: true, model_ready: true, model: "qwen3:8b", models: ["qwen3:8b"] };
@@ -74,6 +74,8 @@ if (!window.pywebview && location.search.includes("mock")) {
       { id: 5, role: "user", content: "Me dê uma aula para o USMLE", ts: iso(15), conversation_id: 3, title: "Simulado USMLE" }],
     open_conversation: async (id) => ({ ok: true, messages: [{ role: "user", content: "Quanto pesa o coração de um homem adulto?" }, { role: "assistant", content: "Em média de 280 a 340 gramas." }], ...state() }),
     new_conversation: async () => state(), delete_conversation: async () => ({}), rename_conversation: async () => ({}),
+    set_background: async () => ({}),
+    switch_ai: async (t) => { settings.ai_target = t; return { ...state(), ai_target: t, need_setup: t === "api", llm, settings }; },
     skills: async () => ({ level: 3, rank: "D", total_xp: 640, progress: 0.4, skills: [
       { skill: "organization", level: 4, rank: "D", xp: 380, progress: 0.1, next: 220 }, { skill: "programming", level: 3, rank: "D", xp: 250, progress: 0.4, next: 110 },
       { skill: "study", level: 2, rank: "E", xp: 90, progress: 0.25, next: 90 }, { skill: "finance", level: 1, rank: "E", xp: 20, progress: 0.33, next: 40 },

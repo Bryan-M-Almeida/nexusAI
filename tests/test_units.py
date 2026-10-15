@@ -399,6 +399,53 @@ from nexus import logs  # noqa: E402
 logs.setup().info("unit-test-marker")
 check("log file written", "unit-test-marker" in logs.tail(5))
 
+# -- v0.14: links spoken as site names, caches, background, local <-> API switch -------------------------------
+check("speech: a link becomes the site's name", voice.clean_for_speech("Veja https://pt.wikipedia.org/wiki/Ada_Lovelace.")
+      == "Veja wikipedia.")
+check("speech: www links and markdown links", voice.clean_for_speech("Acesse www.python.org/downloads ou [docs](https://x.y/z)")
+      == "Acesse python ou docs")
+check("speech: .com.br domains", voice.site_name("https://g1.globo.com.br/economia") == "globo")
+calls = []
+
+
+def fake_weather(city="", days=3):
+    calls.append(city)
+    return {"city": city or "SP", "now": 22}
+
+
+tools._online_cache.clear()
+cfg["integrations"] = True
+fake_weather.__name__ = "get_weather"
+wrapped = tools._online(fake_weather)
+wrapped(city="Rio"); wrapped(city="Rio"); wrapped(city="Recife")
+check("online cache: same question within the TTL doesn't hit the network", calls == ["Rio", "Recife"], str(calls))
+knowledge._cache.clear()
+first = knowledge.search("estoicismo")
+check("knowledge cache: repeated search served from cache", knowledge.search("estoicismo") == first and len(knowledge._cache) >= 1)
+knowledge.learn("Teste cache", "conteúdo sobre estoicismo e cache", "aprendido")
+check("knowledge cache: cleared when the base changes", len(knowledge._cache) == 0)
+lst = voice.Listener.__new__(voice.Listener)
+lst.background, lst.model, lst.mode = True, object(), "off"
+cfg["require_wake_word"], cfg["bg_wake_only"] = False, True
+check("background: only 'Nexus...' counts while minimized/unfocused", lst.wake_required())
+lst.background = False
+check("foreground: normal conversation again", not lst.wake_required())
+lst.released = False
+lst.release()
+check("minimized: Whisper released from memory when the mic is off", lst.model is None and lst.released)
+cfg.update({"ai_target": "local", "ai_local": {}, "ai_api": {}, "llm_preset": "ollama", "llm_base_url": "http://127.0.0.1:11434/v1",
+            "llm_model": "qwen3:8b", "llm_api_key": "ollama", "network_mode": "offline"})
+need = _llm.switch_target("api")
+check("AI switch: first time on API asks for setup and leaves offline mode", need and cfg["network_mode"] == "online")
+cfg.update({"llm_preset": "openai", "llm_base_url": "https://api.openai.com/v1", "llm_model": "gpt-x", "llm_api_key": "sk-1"})
+_llm.switch_target("local")
+check("AI switch: back to local restores Ollama", cfg["llm_base_url"].startswith("http://127.0.0.1:11434") and cfg["llm_model"] == "qwen3:8b")
+need = _llm.switch_target("api")
+check("AI switch: the API configuration (and key) is remembered",
+      not need and cfg["llm_model"] == "gpt-x" and cfg["llm_api_key"] == "sk-1")
+_llm.switch_target("local")
+cfg["network_mode"] = "hybrid"
+
 # migration of pre-v0.9 messages: a 2 h gap splits them into two conversations
 import sqlite3  # noqa: E402
 import tempfile  # noqa: E402

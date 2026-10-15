@@ -49,6 +49,8 @@ class Api:
         bridge.start(settings["bridge_port"], self._on_profile)
         self._tts_buf, self._tts_streamed, self._reply_lang = "", False, None
         self.ai_state = "cold"  # cold | warming | ready | offline
+        self._hidden_since = None  # v0.14: when the window was minimized (None = visible)
+        threading.Thread(target=self._background_watch, daemon=True, name="background").start()
 
     def _confirm_command(self, command: str) -> bool:
         """The AI wants to run a command in the workspace: ask the user (dialog + voice) and wait up to 3 min."""
@@ -211,7 +213,7 @@ class Api:
                 "temporary": memory.temporary, "can_repeat": bool(assistant.last_reply()),
                 "conversation": memory.current_conversation(), "focus": self.focus(),
                 "workspace": workspace.active, "network": settings["network_mode"],
-                "performance": settings["performance"]}
+                "performance": settings["performance"], "ai_target": settings["ai_target"]}
 
     def interrupt(self):
         """Dock "interrupt" / Esc: stop speaking and cancel the answer being generated."""
@@ -276,6 +278,34 @@ class Api:
 
     def clear_history(self):
         memory.clear_history()
+
+    # -- background / suspended (v0.14) ----------------------------------------------------------------------------
+    def set_background(self, state):
+        """The interface reports "visible" | "blurred" (not in focus) | "hidden" (minimized)."""
+        self._listener.set_background(state != "visible")
+        if state == "hidden":
+            self._hidden_since = self._hidden_since or time.time()
+        else:
+            self._hidden_since = None
+            if self._listener.released:  # back on screen: reload the voice model quietly (~1 s, from disk)
+                self._listener.released = False
+                threading.Thread(target=self._listener._load_model, daemon=True, name="stt-load").start()
+        return {"wake_only": self._listener.wake_required()}
+
+    def _background_watch(self):
+        """Minimized for a while with the microphone off: free Whisper's memory (reloaded when needed)."""
+        while True:
+            time.sleep(30)
+            hidden = self._hidden_since and time.time() - self._hidden_since >= settings["bg_release_minutes"] * 60
+            if hidden and self._listener.model is not None and self._listener.mode == "off":
+                self._listener.release()
+                log.info("minimized: voice model released from memory")
+
+    # -- one-click local AI <-> API (v0.14) -------------------------------------------------------------------------
+    def switch_ai(self, target):
+        need_setup = llm.switch_target(target)
+        st = llm.status() if not need_setup else {"online": False, "model": settings["llm_model"], "models": []}
+        return {**self.state(), "need_setup": need_setup, "llm": st, "settings": dict(settings)}
 
     # -- connection modes and performance profiles (v0.12) --------------------------------------------------------
     def performance_info(self):

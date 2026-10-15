@@ -61,7 +61,17 @@ def _split_long(heading, content):
         yield heading, part.strip()
 
 
+# v0.14: search results are cached until the knowledge base changes (every message runs at least one search).
+_cache: dict = {}
+_CACHE_MAX = 256
+
+
+def _changed():
+    _cache.clear()
+
+
 def add_document(title: str, text: str, category: str, source: str) -> dict:
+    _changed()
     """Insert or replace (same source) a document. Returns {id, chunks}."""
     existing = db.one("SELECT id FROM kb_docs WHERE source = ?", (source,))
     if existing:
@@ -148,6 +158,17 @@ def scan_inbox() -> list[str]:
 
 
 def search(query: str, limit: int = 4, category: str | None = None) -> list[dict]:
+    key = (query, limit, category)
+    if key in _cache:
+        return [dict(r) for r in _cache[key]]
+    rows = _search(query, limit, category)
+    if len(_cache) >= _CACHE_MAX:
+        _cache.pop(next(iter(_cache)))
+    _cache[key] = [dict(r) for r in rows]
+    return rows
+
+
+def _search(query: str, limit: int = 4, category: str | None = None) -> list[dict]:
     q = fts_query(query)
     if not q:
         return []
@@ -177,6 +198,7 @@ def documents() -> list[dict]:
 
 def delete_document(doc_id: int):
     doc = db.one("SELECT title FROM kb_docs WHERE id = ?", (doc_id,))
+    _changed()
     db.execute("DELETE FROM kb_chunks WHERE doc_id = ?", (doc_id,))
     db.execute("DELETE FROM kb_docs WHERE id = ?", (doc_id,))
     if doc:

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 2.4  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.13.0
+ Versión del documento: 2.5  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.14.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -95,6 +95,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-VOZ-015  Voz de "aparato de fumador" (laringe electrónica), difícil de entender
       NX-VOZ-016  Nombre pronunciado "NÊXUS" (o deletreado "N, E, X, U, S")
       NX-VOZ-017  Mal reconocimiento: palabras cambiadas, idioma equivocado, frases inventadas
+      NX-VOZ-018  Enlaces leídos letra por letra
  DAT  NX-DAT-001  La base de conocimiento no encuentra un tema existente
       NX-DAT-002  PDF importado sin texto ("No pude extraer texto")
       NX-DAT-003  "Fecha inválida" al crear un evento/tarea
@@ -756,6 +757,15 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                24,5% -> 12,1%, y más rápido (3,2 s -> 2,0 s por frase).
   Consejo    : Si hablas otro idioma con NEXUS, elígelo en Configuración >
                Idioma.
+
+[NX-VOZ-018] Enlaces leídos letra por letra
+  Gravedad   : MEDIA            Estado: CORREGIDO (v0.14)  Observado: SÍ
+  Síntoma    : Las respuestas con enlaces (noticias, Wikipedia) se decían
+               carácter por carácter: "h t t p s dos puntos barra...".
+  Corrección : Al hablar, cada enlace se convierte en el nombre del sitio
+               (pt.wikipedia.org -> "wikipedia", g1.globo.com.br -> "globo");
+               los enlaces Markdown solo dicen su texto. La pantalla sigue
+               mostrando el enlace completo. Probado en tests\test_units.py.
 
 ================================================================================
  DAT — DATOS, MEMORIA Y CONOCIMIENTO

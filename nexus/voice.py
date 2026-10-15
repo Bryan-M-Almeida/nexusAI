@@ -19,11 +19,33 @@ ENV_STEP = 0.04  # seconds per point of the speech envelope sent to the UI ring
 MAX_CONTROL_SECONDS = 4  # while NEXUS speaks, only short utterances ("pausa", "stop") are considered
 
 
+URL_RE = re.compile(r"\b(?:https?://|www\.)[^\s<>()\[\]\"']+", re.IGNORECASE)
+_TLD_PARTS = {"com", "org", "net", "gov", "edu", "br", "co", "uk", "io", "app", "dev", "info", "es", "pt", "mx",
+              "ar", "us", "me", "tv", "ai", "www", "m"}
+
+
+def site_name(url: str) -> str:
+    """https://pt.wikipedia.org/wiki/X -> "wikipedia"; https://g1.globo.com.br/... -> "globo"."""
+    from urllib.parse import urlsplit
+
+    host = urlsplit(url if "://" in url else "http://" + url).hostname or ""
+    labels = [x for x in host.lower().split(".") if x]
+    while len(labels) > 1 and labels[-1] in _TLD_PARTS:
+        labels.pop()
+    return labels[-1] if labels else ""
+
+
 def clean_for_speech(text: str) -> str:
     text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
     text = re.sub(r"`[^`\n]+`", " ", text)  # inline code / file paths are shown, not read aloud
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)  # markdown link: only its text
+    # A raw link is spoken as the site's name instead of letter by letter (v0.14).
+    def spoken(m):
+        url = m.group(0).rstrip(".,;:!?")
+        return (site_name(url) or " ") + m.group(0)[len(url):]  # keep the sentence's own punctuation
+
+    text = URL_RE.sub(spoken, text)
     text = re.sub(r"[*_`#>|]", "", text)
-    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -114,6 +136,25 @@ class Speaker:
         rms = np.sqrt(np.mean(audio[: n * step].reshape(n, step) ** 2, axis=1))
         return np.round(rms / (rms.max() or 1), 2).tolist()
 
+    # v0.14: short sentences that repeat (greeting, "Running in ... mode", reminders, "I'll repeat") are
+    # synthesized once and reused; SAPI rendering + effects cost ~100-300 ms per sentence.
+    CACHE_MAX, CACHE_CHARS = 48, 160
+
+    def _render(self, engine, tts, sentence, voice, pitch):
+        key = (sentence, getattr(voice, "name", ""), pitch, settings["tts_speed"], settings["voice_effect"])
+        cache = self.__dict__.setdefault("_cache", {})
+        if key in cache:
+            self.cache_hits = getattr(self, "cache_hits", 0) + 1
+            audio = cache.pop(key)
+            cache[key] = audio  # most recently used goes last
+            return audio
+        audio = tts.apply_effect(engine.render(sentence, voice, pitch, settings["tts_speed"]), settings["voice_effect"])
+        if len(sentence) <= self.CACHE_CHARS:
+            cache[key] = audio
+            while len(cache) > self.CACHE_MAX:
+                cache.pop(next(iter(cache)))
+        return audio
+
     def _run(self):
         from . import tts
 
@@ -143,8 +184,7 @@ class Speaker:
                         if self.interrupt.is_set():
                             break
                         self.on_state("speaking")
-                    audio = tts.apply_effect(engine.render(sentences[i], voice, pitch, settings["tts_speed"]),
-                                             settings["voice_effect"])
+                    audio = self._render(engine, tts, sentences[i], voice, pitch)
                     audio = audio * (max(0, min(100, int(settings["tts_volume"]))) / 100)  # Settings > Voice volume
                     self.on_audio({"env": self._envelope(audio, tts.RATE), "dt": ENV_STEP})
                     sd.play(audio, tts.RATE)
@@ -278,6 +318,9 @@ class Listener:
         self.mode = "off"
         self.live = False  # continuous listening wanted (audio mode with mic unmuted)
         self.awake_until = 0.0
+        self.background = False  # window minimized/unfocused (v0.14): only "Nexus ..." is accepted
+        self.released = False  # Whisper freed while minimized (reloaded when the window comes back)
+        self.prechecks = self.full_runs = 0  # counters for the low-power wake check (diagnostics/tests)
         self._stream = None
         self._frames: queue.Queue = queue.Queue()
         self._lock = threading.Lock()
@@ -302,6 +345,19 @@ class Listener:
             self.model = None
             self.model_state = "error" if download else "missing"
             self.model_error = str(exc) if download else None
+
+    def release(self):
+        """Free Whisper's memory (~0.5 GB for "small") while voice isn't needed; reloaded on demand."""
+        if self.model is not None and self.mode == "off":
+            self.model = None
+            self.model_state = "missing"
+            self.released = True
+
+    def set_background(self, on: bool):
+        self.background = bool(on)
+
+    def wake_required(self) -> bool:
+        return bool(settings["require_wake_word"] or (self.background and settings["bg_wake_only"]))
 
     def reload_model(self):
         threading.Thread(target=self._load_model, args=(True,), daemon=True, name="stt-load").start()
@@ -411,6 +467,12 @@ class Listener:
             name = ((db.get_profile() or {}).get("name") or "").split()[0]
         except Exception:
             name = ""
+        gated = not (was_ptt or during_speech) and self.wake_required() and time.time() >= self.awake_until
+        if gated and self._wake_model() is not None and not self._heard_wake_word(audio, name):
+            if not during_speech:
+                self.on_state("standby" if self.mode == "live" else "idle")
+            return  # no "Nexus" at the start: the full transcription never runs (TV, people around)
+        self.full_runs += 1
         segments, _ = self.model.transcribe(
             normalize_audio(audio), language=self.stt_language(),
             beam_size=1 if during_speech else max(1, int(settings["stt_beam"])),
@@ -421,10 +483,37 @@ class Listener:
             self.on_state("standby" if self.mode == "live" else "idle")
         if not text:
             return
-        if was_ptt or during_speech or not settings["require_wake_word"]:
+        if was_ptt or during_speech or not self.wake_required():
             self.on_text(text, during_speech)
             return
         self._wake_check(text)
+
+    WAKE_WINDOW = 2.0  # seconds: "Nexus" is said at the start of a command
+    _tiny = None  # Whisper "tiny" for the wake word check, or False when it isn't on this PC
+
+    def _wake_model(self):
+        """Measured (tests/bench_voice.py, part 3): Whisper always encodes a fixed 30 s window, so checking only
+        the first 2 s with the SAME model costs ~1.8 s vs ~2.3 s for everything - no saving, and twice the cost
+        when "Nexus" was said. Only a much smaller model makes the pre-check worth it: "tiny" is used when it is
+        already downloaded (never downloaded automatically); otherwise there is no pre-check."""
+        if Listener._tiny is None:
+            try:
+                from faster_whisper import WhisperModel
+
+                Listener._tiny = WhisperModel("tiny", device="cpu", compute_type="int8", local_files_only=True)
+            except Exception:
+                Listener._tiny = False
+        return Listener._tiny or None
+
+    def _heard_wake_word(self, audio, name="") -> bool:
+        """Cheap first pass with the tiny model over the first 2 s; the main model only runs if "Nexus" is there."""
+        self.prechecks += 1
+        head = normalize_audio(audio[: int(self.WAKE_WINDOW * RATE)])
+        segments, _ = self._wake_model().transcribe(head, language=self.stt_language(), beam_size=1,
+                                                    without_timestamps=True, max_new_tokens=12, vad_filter=False,
+                                                    condition_on_previous_text=False,
+                                                    initial_prompt=initial_prompt(name))
+        return bool(WAKE_RE.search(" ".join(s.text for s in segments)))
 
     def _wake_check(self, text):
         m = WAKE_RE.search(text)

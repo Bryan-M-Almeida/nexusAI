@@ -8,6 +8,50 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.14.0 — Protótipo · 2026-10-14
+
+**Leveza: menos trabalho em segundo plano, caches, troca IA local ⇄ API em um clique — e links falados pelo nome.**
+
+### Corrigido
+- **Links lidos letra por letra** (NX-VOZ-018): agora a voz fala só o nome do site ("Veja
+  https://pt.wikipedia.org/wiki/Ada_Lovelace." → "Veja wikipedia."); a tela continua mostrando o link inteiro.
+
+### Segundo plano
+- **Fora de foco ou minimizado**: o aro, o HUD, o pulso e os indicadores param de animar (o aro deixa de ser
+  desenhado — 0 quadros) e voltam ao focar. Opção em Configurações → Interface.
+- **Só "Nexus…" vale com o NEXUS fora de foco** (Configurações → Microfone): conversas por perto e TV não viram
+  comandos.
+- **Minimizado com o microfone desligado**: depois de 10 min (ajustável) o Whisper sai da memória —
+  **−258 MB de RAM** medidos — e volta sozinho (~1 s, do disco) quando a janela reaparece.
+
+### Caches (medidos com `tests/bench_lightness.py`)
+| | 1ª vez | repetido |
+|---|---|---|
+| Clima (São Paulo) | 5 155 ms | 0,07 ms (15 min) |
+| Câmbio USD→BRL | 909 ms | 0,06 ms (1 h) |
+| Frase falada repetida ("Executando em modo Direto.") | 72 ms | 0,01 ms |
+| Busca na base de conhecimento | 0,4 ms | 0,003 ms (até a base mudar) |
+
+Notícias também ficam 15 min e Wikipédia 1 dia; erros nunca são guardados.
+
+### IA local ⇄ API
+- Botão na borda esquerda e chave "IA LOCAL | API" em Configurações → Inteligência: cada lado guarda sua
+  configuração (a chave da API continua criptografada). Na primeira vez, abre a escolha do provedor. Com API, quase
+  toda a carga sai do PC (e as mensagens também).
+
+### Medido e descartado
+- **Pré-checar "Nexus" nos 2 primeiros segundos com o mesmo Whisper** não economiza: o Whisper sempre codifica uma
+  janela fixa de 30 s, então a checagem custou 1,8 s contra 2,3 s da transcrição inteira, e o dobro quando "Nexus"
+  foi dito; reduzir o decodificador (beam 1, sem tempos) poupou só ~10%. A pré-checagem fica pronta para o modelo
+  **tiny** (~75 MB, muito mais leve) e só é usada se ele já estiver no PC — ele não é baixado sozinho.
+
+### Testes desta versão
+- 161/161 testes unitários (12 novos: links falados, caches online e da base, segundo plano, liberação do Whisper,
+  troca local ⇄ API guardando as duas configurações).
+- 28/28 verificações de conversa com qwen3:8b.
+
+---
+
 ## v0.13.0 — Protótipo · 2026-10-14
 
 **Habilidades com níveis e ranks, e as funções essenciais que faltavam: instância única, entrada rápida, backup
@@ -471,7 +515,7 @@ NX-VOZ-016, NX-ENV-007).
 
 Prioridades definidas em 2026-10-14 (desempenho primeiro, para o NEXUS rodar em mais computadores):
 
-### v0.14.0 — Protótipo (próxima) · leveza
+### v0.14.0 — entregue (ver acima); pendente: pré-checagem com o Whisper tiny (precisa de download)
 1. **Segundo plano / suspenso**: com a janela minimizada ou sem foco, pausar animações, HUD e o aro; liberar o
    Whisper e a IA da memória após um tempo sem uso (conforme o perfil).
 2. **Escuta de baixo consumo para "Nexus"**: com a palavra de ativação (ou o NEXUS fora de foco), só o detector de voz
@@ -481,7 +525,7 @@ Prioridades definidas em 2026-10-14 (desempenho primeiro, para o NEXUS rodar em 
 4. **Troca rápida IA local ↔ API** em um clique, guardando as duas configurações (com API, quase toda a carga sai
    do PC).
 
-### v0.15.0 · arquivos
+### v0.15.0 — Protótipo (próxima) · arquivos
 - Ler **PDF, DOCX, TXT/MD e textos**, **ZIP** (RAR depende de ferramenta externa — avaliar) e **imagens** (OCR do
   próprio Windows, sem download); arrastar arquivos para o chat.
 

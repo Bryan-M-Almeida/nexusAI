@@ -2,6 +2,7 @@
 import functools
 import inspect
 import json
+import time
 from datetime import datetime, timedelta
 
 from . import integrations, knowledge, memory, profile
@@ -215,6 +216,12 @@ def report_issue(description=""):
 
 
 # ---------------------------------------------------------------- online integrations (v0.6)
+# v0.14: online answers are reused for a while (weather and news change slowly; rates once a day), so asking
+# twice doesn't wait for the network again. Errors are never cached.
+ONLINE_TTL = {"get_weather": 900, "get_news": 900, "convert_currency": 3600, "wikipedia": 86400}
+_online_cache: dict = {}
+
+
 def _online(fn):
     @functools.wraps(fn)  # keeps the real signature: execute() filters arguments with inspect.signature
     def wrapper(**kwargs):
@@ -222,7 +229,15 @@ def _online(fn):
             return {"error": "online integrations are disabled in Settings"}
         if settings["network_mode"] == "offline":
             return {"error": "NEXUS is in offline mode: no internet access (Settings > Performance)"}
-        return fn(**kwargs)
+        ttl = ONLINE_TTL.get(fn.__name__)
+        key = (fn.__name__, json.dumps(kwargs, sort_keys=True, default=str), settings["home_city"], settings["language"])
+        hit = _online_cache.get(key)
+        if ttl and hit and time.time() - hit[0] < ttl:
+            return hit[1]
+        result = fn(**kwargs)
+        if ttl and isinstance(result, dict) and "error" not in result:
+            _online_cache[key] = (time.time(), result)
+        return result
     return wrapper
 
 

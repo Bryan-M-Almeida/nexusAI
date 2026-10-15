@@ -98,6 +98,26 @@ def is_local_url(url: str | None = None) -> bool:
     return any(h in url for h in ("//127.0.0.1", "//localhost", "//[::1]", "//0.0.0.0"))
 
 
+AI_FIELDS = ("llm_preset", "llm_base_url", "llm_model", "llm_api_key", "llm_provider")
+LOCAL_DEFAULT = {"llm_preset": "ollama", "llm_base_url": "http://127.0.0.1:11434/v1", "llm_model": "qwen3:8b",
+                 "llm_api_key": "ollama", "llm_provider": "auto"}
+
+
+def switch_target(target: str) -> bool:
+    """One-click local AI <-> API (v0.14): the current fields go to their slot and the other slot is loaded.
+    With an API the model runs on the provider's servers - almost no load on this PC, but the messages leave it.
+    Returns True when the API still has to be configured (provider + key)."""
+    target = "api" if target == "api" else "local"
+    current = settings["ai_target"]
+    changes = {f"ai_{current}": {k: settings[k] for k in AI_FIELDS}, "ai_target": target}
+    slot = settings.get(f"ai_{target}") or {}
+    changes.update(slot or (LOCAL_DEFAULT if target == "local" else {}))
+    if target == "api" and settings["network_mode"] == "offline":
+        changes["network_mode"] = "online"  # an API needs the internet
+    settings.apply(changes)
+    return target == "api" and (not slot or is_local_url())
+
+
 def offline_blocked() -> bool:
     """Offline mode: a cloud AI server is never contacted."""
     return settings["network_mode"] == "offline" and not is_local_url()

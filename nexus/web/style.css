@@ -539,6 +539,15 @@ button, .dock, .rail, .topbar, .core-label { user-select: none; }
 .backup-list { list-style: none; margin: 8px 0 14px; padding: 0; font-size: 11px; color: var(--muted); max-height: 140px; overflow-y: auto; }
 .backup-list li { padding: 3px 0; border-bottom: 1px solid rgba(74, 144, 226, .08); }
 
+/* ---------------------------------------------------------------- v0.14 background, AI switch */
+/* Not in focus: nothing animates (the compositor stops repainting the ring, HUD and pulse). */
+.app.bg .ring-spin, .app.bg .ring-sway, .app.bg .ring-core, .app.bg .chip .dot, .app.bg .caret::after,
+.app.bg .hud-frame span, .app.bg .hud-sideticks { animation-play-state: paused !important; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); margin: 2px 0 6px; }
+.seg button { background: none; border: 0; padding: 6px 16px; font-size: 11px; letter-spacing: .14em; color: var(--muted); }
+.seg button.on { color: var(--text); background: rgba(61, 139, 219, .2); }
+#btnAiTarget.api { color: #f2b33d; border-color: rgba(242, 179, 61, .5); }
+
 /* ---------------------------------------------------------------- modals & toasts */
 .modal { position: fixed; inset: 0; z-index: 20; background: rgba(3, 5, 8, .78); display: grid; place-items: center; padding: 20px; backdrop-filter: blur(4px); }
 .modal-box { width: min(560px, 100%); max-height: 92vh; overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line-strong); padding: 26px; position: relative; animation: rise .4s var(--ease-out); }

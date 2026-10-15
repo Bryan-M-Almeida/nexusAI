@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 2.4  ·  Date: 2026-10-14  ·  App version: 0.13.0
+ Document version: 2.5  ·  Date: 2026-10-14  ·  App version: 0.14.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -94,6 +94,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-VOZ-015  "Smoker's device" (electrolarynx) voice, hard to understand
       NX-VOZ-016  Name pronounced "NÊXUS" (or spelled "N, E, X, U, S")
       NX-VOZ-017  Poor recognition: wrong words, wrong language, invented sentences
+      NX-VOZ-018  Links read out letter by letter
  DAT  NX-DAT-001  Knowledge base doesn't find an existing topic
       NX-DAT-002  Imported PDF has no text ("Could not extract text")
       NX-DAT-003  "Invalid date" when creating an event/task
@@ -724,6 +725,15 @@ QUICK DIAGNOSTICS (run these before investigating)
                24.5% -> 12.1%, and faster (3.2 s -> 2.0 s per sentence).
   Tip        : If you speak another language with NEXUS, choose it in
                Settings > Language.
+
+[NX-VOZ-018] Links read out letter by letter
+  Severity   : MEDIUM           Status: FIXED (v0.14)      Observed: YES
+  Symptom    : Answers with links (news, Wikipedia) were spoken character by
+               character: "h t t p s colon slash...".
+  Fix        : When spoken, each link becomes the site's name
+               (pt.wikipedia.org -> "wikipedia", g1.globo.com.br -> "globo");
+               Markdown links only speak their text. The screen still shows
+               the full link. Tested in tests\test_units.py.
 
 ================================================================================
  DAT — DATA, MEMORY AND KNOWLEDGE

@@ -147,7 +147,7 @@ async function start() {
   applyInterface();
   api().notifications().then((r) => setBadge(r.unread));
   api().skills().then(renderLvBadge);
-  applyState({ network: settings.network_mode, performance: settings.performance,
+  applyState({ network: settings.network_mode, performance: settings.performance, ai_target: settings.ai_target || "local",
     ui_mode: settings.ui_mode, mic_muted: settings.mic_muted, voice_enabled: settings.voice_enabled, stt: st.stt,
     ai_mode: settings.ai_mode || "assistant", temporary: false });
   await new Promise((r) => setTimeout(r, Math.max(0, BOOT_MIN_MS - (Date.now() - t0))));
@@ -377,6 +377,7 @@ function applyState(st) {
   if (ws) $("#wsName").textContent = ws.name;
   $("#app").classList.toggle("focus", !!state.focus);
   $("#btnFocus").classList.toggle("on", !!state.focus);
+  if (state.ai_target) renderAiTarget();
   if (state.network) {
     $("#chipNet").textContent = T("netChip_" + state.network);
     $("#chipNet").classList.toggle("offline", state.network === "offline");
@@ -395,7 +396,9 @@ function ringSpeak(p) {
   ringEnvStart = performance.now();
 }
 
+let ringRunning = true;
 function ringFrame(now) {
+  if ($("#app").classList.contains("bg")) { ringRunning = false; return; }  // v0.14: no work while unfocused
   let aiTarget = 0;
   if (ringEnv && voiceState === "speaking") {
     const i = Math.floor((now - ringEnvStart) / 1000 / ringEnvDt);
@@ -909,6 +912,7 @@ function wire() {
   wireRingDrag();
   wireWorkspace();
   wireEssentials();
+  wireLightness();
   $("#btnNewConv").onclick = newConversation;
   $("#btnConvs").onclick = () => openConversations("threads");
   $$("#convTabs button").forEach((b) => (b.onclick = () => openConversations(b.dataset.ctab)));
@@ -1256,6 +1260,57 @@ function wireEssentials() {
     if (r.ok) notice(T("restoreScheduled")); else if (r.error) notice(r.error);
   };
   $("#btnBackupFolder").onclick = () => api().open_backups_folder();
+}
+
+/* ------------------------------------------------------------------ background & AI switch (v0.14) */
+let bgState = "visible";
+function reportBackground() {
+  const st = document.hidden ? "hidden" : document.hasFocus() ? "visible" : "blurred";
+  if (st === bgState) return;
+  bgState = st;
+  const pause = st !== "visible" && settings.pause_when_unfocused !== false;
+  $("#app").classList.toggle("bg", pause);
+  if (!pause && !ringRunning) { ringRunning = true; requestAnimationFrame(ringFrame); }
+  if (window.pywebview && api()) api().set_background(st);
+}
+
+function renderAiTarget() {
+  const api_ = state.ai_target === "api";
+  $("#aiTargetName").textContent = T(api_ ? "aiTargetApi" : "aiTargetLocal");
+  $("#btnAiTarget").classList.toggle("api", api_);
+  $$("#aiSeg [data-target]").forEach((b) => b.classList.toggle("on", b.dataset.target === (state.ai_target || "local")));
+}
+
+async function switchAi(target) {
+  const r = await api().switch_ai(target);
+  settings = r.settings;
+  applyState(r);
+  setAi(r.llm);
+  renderAiTarget();
+  showTip(T("aiSwitched", { name: T(target === "api" ? "aiTargetApi" : "aiTargetLocal") }));
+  if (r.need_setup) {
+    openSettings("ai");
+    const f = $("#settingsForm");
+    if (!presets.length) await new Promise((res) => setTimeout(res, 400));
+    const cloud = presets.find((x) => x.local === false);
+    if (cloud && (!f.elements.llm_preset.value || presets.find((x) => x.id === f.elements.llm_preset.value)?.local)) {
+      f.elements.llm_preset.value = cloud.id;
+      onPresetChange();
+      f.elements.llm_api_key.value = "";
+    }
+    notice(T("aiNeedSetup"));
+  } else if (!$("#settings").hidden) openSettings("ai");
+}
+
+function wireLightness() {
+  document.addEventListener("visibilitychange", reportBackground);
+  window.addEventListener("blur", reportBackground);
+  window.addEventListener("focus", reportBackground);
+  $("#btnAiTarget").onclick = () => switchAi(state.ai_target === "api" ? "local" : "api");
+  $("#aiSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-target]");
+    if (b && b.dataset.target !== (state.ai_target || "local")) switchAi(b.dataset.target);
+  });
 }
 
 /* ------------------------------------------------------------------ init */

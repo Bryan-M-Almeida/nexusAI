@@ -65,6 +65,9 @@
       <span><b data-i18n="modeDirect">Direto</b><small data-i18n="modeDirectHint">curto e exato · mais rápido</small></span></button>
     <button class="rail-btn" data-ai-mode="study"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>
       <span><b data-i18n="modeStudy">Estudo</b><small data-i18n="modeStudyHint">tutor passo a passo</small></span></button>
+    <p class="rail-title mono rail-sep" data-i18n="aiTargetTitle">INTELIGÊNCIA</p>
+    <button class="rail-btn" id="btnAiTarget"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>
+      <span><b id="aiTargetName">IA local</b><small id="aiTargetHint" data-i18n="aiTargetHint">clique para trocar · local ⇄ API</small></span></button>
     <p class="rail-title mono rail-sep" data-i18n="focusTitle">FOCO</p>
     <button class="rail-btn" id="btnFocus"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
       <span><b data-i18n="focusMode">Modo foco</b><small data-i18n="focusHint">sem distrações · avisos só no sino</small></span></button>
@@ -328,6 +331,8 @@
       <section class="set-sec" data-sec="ai" hidden>
         <h2 data-i18n="secAi">Inteligência</h2>
         <div class="ai-status mono" id="aiStatus"></div>
+        <div class="seg mono" id="aiSeg"><button type="button" data-target="local" data-i18n="aiLocal">IA LOCAL</button><button type="button" data-target="api" data-i18n="aiApi">API</button></div>
+        <p class="hint" data-i18n="aiSegHint">As duas configurações ficam guardadas; troque a qualquer momento pela borda esquerda.</p>
         <label><span data-i18n="provider">Provedor</span><select name="llm_preset" id="llmPreset"></select></label>
         <p class="hint warn-cloud" id="cloudWarn" hidden data-i18n="cloudWarn">Provedor na nuvem: suas mensagens, memórias e dados enviados no contexto saem do computador. Os locais (Ollama, LM Studio) não enviam nada.</p>
         <label><span data-i18n="llmUrl">Endereço do servidor</span><input name="llm_base_url" spellcheck="false"></label>
@@ -376,6 +381,8 @@
         </div>
         <p class="hint" data-i18n="vadHint">Valor menor de sensibilidade capta vozes mais baixas (e mais ruído). Aumente a pausa se o NEXUS corta você no meio da frase.</p>
         <label class="check"><input type="checkbox" name="require_wake_word"><span data-i18n="requireWake">Só responder quando eu disser "Nexus"</span></label>
+        <label class="check"><input type="checkbox" name="bg_wake_only"><span data-i18n="bgWakeOnly">Com o NEXUS minimizado ou fora de foco, só responder a "Nexus…"</span></label>
+        <p class="hint" data-i18n="wakeHint">Com "Nexus" exigido, só os 2 primeiros segundos de cada fala são checados; a transcrição completa só roda depois de ouvir "Nexus" (bem menos processador com TV ou conversas por perto).</p>
       </section>
 
       <!-- PERFORMANCE & CONNECTION (v0.12) -->
@@ -395,6 +402,7 @@
           <button type="button" class="card-opt" data-perf="max"><b data-i18n="perfMax">Força total</b><small data-i18n="perfMaxHint">Máximo do seu hardware: contexto maior que ainda cabe na placa de vídeo, Whisper medium, IA sempre carregada.</small><i class="why" id="maxWhy"></i></button>
         </div>
         <p class="hint" data-i18n="perfHint">O perfil ajusta várias opções de uma vez; você ainda pode mudar cada uma nas outras seções.</p>
+        <label><span data-i18n="bgRelease">Minimizado por quantos minutos para liberar a memória da voz</span><input name="bg_release_minutes" type="number" min="1" max="240"></label>
         <p class="sub mono" data-i18n="hwTitle">SEU COMPUTADOR</p>
         <div class="hw-box mono" id="hwBox"></div>
       </section>
@@ -438,6 +446,7 @@
         <label class="check"><input type="checkbox" name="show_hud"><span data-i18n="showHud">HUD em volta do aro (telemetria, cantos e pulso)</span></label>
         <label class="check"><input type="checkbox" name="show_captions"><span data-i18n="showCaptions">Legenda da resposta no modo áudio</span></label>
         <label class="check"><input type="checkbox" name="reduce_motion"><span data-i18n="reduceMotion">Reduzir animações (PCs mais fracos)</span></label>
+        <label class="check"><input type="checkbox" name="pause_when_unfocused"><span data-i18n="pauseUnfocused">Pausar animações quando o NEXUS estiver fora de foco</span></label>
         <div class="row-btns"><button class="btn-ghost" type="button" id="btnCenterRing" data-i18n="centerRing">Centralizar o aro</button></div>
       </section>
 

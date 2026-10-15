@@ -130,3 +130,30 @@ for name, cfg in CONFIGS.items():
             print(f"      [{vname.split()[1]}] {phrase!r} -> {text!r}")
     print(f"   {name:<32}: erro de palavras (WER) {np.mean(errs) * 100:5.1f}% | 'Nexus' reconhecido "
           f"{wake_hits}/{wake_total} | {secs / len(clips):.2f}s por frase")
+
+# ---------------------------------------------------------------- 3) low-power wake word (v0.14)
+print("\n3) PALAVRA 'NEXUS' EXIGIDA — custo por fala de ~6 s (conversa ao redor / TV)")
+LONG = ["Ontem eu fui ao mercado e comprei arroz, feijão, café e um pouco de fruta para a semana inteira.",
+        "Nexus, me lembra de ligar para a minha mãe amanhã de manhã, antes de sair para o trabalho."]
+listener = voice.Listener.__new__(voice.Listener)  # only the transcription helpers, no microphone/threads
+listener.model, listener.prechecks, listener.full_runs = model, 0, 0
+if listener._wake_model() is None:
+    print("   (Whisper 'tiny' não está no PC: sem pré-checagem; com o próprio 'small' ela não economiza — v0.14)")
+    raise SystemExit
+for vname in ("Microsoft Maria", "Microsoft Daniel"):
+    for phrase in LONG:
+        speech = to16k(engine.render(phrase, voices[vname], 0))
+        audio = speech / np.abs(speech).max() * 0.3 + noise(len(speech), 0.012)
+        t0 = time.time()
+        segs, _ = model.transcribe(voice.normalize_audio(audio), language="pt", beam_size=5, vad_filter=False,
+                                   condition_on_previous_text=False, initial_prompt=voice.initial_prompt("Bryan"))
+        full_text = " ".join(x.text for x in segs)
+        full = time.time() - t0
+        t0 = time.time()
+        heard = listener._heard_wake_word(audio, "Bryan")
+        pre = time.time() - t0
+        kind = "com 'Nexus'" if phrase.startswith("Nexus") else "sem 'Nexus'"
+        cost_v08 = full
+        cost_v14 = pre + (full if heard else 0)
+        print(f"   [{vname.split()[1]:<6}] {kind}: v0.13 {cost_v08:.2f}s | v0.14 {cost_v14:.2f}s "
+              f"(checagem {pre:.2f}s, ouviu 'Nexus': {heard}) | {len(audio) / SR:.1f}s de áudio")

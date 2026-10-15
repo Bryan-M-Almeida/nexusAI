@@ -115,6 +115,13 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 
 Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia, `Ctrl+,` Configurações, `Ctrl+Shift+N` nova conversa, `Ctrl+H` conversas, `Ctrl+J` notificações, `Ctrl+T` transcrição.
 
+### Leveza (v0.14)
+
+- Fora de foco ou minimizado, as animações param e só "Nexus…" vale como comando; minimizado com o microfone desligado, a voz sai da memória (−258 MB) e volta sozinha.
+- Clima, notícias, câmbio, Wikipédia, frases faladas repetidas e buscas na base ficam em cache (clima repetido: de 5 s para instantâneo).
+- **IA local ⇄ API** em um clique (borda esquerda); cada lado guarda sua configuração.
+- Links são falados pelo nome do site, não letra por letra.
+
 ### Habilidades (v0.13)
 
 O selo ao lado do nome na barra superior mostra o **rank (E → S) e o nível** do NEXUS; clique para ver cada área (Organização, Finanças, Programação, Estudo, Saúde, Conhecimento, Pesquisa, Voz). Elas sobem com o uso — cada assunto, cada ação feita e cada fala por voz — sem nenhuma chamada extra à IA.
@@ -247,6 +254,7 @@ Os testes **sempre** usam uma pasta de dados temporária, então nunca tocam nos
 .\.venv\Scripts\python tests\bench_latency.py --warm # tempos de resposta
 .\.venv\Scripts\python tests\bench_voice.py         # fim de fala e precisão do reconhecimento
 .\.venv\Scripts\python tests\bench_hardware.py      # IA por tamanho de contexto (placa x processador) e voz
+.\.venv\Scripts\python tests\bench_lightness.py     # caches e memória liberada em segundo plano
 ```
 
 ## Gerar o executável
@@ -299,4 +307,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.13.0 (protótipo)**.
+Versão atual: **v0.14.0 (protótipo)**.

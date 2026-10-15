@@ -105,6 +105,13 @@ DEFAULTS = {
     "stt_beam": 5,                # Whisper beam size (1 = fastest)
     "llm_keep_alive": "2h",       # how long the model stays in VRAM after the last message
     "llm_num_gpu": -1,            # layers on the GPU (-1 = Ollama decides, 999 = all, 0 = CPU only)
+    # v0.14 ----------------------------------------------------------------------------------------------------
+    "bg_wake_only": True,         # window minimized/unfocused: only utterances starting with "Nexus" count
+    "bg_release_minutes": 10,     # minimized this long with the mic off -> Whisper leaves memory
+    "pause_when_unfocused": True, # stop the ring/HUD animations while the window isn't in focus
+    "ai_target": "local",         # local | api (one-click switch keeps both configurations)
+    "ai_local": {},               # saved llm_* fields for each target
+    "ai_api": {},
 }
 
 
@@ -164,11 +171,17 @@ class Settings(dict):
             except json.JSONDecodeError:
                 pass
         self["llm_api_key"] = unprotect(self["llm_api_key"])
+        for slot in ("ai_local", "ai_api"):  # v0.14: the saved API configuration keeps its key encrypted too
+            if isinstance(self.get(slot), dict) and self[slot].get("llm_api_key"):
+                self[slot] = {**self[slot], "llm_api_key": unprotect(self[slot]["llm_api_key"])}
         if self["llm_api_key"] not in ("", "ollama") and '"dpapi:' not in SETTINGS_PATH.read_text("utf-8"):
             self.save()  # a key saved as plain text by v0.10-v0.12 is encrypted now
 
     def save(self):
         data = {**self, "llm_api_key": protect(self["llm_api_key"])}
+        for slot in ("ai_local", "ai_api"):
+            if isinstance(data.get(slot), dict) and data[slot].get("llm_api_key"):
+                data[slot] = {**data[slot], "llm_api_key": protect(data[slot]["llm_api_key"])}
         SETTINGS_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), "utf-8")
 
     def apply(self, changes: dict):
