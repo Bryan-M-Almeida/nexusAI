@@ -386,6 +386,10 @@ def execute(name: str, args: dict):
     fn = REGISTRY.get(name)
     if not fn:
         return {"error": f"unknown tool {name}"}
+    from . import features
+
+    if not features.tool_allowed(name):  # beta feature switched off (Settings > Beta)
+        return {"error": f"'{name}' is a beta feature that is turned off; the user can enable it in Settings > Beta"}
     # Small models sometimes invent parameters (e.g. "status" on list_events): drop them.
     accepted = inspect.signature(fn).parameters
     args = {k: v for k, v in (args or {}).items() if k in accepted and v is not None}

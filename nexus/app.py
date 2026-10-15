@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 import webview
 
-from . import (MODEL_NAME, __version__, assistant, bridge, control, i18n, knowledge, llm, memory, notify, profile,
+from . import (MODEL_NAME, __version__, assistant, bridge, control, features, i18n, knowledge, llm, memory, notify, profile,
                library, netprobe, performance, scheduler, skills, tools, workspace)
 from . import files as filereader
 from .logs import log, setup as setup_logs
@@ -463,6 +463,8 @@ class Api:
         return self.open_workspace(ws["id"])
 
     def open_workspace(self, wid):
+        if not features.enabled("workspace"):
+            return {"error": "beta_off"}
         self._speaker.stop()
         if memory.temporary:
             memory.set_temporary(False)
@@ -715,7 +717,7 @@ class Api:
 
     # -- settings --------------------------------------------------------------
     def get_settings(self):
-        return {"settings": dict(settings), "llm": llm.status(), "langs": LANGS, "lang": lang(),
+        return {"settings": dict(settings), "llm": llm.status(), "langs": LANGS, "lang": lang(), "features": features.state(),
                 "voices": self._speaker.voices, "presets": llm.PRESETS, "mics": self.list_mics()}
 
     # -- notifications (v0.10) -------------------------------------------------------------------------------

@@ -112,6 +112,13 @@ DEFAULTS = {
     "ai_target": "local",         # local | api (one-click switch keeps both configurations)
     "ai_local": {},               # saved llm_* fields for each target
     "ai_api": {},
+    # v0.15.5: user mode shows the core; beta features are opt-in (Settings > Beta). Developer mode = everything on.
+    "app_mode": "user",           # user | developer
+    "beta_workspace": False,
+    "beta_library": False,
+    "beta_skills": False,
+    "beta_browser": False,
+    "llm_raw_prompt": False,      # experimental: qwen3 prompt written by NEXUS (raw) - same speed in v0.15.5 tests
 }
 
 

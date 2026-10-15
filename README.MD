@@ -49,7 +49,7 @@ powershell -ExecutionPolicy Bypass -File setup.ps1
    ```powershell
    ollama pull qwen3:8b
    ```
-3. **Placas AMD**: as versões atuais do Ollama (testado na 0.40.3) já usam o backend **Vulkan** automaticamente quando o ROCm não está disponível. Na RX 6600 XT ele foi detectado sem nenhuma configuração. Confira com `ollama ps`: a coluna PROCESSOR deve mostrar `100% GPU`. Atualizar o driver AMD Adrenalin tende a melhorar o desempenho.
+3. **Placas AMD**: as versões atuais do Ollama (testado na 0.40.3) já usam o backend **Vulkan** automaticamente quando o ROCm não está disponível. Na RX 6600 XT ele foi detectado sem nenhuma configuração. Confira com `ollama ps`: a coluna PROCESSOR deve mostrar `100% GPU`. Atualizar o driver AMD Adrenalin tende a melhorar o desempenho. **Medido na v0.15.5** (NX-LLM-035): se o `server.log` do Ollama disser "AMD driver is too old", ele está em Vulkan e o Flash Attention lê o prompt a ~75 tokens/s; com a variável de ambiente `OLLAMA_FLASH_ATTENTION=0` (e o Ollama reiniciado) foram ~265 tokens/s — respostas começam bem antes, com a geração um pouco mais lenta.
 4. Alternativa: **LM Studio** (usa Vulkan em AMD). Ative o servidor local e, nas configurações do NEXUS, use `http://localhost:1234/v1`, com Context Length de 8192 ou mais.
 
 Modelo padrão: `qwen3:8b`. Nos testes, foi o único que chamou todas as ferramentas corretamente; o `qwen2.5:7b` fingia registrar gastos, memórias e aprendizados. Para PCs mais fracos: `qwen3:4b` (menos preciso).
@@ -114,6 +114,13 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 - "Na próxima vez que eu abrir, me lembra de continuar o projeto do app" → no próximo início: *"Olá, Alex, vamos continuar o projeto do app?"*
 
 Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia, `Ctrl+,` Configurações, `Ctrl+Shift+N` nova conversa, `Ctrl+H` conversas, `Ctrl+J` notificações, `Ctrl+T` transcrição.
+
+### Modo usuário, modo desenvolvedor e Beta (v0.15.5)
+
+Em **Configurações → Beta**:
+- **Modo usuário** (padrão): o essencial do NEXUS — voz, conversa, memória, agenda, lembretes, tarefas, base de conhecimento, conversas, arquivos, foco e emergência.
+- **Funções beta** (desligadas até a versão final; ligue cada uma sabendo que podem ter bugs): **Área de trabalho**, **Biblioteca e modo podcast**, **Habilidades e níveis** e **Navegador** (abrir sites, pesquisar, tocar músicas). Desligadas, somem da tela **e** da lista de ferramentas da IA — o prompt fica ~300 tokens menor.
+- **Modo desenvolvedor**: tudo ligado, para testar todas as funções. Suas escolhas do modo usuário continuam guardadas.
 
 ### Arquivos, Biblioteca e navegador (v0.15)
 
@@ -307,6 +314,7 @@ nexus/
   library.py    biblioteca de livros, páginas e partes do podcast
   browser.py    abrir links, pesquisas e músicas no navegador padrão
   netprobe.py   conexão automática (mede latência e velocidade)
+  features.py   funções beta e modo usuário / desenvolvedor
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -318,4 +326,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.15.1 (protótipo)**.
+Versão atual: **v0.15.5 (protótipo)**.

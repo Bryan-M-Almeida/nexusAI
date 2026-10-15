@@ -615,6 +615,71 @@ memory.set_temporary(False)
 check("temporary chat: the model can't memorize facts on its own", blocked)
 check("temporary chat: an explicit 'lembra que...' still works", allowed)
 
+# -- v0.15.5: beta features, user/developer mode, prompt cache across turns ---------------------------------------
+from nexus import features  # noqa: E402
+
+beta_names = {"list_books", "read_book", "open_url", "web_search", "play_music"}
+settings["app_mode"] = "user"
+user_tools = {x["function"]["name"] for x in assistant.turn_tools()}
+check("beta: user mode starts with every beta feature off", not any(features.state()["features"].values()))
+check("beta: their tools leave the AI's prompt", not user_tools & beta_names and "add_task" in user_tools)
+check("beta: a disabled tool refuses to run", "beta" in str(tools.execute("open_url", {"url": "https://x.org"})))
+settings["beta_library"] = True
+check("beta: one feature can be enabled alone",
+      {"list_books", "read_book"} <= {x["function"]["name"] for x in assistant.turn_tools()} and not features.enabled("browser"))
+settings["beta_library"] = False
+settings["app_mode"] = "developer"
+check("beta: developer mode turns everything on",
+      all(features.state()["features"].values()) and beta_names <= {x["function"]["name"] for x in assistant.turn_tools()})
+settings["app_mode"] = "user"
+check("beta: core features are always on", features.enabled("memory") and features.tool_allowed("add_task"))
+
+seen_prompts = []
+
+
+def capture_stream(messages, *a, **k):
+    seen_prompts.append([dict(m) for m in messages])
+    return iter([("token", f"Resposta {len(seen_prompts)}."), ("done", None)])
+
+
+memory.new_conversation()
+_llm.stream_chat = capture_stream
+bot = assistant.Assistant(lambda e, p: None)
+bot.ask("Quanto é 2 mais 2?")
+bot.ask("E 3 mais 3?")
+_llm.stream_chat = real_stream
+first, second = seen_prompts[0], seen_prompts[1]
+check("prompt cache: the next turn starts with the same history (system + earlier turns)",
+      second[0] == first[0] and second[len(first) - 1]["content"] == "Quanto é 2 mais 2?", str(second[-3:])[:300])
+check("prompt cache: the database keeps only the raw text",
+      memory.history(5)[0]["content"] == "Quanto é 2 mais 2?")
+
+from datetime import date as _date, timedelta as _td  # noqa: E402
+
+_ctx = assistant.build_context("Me lembra de ligar para o dentista amanhã às 10h.")
+check("calendar: 'tomorrow' is labelled with its date (the model picked the 2nd list item)",
+      "Tomorrow = " in _ctx and (_date.today() + _td(days=1)).isoformat() in _ctx.split("Tomorrow = ")[1].split(";")[0])
+
+# raw qwen3 prompt: turn N+1 starts with exactly turn N's prompt plus what the model generated
+from nexus import llm as _rawllm  # noqa: E402
+
+t_tools = assistant.turn_tools()[:2]
+turn1 = [{"role": "system", "content": "S"}, {"role": "user", "content": "oi"}]
+call_msg = {"role": "assistant", "content": "", "tool_calls": [
+    {"id": "c0", "type": "function", "function": {"name": "add_task", "arguments": '{"title": "pão"}'}}]}
+p1 = _rawllm.render_qwen3(turn1, t_tools)
+generated = '<tool_call>\n{"name": "add_task", "arguments": {"title":"pão"}}\n</tool_call>'
+p2 = _rawllm.render_qwen3(turn1 + [call_msg, {"role": "tool", "content": "{}", "name": "add_task"}], t_tools)
+p3 = _rawllm.render_qwen3(turn1 + [{"role": "assistant", "content": "Olá!"}, {"role": "user", "content": "e aí?"}], t_tools)
+check("raw prompt: the next turn starts with the previous prompt + the generated answer",
+      p3.startswith(p1 + "Olá!<|im_end|>\n") and p3.endswith("<think>\n\n</think>\n\n"))
+check("raw prompt: a tool round repeats the generated tool call", p2.startswith(p1 + generated), p2[len(p1):len(p1) + 90])
+check("raw prompt: tools listed like Ollama's template", '{"type": "function", "function": {"name":"' in p1)
+check("raw prompt: tool calls parsed from the text",
+      _rawllm.parse_tool_calls("x" + generated) == [{"id": "call_0", "name": "add_task", "arguments": '{"title": "pão"}'}])
+check("raw prompt: tool-call text never reaches the screen",
+      _rawllm._visible("Vou anotar.<tool_c") == "Vou anotar." and _rawllm._visible("Ok" + generated, final=True) == "Ok")
+
 # migration of pre-v0.9 messages: a 2 h gap splits them into two conversations
 import sqlite3  # noqa: E402
 import tempfile  # noqa: E402

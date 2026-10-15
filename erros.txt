@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 2.7  ·  Data: 2026-10-15  ·  Versão do app: 0.15.1
+ Versão do documento: 2.8  ·  Data: 2026-10-15  ·  Versão do app: 0.15.5
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -80,6 +80,10 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-030  Respostas lentas em conversas longas (histórico deslizante sem cache)
       NX-LLM-031  Erro de API mostrado como "inicie o Ollama" (chave, créditos, limite)
       NX-LLM-032  Resposta em loop infinito (a mesma frase sem parar)
+      NX-LLM-033  Última resposta relida a cada mensagem (cache do Ollama incompleto)
+      NX-LLM-034  "Não consigo abrir o site / tocar a música / ler o livro" (função beta desligada)
+      NX-LLM-035  Leitura do prompt muito lenta em placas AMD (Vulkan + Flash Attention)
+      NX-LLM-036  Lembrete marcado para depois de amanhã ("amanhã" virava o dia 17)
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -582,6 +586,52 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Correção   : Teto de ~1.200 tokens por resposta e detector de repetição
                (assistant._looping / _trim_loop): o loop é cortado e a resposta
                termina na primeira frase completa. Testado em tests\test_units.py.
+
+[NX-LLM-033] Última resposta relida a cada mensagem (cache do Ollama incompleto)
+  Severidade : MÉDIA            Status: EXPERIMENTAL       Observado: SIM
+  Sintoma    : Mesmo com a janela ancorada (NX-LLM-030), cada resposta
+               começava relendo a pergunta e a resposta anteriores.
+  Causa      : O template do qwen3 no Ollama põe " /no_think" só na ÚLTIMA
+               pergunta e um bloco <think> vazio antes da resposta; os dois
+               somem quando a troca vira histórico. O cache parava ali e a
+               resposta anterior inteira era relida.
+  Correção   : Experimental, desligada por padrão (settings.json:
+               "llm_raw_prompt": true): o próprio NEXUS monta o prompt do qwen3
+               (llm.render_qwen3, rota raw /api/generate), igual em todos os
+               turnos, e o cache cobre até o último token gerado. Nos testes da
+               v0.15.5 a média ficou dentro do ruído, porque a pergunta anterior
+               ainda muda (o bloco de contexto não volta ao histórico); devolver
+               esse bloco enchia a janela e deixava tudo mais lento. Medição: tests/bench_long_conversation.py.
+
+[NX-LLM-034] "Não consigo abrir o site / tocar a música / ler o livro"
+  Severidade : BAIXA            Status: ESPERADO (v0.15.5) Observado: PREVISTO
+  Causa      : No modo usuário, Área de trabalho, Biblioteca, Habilidades e
+               Navegador são funções beta, desligadas por padrão: somem da tela
+               e das ferramentas da IA.
+  Solução    : Configurações → Beta: ligue a função (ou use o Modo
+               desenvolvedor, que liga todas).
+
+[NX-LLM-035] Leitura do prompt muito lenta em placas AMD (Vulkan + Flash Attention)
+  Severidade : ALTA             Status: CONTORNO           Observado: SIM
+  Sintoma    : Cada resposta demora 5-20 s antes de começar, mesmo com o
+               modelo inteiro na placa de vídeo.
+  Causa      : Com driver AMD antigo o Ollama avisa "AMD driver is too old"
+               (server.log) e usa Vulkan em vez de ROCm. Nesse caminho, com
+               Flash Attention ligado, a RX 6600 XT leu o prompt a 75 tokens/s;
+               desligado, a 265 tokens/s (3,5x), com a geração caindo de 33
+               para 23 tokens/s. Medido com 5.500 tokens.
+  Solução    : (1) Atualizar o driver AMD (Adrenalin), o que libera o ROCm; ou
+               (2) definir a variável de ambiente OLLAMA_FLASH_ATTENTION=0 e
+               reiniciar o Ollama.
+
+[NX-LLM-036] Lembrete marcado para depois de amanhã ("amanhã" virava o dia 17)
+  Severidade : ALTA             Status: CORRIGIDO (v0.15.5) Observado: SIM
+  Sintoma    : Na avaliação, depois de uma conversa longa, "me lembra amanhã às
+               10h" foi salvo para o dia seguinte ao certo.
+  Causa      : O calendário do contexto era uma lista sem rótulo (amanhã, depois
+               de amanhã, ...) e o modelo pegou o segundo item.
+  Correção   : O contexto diz "Tomorrow = <dia>; day after tomorrow = <dia>".
+               Reproduzido 3/3 antes e corrigido 3/3 depois.
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE

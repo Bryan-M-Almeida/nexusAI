@@ -5,7 +5,7 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import emergency, knowledge, llm, memory, netprobe, profile, skills, tools, workspace
+from . import emergency, features, knowledge, llm, memory, netprobe, profile, skills, tools, workspace
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
@@ -156,7 +156,8 @@ def turn_tools() -> list:
     if workspace.active:
         keep = {"search_knowledge", "wikipedia", "get_datetime", "conversation_control"}
         return workspace.SCHEMAS + [x for x in tools.SCHEMAS if x["function"]["name"] in keep]
-    return tools.SCHEMAS
+    # v0.15.5: tools of beta features that are off stay out of the prompt (smaller prompt = faster first answer)
+    return [x for x in tools.SCHEMAS if features.tool_allowed(x["function"]["name"])]
 
 
 def build_context(user_text: str, emergency_topic: str | None = None) -> str:
@@ -173,7 +174,9 @@ def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     timely = bool(TIME_WORDS.search(user_text))
     parts = [f"## Now\n{day(now)} {now.strftime('%H:%M')}"]
     if timely:
-        parts.append("Calendar: " + "; ".join(day(now + timedelta(days=d)) for d in range(1, 8)))
+        # v0.15.5: labelled - after a long conversation the model took the 2nd entry of a bare list as "tomorrow"
+        parts.append(f"Tomorrow = {day(now + timedelta(days=1))}; day after tomorrow = {day(now + timedelta(days=2))}\n"
+                     "Calendar: " + "; ".join(day(now + timedelta(days=d)) for d in range(3, 8)))
     # Memories: the ones related to this message; everything we know only when asked about the user.
     mems = {m["id"]: m for m in memory.recall(user_text, limit=4)}
     if ABOUT_ME.search(user_text):
@@ -292,7 +295,7 @@ def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None
             return (f"This needs LIVE data that you do not know. Call `{tool}` now; never say it is unavailable and "
                     f"never invent headlines, rates or forecasts. Then answer briefly from the tool result.")
     for rx, expected, tool in INTENTS:
-        if rx.search(user_text) and not (called or set()) & expected:
+        if rx.search(user_text) and not (called or set()) & expected and features.tool_allowed(tool):
             return (f"The user explicitly asked you to store this, but you did NOT call any tool, so nothing was saved. "
                     f"Call `{tool}` now with the information from the user's message, then confirm briefly in the "
                     f"user's language.")
@@ -488,8 +491,9 @@ class Assistant:
             self.emit("tool", {"name": "report_issue", "args": {}})
             self.emit("done", {"text": reply, "speak": True, "interrupted": False})
             return
-        # Context travels inside the current user turn (many chat templates drop extra system messages);
-        # history keeps only the raw text, so the cached prompt prefix stays valid on the next turn.
+        # Context travels inside the current user turn (many chat templates drop extra system messages); the history
+        # keeps only the raw text. v0.15.5 measured keeping the context blocks too: the knowledge excerpts fill the
+        # history window, it jumps more often and answers got slower (14.9 s vs 13.5 s over 16 questions).
         context = build_context(text, emergency_topic=topic)
         if getattr(self, "attachments", None):
             context += "\n" + attachment_context(text, self.attachments)
@@ -630,6 +634,8 @@ class Assistant:
 
     def _level_up(self, text, used, spoken=False):
         """Skills XP for the finished turn (v0.13); a level-up shows a toast in the interface."""
+        if not features.enabled("skills"):
+            return
         try:
             ups = skills.award(text, used, spoken=spoken, workspace=bool(workspace.active),
                                study=settings["ai_mode"] == "study")

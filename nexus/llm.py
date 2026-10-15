@@ -104,7 +104,7 @@ def stream_chat(messages: list, tools: list | None = None, temperature: float | 
     temperature = settings["llm_temperature"] if temperature is None else temperature
     if offline_blocked():
         raise LLMOffline("offline mode: the AI server is on the internet - choose Ollama or LM Studio", kind="offline_mode")
-    stream = _stream_ollama if _is_ollama() else _stream_openai
+    stream = _stream_raw if raw_prompt() else _stream_ollama if _is_ollama() else _stream_openai
     try:
         yield from stream(messages, tools, temperature, max_tokens)
     except httpx.HTTPError as exc:  # no answer at all: local server closed or no connection to the provider
@@ -180,8 +180,12 @@ def prefill(messages: list, tools: list | None = None) -> dict:
     user's first message only pays for its own tokens. Ollama keeps the processed prefix in its KV cache."""
     if not _is_ollama():
         return {"skipped": "not ollama"}
-    body = _native_body(messages, tools, settings["llm_temperature"], stream=False, num_predict=1)
-    r = httpx.post(f"{_ollama_root()}/api/chat", json=body, timeout=TIMEOUT)
+    if raw_prompt():
+        body = _raw_body(messages, tools, settings["llm_temperature"], stream=False, num_predict=1)
+        r = httpx.post(f"{_ollama_root()}/api/generate", json=body, timeout=TIMEOUT)
+    else:
+        body = _native_body(messages, tools, settings["llm_temperature"], stream=False, num_predict=1)
+        r = httpx.post(f"{_ollama_root()}/api/chat", json=body, timeout=TIMEOUT)
     r.raise_for_status()
     data = r.json()
     return {k: data.get(k) for k in ("load_duration", "prompt_eval_count", "prompt_eval_duration", "total_duration")}
@@ -222,6 +226,128 @@ def _stream_ollama(messages, tools, temperature, max_tokens=None):
                 last_stats.update({k: chunk.get(k) for k in ("prompt_eval_count", "prompt_eval_duration", "eval_count",
                                                               "eval_duration", "load_duration", "total_duration")})
                 calls_log.append(dict(last_stats))
+    yield ("tool_calls", calls) if calls else ("done", None)
+
+
+# v0.15.5: qwen3 on Ollama gets its prompt written by NEXUS (raw /api/generate). Through /api/chat the template
+# adds " /no_think" to the LAST user message only and an empty <think> block before the answer; both disappear when
+# that exchange becomes history, so the cache broke right there and every turn re-read the previous answer (~300
+# tokens; ~6 s on an RX 6600 XT with Vulkan). Here every turn renders exactly like the previous one plus what the
+# model generated, so the cache covers the whole conversation. Same format as Ollama's qwen3 template otherwise.
+EMPTY_THINK = "<think>\n\n</think>\n\n"
+TOOL_OPEN, TOOL_CLOSE = "<tool_call>", "</tool_call>"
+
+
+def _compact(obj) -> str:
+    """JSON the way Ollama's Go template prints it (no spaces): far fewer tokens than json.dumps' default."""
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+
+
+def raw_prompt() -> bool:
+    return (_is_ollama() and settings["llm_model"].lower().startswith("qwen3")
+            and bool(settings.get("llm_raw_prompt", True)))
+
+
+def render_qwen3(messages: list, tools: list | None) -> str:
+    out = []
+    system = "\n".join(m["content"] for m in messages if m["role"] == "system")
+    if system or tools:
+        head = "<|im_start|>system\n" + system
+        if tools:
+            head += ("\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\n"
+                     "You are provided with function signatures within <tools></tools> XML tags:\n<tools>")
+            head += "".join('\n{"type": "function", "function": ' + _compact(t["function"]) + "}" for t in tools)
+            head += ("\n</tools>\n\nFor each function call, return a json object with function name and arguments "
+                     "within <tool_call></tool_call> XML tags:\n<tool_call>\n"
+                     '{"name": <function-name>, "arguments": <args-json-object>}\n</tool_call>')
+        out.append(head + "<|im_end|>\n")
+    for m in messages:
+        if m["role"] == "user":
+            out.append(f"<|im_start|>user\n{m['content']} /no_think<|im_end|>\n")
+        elif m["role"] == "assistant":
+            body = EMPTY_THINK + (m.get("content") or "")
+            if m.get("tool_calls"):
+                calls = "".join('{"name": "' + c["function"]["name"] + '", "arguments": '
+                                + _compact(json.loads(c["function"]["arguments"] or "{}")) + "}\n" for c in m["tool_calls"])
+                body += ("\n" if m.get("content") else "") + TOOL_OPEN + "\n" + calls + TOOL_CLOSE
+            out.append(f"<|im_start|>assistant\n{body}<|im_end|>\n")
+        elif m["role"] == "tool":
+            out.append(f"<|im_start|>user\n<tool_response>\n{m['content']}\n</tool_response><|im_end|>\n")
+    out.append("<|im_start|>assistant\n" + EMPTY_THINK)
+    return "".join(out)
+
+
+def _visible(text: str, final: bool = False) -> str:
+    """Answer text the user may see: no tool-call block, no thinking, no half-written tag at the end."""
+    text = re.sub(r"<think>.*?</think>\s*", "", text, flags=re.S)
+    for tag in ("<think>", TOOL_OPEN):
+        if tag in text:
+            text = text[:text.index(tag)]
+    if not final:
+        for k in range(len(TOOL_OPEN) - 1, 0, -1):
+            if text.endswith(TOOL_OPEN[:k]) or text.endswith("<think>"[:k]):
+                return text[:-k]
+    return text
+
+
+def parse_tool_calls(text: str) -> list:
+    calls, decoder = [], json.JSONDecoder()
+    for block in text.split(TOOL_OPEN)[1:]:
+        block = block.split(TOOL_CLOSE)[0]
+        i = 0
+        while True:
+            start = block.find("{", i)
+            if start == -1:
+                break
+            try:
+                obj, i = decoder.raw_decode(block, start)
+            except ValueError:
+                break
+            if isinstance(obj, dict) and obj.get("name"):
+                args = obj.get("arguments") or {}
+                calls.append({"id": f"call_{len(calls)}", "name": obj["name"],
+                              "arguments": args if isinstance(args, str) else json.dumps(args, ensure_ascii=False)})
+    return calls
+
+
+def _raw_body(messages, tools, temperature, stream=True, **options):
+    body = {"model": settings["llm_model"], "prompt": render_qwen3(messages, tools), "raw": True, "stream": stream,
+            "keep_alive": settings.get("llm_keep_alive") or KEEP_ALIVE,
+            "options": {"temperature": temperature, "num_ctx": settings["llm_context"],
+                        "stop": ["<|im_end|>", "<|im_start|>"], **options}}
+    if int(settings.get("llm_num_gpu", -1)) >= 0:
+        body["options"]["num_gpu"] = int(settings["llm_num_gpu"])
+    return body
+
+
+def _stream_raw(messages, tools, temperature, max_tokens=None):
+    body = _raw_body(messages, tools, temperature, **({"num_predict": max_tokens} if max_tokens else {}))
+    text, sent = "", 0
+    with httpx.stream("POST", f"{_ollama_root()}/api/generate", json=body, timeout=TIMEOUT) as r:
+        if r.status_code >= 400:
+            r.read()
+            raise LLMOffline(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code)
+        for line in r.iter_lines():
+            if not line.strip():
+                continue
+            chunk = json.loads(line)
+            if chunk.get("error"):
+                raise LLMOffline(chunk["error"])
+            if chunk.get("response"):
+                text += chunk["response"]
+                shown = _visible(text)
+                if len(shown) > sent:
+                    yield "token", shown[sent:]
+                    sent = len(shown)
+            if chunk.get("done"):
+                last_stats.clear()
+                last_stats.update({k: chunk.get(k) for k in ("prompt_eval_count", "prompt_eval_duration", "eval_count",
+                                                              "eval_duration", "load_duration", "total_duration")})
+                calls_log.append(dict(last_stats))
+    calls = parse_tool_calls(text)
+    rest = _visible(text, final=True)
+    if not calls and len(rest) > sent:
+        yield "token", rest[sent:]
     yield ("tool_calls", calls) if calls else ("done", None)
 
 

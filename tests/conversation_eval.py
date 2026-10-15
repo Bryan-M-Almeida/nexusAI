@@ -11,6 +11,7 @@ from nexus.config import settings
 from nexus.db import db
 
 settings["auto_memory"] = True  # exercised on purpose: questions must not become memories
+settings["app_mode"] = "developer"  # v0.15.5: the eval covers the beta features too (library, browser)
 knowledge.load_seed()
 _isolated.load_example_profile()
 status = llm.status()

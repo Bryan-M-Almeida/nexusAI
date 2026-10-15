@@ -8,6 +8,50 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.15.5 — Protótipo · 2026-10-15
+
+**Modo usuário, modo desenvolvedor e funções Beta — menos excesso na tela e respostas mais rápidas.**
+
+### Novo
+- **Configurações → Beta** com **Modo usuário** (padrão) e **Modo desenvolvedor**. O núcleo do NEXUS fica sempre
+  ligado: voz, conversa, memória, agenda, lembretes, tarefas, base de conhecimento, conversas, arquivos, foco e
+  emergência.
+- **Funções beta**, desligadas no modo usuário até a versão final (cada uma pode ser ligada sabendo que pode ter
+  bugs): **Área de trabalho** (a mais arriscada: roda comandos), **Biblioteca e modo podcast**, **Habilidades e
+  níveis** e **Navegador** (abrir sites, pesquisar, tocar músicas). Desligada, a função some da tela **e** da lista
+  de ferramentas da IA; se a IA tentar usá-la mesmo assim, a ferramenta recusa e explica onde ligar.
+- **Modo desenvolvedor** liga tudo. As escolhas do modo usuário continuam guardadas para quando voltar.
+- Desligar a Área de trabalho estando dentro de uma sai dela.
+
+### Desempenho
+- **Prompt menor no modo usuário**: 34 → 29 ferramentas, **~2.302 → ~1.994 tokens** de ferramentas (−308, ~8% do
+  prompt fixo) — menos para ler quando o cache não serve e mais espaço para o histórico. Em 16 perguntas seguidas
+  (`tests/bench_long_conversation.py`): **15,5 s → 14,4 s por resposta** no modo usuário; da 9ª pergunta em diante,
+  **15,4 s → 13,3 s (−14%)**.
+- **O gargalo real foi encontrado** (NX-LLM-035): o driver AMD desta máquina é antigo, então o Ollama usa Vulkan em vez
+  de ROCm, e ali o Flash Attention lê o prompt a **75 tokens/s** — desligado, **265 tokens/s (3,5×)**, com a geração
+  caindo de 33 para 23 tokens/s (medido com 5.500 tokens). É isso que faz cada resposta demorar 5–20 s para começar.
+  Atualizar o driver AMD (libera o ROCm) ou usar `OLLAMA_FLASH_ATTENTION=0` resolve; documentado no catálogo.
+- **Prompt do qwen3 montado pelo NEXUS** (experimental, desligado; NX-LLM-033): o template do Ollama põe
+  " /no_think" e um bloco de pensamento vazio só no último turno, e os dois somem no turno seguinte — o cache quebra
+  antes da última resposta. O NEXUS agora sabe escrever o prompt do qwen3 igual em todo turno (rota raw) e o cache
+  passa a cobrir até o último token gerado, mas a média ficou dentro do ruído das medições (a pergunta anterior ainda
+  muda, porque o bloco de contexto não volta ao histórico; devolvê-lo enchia a janela e ficou mais lento: 14,9 s contra
+  13,5 s). Fica testado e pronto para quando valer a pena (`"llm_raw_prompt": true`).
+
+### Corrigido
+- **Lembrete marcado para depois de amanhã** (NX-LLM-036): depois de uma conversa longa, "me lembra amanhã às 10h" era
+  salvo no dia 17 em vez do 16 — o calendário do contexto era uma lista sem rótulo e o modelo pegava o 2º item. Agora o
+  contexto diz explicitamente qual é o dia de amanhã e o de depois de amanhã (reproduzido 3/3, corrigido 3/3).
+
+### Testes desta versão
+- 217/217 testes unitários (14 novos: funções beta e modos, ferramentas fora do prompt, calendário com "amanhã"
+  rotulado, prompt do qwen3 montado pelo NEXUS e leitura de chamadas de ferramenta).
+- 31/31 verificações de conversa com qwen3:8b no modo desenvolvedor (tempo médio 11,9 s, mediana 9,8 s, máximo
+  27,3 s — igual à v0.15.1 dentro do ruído) e 7/7 na área de trabalho.
+
+---
+
 ## v0.15.1 — Protótipo · 2026-10-15
 
 **Só correções: respostas cortadas e confusas em conversas longas, e lentidão depois do título automático.**
@@ -622,7 +666,17 @@ Prioridades definidas em 2026-10-14 (desempenho primeiro, para o NEXUS rodar em 
 4. **Troca rápida IA local ↔ API** em um clique, guardando as duas configurações (com API, quase toda a carga sai
    do PC).
 
-### v0.15.x — Protótipo (próxima)
+### v0.16.0 — Novo visual (prioridade máxima, pedida em 2026-10-15)
+- Tela limpa: fundo escuro com aro concêntrico e núcleo brilhante no centro, estado ("AGUARDANDO") e a última troca
+  logo abaixo; "NEXUS" no canto superior esquerdo com o significado embaixo, menor.
+- Atalhos para cada parte do menu e um **HUD guia** (tutorial) por atalho.
+- A IA abre menus e opções quando pedido: o aro diminui, vai até o lugar da ação e espera ordens acima do painel.
+- Cores do aro, do núcleo e do fundo personalizáveis.
+- Entregue em partes, com diferença visível a cada versão.
+
+### v0.15.x — Protótipo (depois do novo visual)
+- Entregue na v0.15.5: Beta + modo usuário / desenvolvedor. A partir daqui, toda versão traz também melhorias
+  medidas de desempenho.
 - **Modo treinamento**: aprende enquanto está ativo; ao terminar, compara o que aprendeu com pesquisas online,
   mostrando o progresso no aro (anéis ondulando e a porcentagem no lugar de "NEXUS"), diz "Análise completa" e
   registra o resumo (aprendido, deixado de fora, % de concordância) na aba **Aprendizados**.

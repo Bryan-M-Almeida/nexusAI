@@ -349,6 +349,7 @@
       <button type="button" data-sec="integ" data-i18n="secInteg">Integrações</button>
       <button type="button" data-sec="ui" data-i18n="secUi">Interface</button>
       <button type="button" data-sec="data" data-i18n="secData">Dados</button>
+      <button type="button" data-sec="beta" data-i18n="secBeta">Beta</button>
     </nav>
     <div class="set-body">
       <!-- GENERAL -->
@@ -509,6 +510,26 @@
         <ul class="backup-list mono" id="backupList"></ul>
         <label><span data-i18n="bridgePort">Porta da ponte com a landing page</span><input name="bridge_port" type="number" min="1024" max="65535"></label>
         <p class="hint" data-i18n="restartHint">Vale depois de reabrir o NEXUS.</p>
+      </section>
+
+      <!-- BETA & APP MODE (v0.15.5) -->
+      <section class="set-sec" data-sec="beta" hidden>
+        <h2 data-i18n="secBeta">Beta</h2>
+        <p class="sub mono" data-i18n="appModeTitle">MODO</p>
+        <div class="cards" id="modeCards">
+          <button type="button" class="card-opt" data-app-mode="user"><b data-i18n="appModeUser">Modo usuário</b><small data-i18n="appModeUserHint">O essencial do NEXUS, estável. As funções beta só aparecem se você ligar abaixo.</small></button>
+          <button type="button" class="card-opt" data-app-mode="developer"><b data-i18n="appModeDev">Modo desenvolvedor</b><small data-i18n="appModeDevHint">Todas as funções ligadas, inclusive as beta. Para quem quer testar tudo.</small></button>
+        </div>
+        <input type="hidden" name="app_mode">
+        <p class="sub mono" data-i18n="betaTitle">FUNÇÕES BETA</p>
+        <p class="hint warn-cloud" data-i18n="betaWarn">Funções em teste: podem ter bugs, ficar lentas ou mudar até a versão final. Desligadas, também saem da lista de ferramentas da IA, e as respostas ficam mais rápidas.</p>
+        <div id="betaList">
+          <label class="check"><input type="checkbox" name="beta_workspace"><span data-i18n="betaWorkspace">Área de trabalho: a IA cria e edita arquivos e roda comandos (com confirmação)</span></label>
+          <label class="check"><input type="checkbox" name="beta_library"><span data-i18n="betaLibrary">Biblioteca e modo podcast</span></label>
+          <label class="check"><input type="checkbox" name="beta_skills"><span data-i18n="betaSkills">Habilidades e níveis (E → S)</span></label>
+          <label class="check"><input type="checkbox" name="beta_browser"><span data-i18n="betaBrowser">Navegador: abrir sites, pesquisar e tocar músicas no YouTube</span></label>
+        </div>
+        <p class="hint" id="betaDevHint" hidden data-i18n="betaDevOn">No modo desenvolvedor todas ficam ligadas.</p>
       </section>
     </div>
     <div class="set-foot">

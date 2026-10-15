@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 2.7  ·  Fecha: 2026-10-15  ·  Versión de la app: 0.15.1
+ Versión del documento: 2.8  ·  Fecha: 2026-10-15  ·  Versión de la app: 0.15.5
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -83,6 +83,10 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-LLM-030  Respuestas lentas en conversaciones largas (historial deslizante sin caché)
       NX-LLM-031  Error de API mostrado como "inicia Ollama" (clave, créditos, límite)
       NX-LLM-032  Respuesta en bucle infinito (la misma frase sin parar)
+      NX-LLM-033  Última respuesta releída en cada mensaje (caché de Ollama incompleta)
+      NX-LLM-034  "No puedo abrir el sitio / poner la canción / leer el libro" (función beta desactivada)
+      NX-LLM-035  Lectura del prompt muy lenta en tarjetas AMD (Vulkan + Flash Attention)
+      NX-LLM-036  Recordatorio puesto para pasado mañana ("mañana" pasaba a ser el 17)
  VOZ  NX-VOZ-001  El micrófono no responde en el primer uso (descarga Whisper)
       NX-VOZ-002  Micrófono equivocado seleccionado (p. ej. DroidCam)
       NX-VOZ-003  Palabra de activación "Nexus" no reconocida / falsos disparos
@@ -608,6 +612,52 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Corrección : Tope de ~1.200 tokens por respuesta y detector de repetición
                (assistant._looping / _trim_loop): el bucle se corta y la
                respuesta termina en la primera frase completa.
+
+[NX-LLM-033] Última respuesta releída en cada mensaje (caché de Ollama incompleta)
+  Gravedad   : MEDIA            Estado: EXPERIMENTAL       Observado: SÍ
+  Síntoma    : Incluso con la ventana anclada (NX-LLM-030), cada respuesta
+               empezaba releyendo la pregunta y la respuesta anteriores.
+  Causa      : La plantilla de qwen3 en Ollama añade " /no_think" solo a la
+               ÚLTIMA pregunta y un bloque <think> vacío antes de la respuesta;
+               ambos desaparecen cuando el intercambio pasa al historial. La
+               caché se cortaba ahí y se releía toda la respuesta anterior.
+  Corrección : Experimental, desactivada por defecto (settings.json:
+               "llm_raw_prompt": true): NEXUS escribe el prompt de qwen3
+               (llm.render_qwen3, ruta raw /api/generate), igual en todos los
+               turnos, y la caché cubre hasta el último token generado. En las
+               pruebas de la v0.15.5 la media quedó dentro del ruido, porque la
+               pregunta anterior todavía cambia (su bloque de contexto no vuelve
+               al historial); conservarlo llenaba la ventana y era más lento. Medido con tests/bench_long_conversation.py.
+
+[NX-LLM-034] "No puedo abrir el sitio / poner la canción / leer el libro"
+  Gravedad   : BAJA             Estado: ESPERADO (v0.15.5) Observado: PREVISTO
+  Causa      : En modo usuario, Área de trabajo, Biblioteca, Habilidades y
+               Navegador son funciones beta, desactivadas por defecto: salen de
+               la pantalla y de las herramientas de la IA.
+  Solución   : Configuración → Beta: activa la función (o usa el Modo
+               desarrollador, que las activa todas).
+
+[NX-LLM-035] Lectura del prompt muy lenta en tarjetas AMD (Vulkan + Flash Attention)
+  Gravedad   : ALTA             Estado: SOLUCIÓN PARCIAL   Observado: SÍ
+  Síntoma    : Cada respuesta tarda 5-20 s en empezar, aunque el modelo entero
+               esté en la tarjeta gráfica.
+  Causa      : Con un driver AMD antiguo Ollama registra "AMD driver is too old"
+               (server.log) y usa Vulkan en lugar de ROCm. Por ese camino, con
+               Flash Attention activado, la RX 6600 XT leyó el prompt a 75
+               tokens/s; desactivado, a 265 tokens/s (3,5x), y la generación bajó
+               de 33 a 23 tokens/s. Medido con 5.500 tokens.
+  Solución   : (1) Actualizar el driver AMD (Adrenalin), que habilita ROCm; o
+               (2) definir la variable de entorno OLLAMA_FLASH_ATTENTION=0 y
+               reiniciar Ollama.
+
+[NX-LLM-036] Recordatorio puesto para pasado mañana ("mañana" pasaba a ser el 17)
+  Gravedad   : ALTA             Estado: CORREGIDO (v0.15.5) Observado: SÍ
+  Síntoma    : En la evaluación, tras una conversación larga, "recuérdame mañana
+               a las 10" se guardó un día tarde.
+  Causa      : El calendario del contexto era una lista sin etiquetas (mañana,
+               pasado mañana, ...) y el modelo tomó el segundo elemento.
+  Corrección : El contexto dice "Tomorrow = <día>; day after tomorrow = <día>".
+               Reproducido 3/3 antes, corregido 3/3 después.
 
 ================================================================================
  VOZ — RECONOCIMIENTO Y SÍNTESIS

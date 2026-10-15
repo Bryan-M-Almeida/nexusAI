@@ -1,6 +1,7 @@
 """Long conversation: time Ollama spends READING the prompt per answer (cache misses show up here; its token
-count always reports the whole prompt, cached or not) and total time per answer, with the history window
-sliding one message per turn (v0.15.0 behaviour) vs anchored and jumping (v0.15.1).
+count always reports the whole prompt, cached or not) and total time per answer: v0.15.1 (Ollama's chat template:
+the previous answer was re-read every turn) vs v0.15.5 (qwen3 prompt written by NEXUS, identical from one turn to
+the next) in developer mode (all 34 tools) and user mode (beta tools off).
 Run: .venv\\Scripts\\python tests\\bench_long_conversation.py   (several minutes)"""
 import _isolated  # noqa: F401
 
@@ -19,14 +20,13 @@ QUESTIONS = ["O que é juros compostos?", "E juros simples?", "Qual a diferença
              "Onde deixar essa reserva?", "E tesouro direto?", "Resume tudo em 3 frases.", "Obrigado!"]
 
 
-def run(sliding: bool):
+def run(raw: bool, mode: str):
     memory.new_conversation()
+    settings["app_mode"] = mode
+    settings["llm_raw_prompt"] = raw
     brain = assistant.Assistant(lambda e, p: None)
     processed, times = [], []
     for q in QUESTIONS:
-        if sliding:
-            assistant._anchors.clear()  # old behaviour: the window re-slides every turn
-            settings["history_turns"] = 12
         t0 = time.time()
         brain.ask(q)
         times.append(time.time() - t0)
@@ -35,9 +35,11 @@ def run(sliding: bool):
     return processed, times
 
 
-for label, sliding in (("deslizante (v0.15.0)", True), ("ancorada (v0.15.1)", False)):
-    processed, times = run(sliding)
+for label, raw, mode in (("v0.15.1 (34 ferramentas)", False, "developer"), ("v0.15.5 desenvolvedor", True, "developer"),
+                          ("v0.15.5 usuário", True, "user")):
+    processed, times = run(raw, mode)
     late = slice(8, None)  # once the window is full
-    print(f"{label:<22} leitura do prompt/resposta (a partir da 9ª): {sum(processed[late]) / len(processed[late]):.2f}s | "
-          f"tempo médio total {sum(times) / len(times):.1f}s | a partir da 9ª {sum(times[late]) / len(times[late]):.1f}s")
-    print("   leitura/total:", [f"{p:.1f}/{t:.0f}s" for p, t in zip(processed, times)])
+    print(f"{label:<25} leitura do prompt/resposta: {sum(processed) / len(processed):.2f}s (a partir da 9ª "
+          f"{sum(processed[late]) / len(processed[late]):.2f}s) | tempo médio {sum(times) / len(times):.1f}s | "
+          f"a partir da 9ª {sum(times[late]) / len(times[late]):.1f}s", flush=True)
+    print("   leitura/total:", [f"{p:.1f}/{t:.0f}s" for p, t in zip(processed, times)], flush=True)

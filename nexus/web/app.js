@@ -440,6 +440,24 @@ function applyInterface() {
   const app = $("#app");
   app.classList.toggle("no-hud", settings.show_hud === false);
   app.classList.toggle("reduce-motion", !!settings.reduce_motion);
+  // v0.15.5: beta features that are off disappear from the interface (Settings > Beta)
+  $("#btnWorkspaces").hidden = !feature("workspace");
+  $("#btnLibrary").hidden = !feature("library");
+  $("#btnSkills").hidden = !feature("skills");
+  const anyWork = feature("workspace") || feature("library");
+  $('#railRight [data-i18n="wsRail"]').hidden = !anyWork;
+  $('#railRight [data-i18n="convTitle"]').classList.toggle("rail-sep", anyWork);
+}
+
+/* beta features (v0.15.5): developer mode turns all of them on */
+function feature(name) { return settings.app_mode === "developer" || !!settings["beta_" + name]; }
+
+function renderBeta() {
+  const f = $("#settingsForm"), dev = (f.elements.app_mode.value || settings.app_mode) === "developer";
+  $$("#modeCards [data-app-mode]").forEach((b) => b.classList.toggle("on", b.dataset.appMode === (dev ? "developer" : "user")));
+  $$("#betaList input").forEach((el) => { el.disabled = dev; if (dev) el.checked = true; else el.checked = !!settings[el.name]; });
+  $("#betaList").classList.toggle("dim", dev);
+  $("#betaDevHint").hidden = !dev;
 }
 
 function caption(text, ms = 3000) {
@@ -636,6 +654,7 @@ function fillSettings() {
     if (el.type === "checkbox") el.checked = !!v; else el.value = v;
   }
   f.elements.network_mode.value = settings.network_mode || "hybrid";
+  f.elements.app_mode.value = settings.app_mode || "user";
   const leads = String(settings.reminder_leads || "").split(",").map(Number);
   $("#leadChips").innerHTML = LEADS.map((m) => `<button type="button" class="chip-opt ${leads.includes(m) ? "on" : ""}" data-lead="${m}">${esc(leadLabel(m))}</button>`).join("")
     + `<span class="chip-opt on fixed">${esc(T("leadNow"))}</span>`;
@@ -657,6 +676,8 @@ function collectSettings() {
   f.elements.quiet_hours.value = $("#quietOn").checked ? `${$("#quietFrom").value}-${$("#quietTo").value}` : "";
   f.elements.daily_briefing.value = $("#briefingOn").checked ? $("#briefingAt").value : "";
   for (const el of f.elements) if (el.name) changes[el.name] = el.type === "checkbox" ? el.checked : el.value;
+  // developer mode shows every beta box checked, but the user's own choices stay saved for user mode
+  if (changes.app_mode === "developer") for (const el of $$("#betaList input")) changes[el.name] = !!settings[el.name];
   return changes;
 }
 
@@ -711,6 +732,7 @@ async function pickProfile(name) {
 
 function openSettings(sec) {
   fillSettings();
+  renderBeta();
   renderPerf();
   renderBackups();
   showSection(typeof sec === "string" ? sec : "general");
@@ -874,9 +896,22 @@ function wire() {
     applyLang(r.lang);
     applyInterface();
     applyState({ network: settings.network_mode, performance: settings.performance });
+    if (!$("#wsBar").hidden && !feature("workspace")) exitWorkspace();  // Beta > workspace switched off inside one
     $("#settings").hidden = true;
   });
   $$("#setNav [data-sec]").forEach((b) => (b.onclick = () => showSection(b.dataset.sec)));
+  $$("#modeCards [data-app-mode]").forEach((b) => (b.onclick = () => {
+    const f = $("#settingsForm");
+    if (f.elements.app_mode.value === "developer") for (const el of $$("#betaList input")) el.checked = !!settings[el.name];
+    f.elements.app_mode.value = b.dataset.appMode;
+    if (b.dataset.appMode === "developer") renderBeta();
+    else {
+      $$("#modeCards [data-app-mode]").forEach((x) => x.classList.toggle("on", x === b));
+      $$("#betaList input").forEach((el) => (el.disabled = false));
+      $("#betaList").classList.remove("dim");
+      $("#betaDevHint").hidden = true;
+    }
+  }));
   $("#leadChips").addEventListener("click", (e) => e.target.closest("[data-lead]")?.classList.toggle("on"));
   $$("#settingsForm output[data-for]").forEach((out) => ($("#settingsForm").elements[out.dataset.for].oninput = () => syncOutput(out)));
   $("#settingsForm").elements.llm_preset.onchange = onPresetChange;
