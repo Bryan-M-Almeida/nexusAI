@@ -8,6 +8,41 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.16.0 — Protótipo · 2026-10-15
+
+**Novo visual: uma tela limpa, só o NEXUS no centro — o resto nas bordas, nos atalhos e no guia (F1).**
+
+### Novo
+- **Tela principal redesenhada**: fundo azul-marinho com brilho no centro; um aro claro com marcações, arcos, anel
+  pontilhado e anel segmentado em volta de um **núcleo azul brilhante** que "respira"; embaixo, o estado
+  (**AGUARDANDO**, OUVINDO, PENSANDO…) e a última troca em duas linhas — a sua fala e a resposta do NEXUS.
+- **"NEXUS" no canto superior esquerdo**, com o significado logo abaixo, menor (fonte larga Orbitron).
+- Saíram da tela: telemetria nos cantos, molduras de HUD, miras vermelhas, linhas de varredura e o traço de pulso.
+  O vermelho agora só aparece em erros e ações perigosas.
+- **Guia (F1)**: um HUD por cima da tela que mostra o que cada borda faz (barra superior, modos da IA, trabalho e
+  conversas, controles) e todos os atalhos. Fecha com F1, Esc ou clique. Também pelo "F1 · GUIA" no canto.
+- **Atalhos para cada parte**: Ctrl+1 painel (agenda, tarefas, memória), Ctrl+2 conversas, Ctrl+3 notificações,
+  Ctrl+4 biblioteca, Ctrl+5 área de trabalho, Ctrl+6 habilidades (os três últimos só com a função beta ligada),
+  Ctrl+M texto ⇄ áudio — além dos que já existiam (Ctrl+, Ctrl+Shift+N, Ctrl+T, Ctrl+Espaço, Esc, F11).
+- **Cores personalizáveis** (Configurações → Interface): aro, núcleo e fundo, com prévia ao vivo e "Cores originais".
+  Todo o resto (barras, painéis, mensagens, botões) acompanha as cores escolhidas.
+- "Marcações e brilho em volta do aro" (antes "HUD em volta do aro") desliga as marcações e o halo, para um aro simples.
+
+### Desempenho
+- **O aro dorme quando o NEXUS está quieto.** Até a v0.15.5 o laço de animação rodava 60 vezes por segundo para
+  sempre, reescrevendo 3 variáveis CSS a cada quadro (o aro inteiro e o brilho eram recalculados) e redesenhando o
+  traço de pulso. Medido na interface parada por 3 s: **62 → 0 quadros/s** e **217 → 0 escritas no DOM por segundo**.
+  A "respiração" do núcleo virou uma animação CSS, e a voz e o microfone acordam o laço na hora (61 quadros/s
+  enquanto há som).
+
+### Testes desta versão
+- 222/222 testes unitários (5 novos: todos os textos da interface nos 3 idiomas, textos do guia e das cores, cores
+  padrão válidas).
+- Interface conferida no modo de prévia (`index.html?mock`): tela parada, troca de duas linhas, guia, atalhos,
+  modo texto, barras das bordas e troca de cores ao vivo.
+
+---
+
 ## v0.15.5 — Protótipo · 2026-10-15
 
 **Modo usuário, modo desenvolvedor e funções Beta — menos excesso na tela e respostas mais rápidas.**
@@ -666,13 +701,10 @@ Prioridades definidas em 2026-10-14 (desempenho primeiro, para o NEXUS rodar em 
 4. **Troca rápida IA local ↔ API** em um clique, guardando as duas configurações (com API, quase toda a carga sai
    do PC).
 
-### v0.16.0 — Novo visual (prioridade máxima, pedida em 2026-10-15)
-- Tela limpa: fundo escuro com aro concêntrico e núcleo brilhante no centro, estado ("AGUARDANDO") e a última troca
-  logo abaixo; "NEXUS" no canto superior esquerdo com o significado embaixo, menor.
-- Atalhos para cada parte do menu e um **HUD guia** (tutorial) por atalho.
-- A IA abre menus e opções quando pedido: o aro diminui, vai até o lugar da ação e espera ordens acima do painel.
-- Cores do aro, do núcleo e do fundo personalizáveis.
-- Entregue em partes, com diferença visível a cada versão.
+### Novo visual (prioridade máxima, pedida em 2026-10-15)
+- Entregue na v0.16.0: tela limpa, nome no canto, guia (F1), atalhos e cores personalizáveis.
+- **Próxima parte**: a IA abre menus e opções quando pedido ("abre as configurações") — o aro diminui, vai até o lugar
+  da ação e espera ordens acima do painel.
 
 ### v0.15.x — Protótipo (depois do novo visual)
 - Entregue na v0.15.5: Beta + modo usuário / desenvolvedor. A partir daqui, toda versão traz também melhorias

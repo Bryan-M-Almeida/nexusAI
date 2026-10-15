@@ -118,6 +118,10 @@ DEFAULTS = {
     "beta_library": False,
     "beta_skills": False,
     "beta_browser": False,
+    # v0.16 interface colours (ring, core, background)
+    "color_ring": "#cfe4ff",
+    "color_core": "#2f86ff",
+    "color_bg": "#0b1f5c",
     "llm_raw_prompt": False,      # experimental: qwen3 prompt written by NEXUS (raw) - same speed in v0.15.5 tests
 }
 

@@ -28,6 +28,12 @@
 
 <!-- ============ APP (minimal: only the ring; bars appear at the screen edges) ============ -->
 <main id="app" class="app" hidden data-mode="audio">
+  <!-- v0.16: name in the corner, meaning below it -->
+  <div class="brand-corner" aria-label="NEXUS">
+    <p class="bc-name">NEXUS</p>
+    <p class="bc-sub">Networked Experiential Intelligence &amp; User System</p>
+  </div>
+  <button class="guide-hint mono" id="btnGuide" type="button">F1 · <span data-i18n="guideHint">GUIA</span></button>
   <header class="topbar edge-bar" id="topbar">
     <div class="brand"><span class="wordmark wordmark-xs is-on"></span><span class="version mono" id="version"></span>
       <button class="lv-badge mono" id="btnSkills" data-i18n-title="skillsTitleCap"><b id="lvRank">E</b><span id="lvNum">LV 1</span><i><em id="lvBar"></em></i></button></div>
@@ -120,6 +126,10 @@
     </div>
     <svg class="pulse" id="pulse" viewBox="0 0 240 24" preserveAspectRatio="none" aria-hidden="true"><polyline id="pulseLine" points=""/></svg>
     <div class="core-label mono" id="coreLabel"></div>
+    <div class="exchange" id="exchange" aria-live="polite">
+      <p class="ex-line user" id="exUser"></p>
+      <p class="ex-line nexus" id="exNexus"></p>
+    </div>
     <div class="caption" id="caption" aria-live="polite"></div>
   </section>
 
@@ -146,6 +156,20 @@
   </nav>
   <div class="dock-tip mono" id="dockTip"></div>
 </main>
+
+<!-- ============ GUIDE HUD (v0.16): what each edge does + every shortcut ============ -->
+<div class="guide" id="guide" hidden>
+  <div class="g-call g-top"><b data-i18n="gTopT">BARRA SUPERIOR</b><span data-i18n="gTop">Estado da IA e da voz, idioma, painel, notificações e configurações. Leve o mouse ao topo da tela.</span></div>
+  <div class="g-call g-left"><b data-i18n="gLeftT">MODOS DA IA</b><span data-i18n="gLeft">Assistente, Direto e Estudo; IA local ou API; modo foco. Borda esquerda.</span></div>
+  <div class="g-call g-right"><b data-i18n="gRightT">TRABALHO E CONVERSAS</b><span data-i18n="gRight">Nova conversa, histórico, conversa temporária e as funções beta ligadas. Borda direita.</span></div>
+  <div class="g-call g-bottom"><b data-i18n="gBottomT">CONTROLES</b><span data-i18n="gBottom">Texto ou áudio, transcrição, microfone, voz da IA, parar e repetir. Borda de baixo.</span></div>
+  <div class="g-call g-center"><b data-i18n="gCenterT">O NEXUS</b><span data-i18n="gCenter">Diga "Nexus…" ou segure Ctrl+Espaço para falar. Arraste o aro para mudá-lo de lugar.</span></div>
+  <div class="g-keys">
+    <p class="g-kicker mono" data-i18n="gKeys">ATALHOS</p>
+    <ul class="g-list mono" id="guideKeys"></ul>
+    <p class="g-close mono" data-i18n="gClose">F1 ou Esc para fechar</p>
+  </div>
+</div>
 
 <!-- ============ PANEL DRAWER (schedule, tasks, memory, knowledge, data, log) ============ -->
 <div class="drawer" id="panelDrawer" hidden>
@@ -484,10 +508,17 @@
       <!-- INTERFACE -->
       <section class="set-sec" data-sec="ui" hidden>
         <h2 data-i18n="secUi">Interface</h2>
-        <label class="check"><input type="checkbox" name="show_hud"><span data-i18n="showHud">HUD em volta do aro (telemetria, cantos e pulso)</span></label>
+        <label class="check"><input type="checkbox" name="show_hud"><span data-i18n="showHud">Marcações e brilho em volta do aro</span></label>
         <label class="check"><input type="checkbox" name="show_captions"><span data-i18n="showCaptions">Legenda da resposta no modo áudio</span></label>
         <label class="check"><input type="checkbox" name="reduce_motion"><span data-i18n="reduceMotion">Reduzir animações (PCs mais fracos)</span></label>
         <label class="check"><input type="checkbox" name="pause_when_unfocused"><span data-i18n="pauseUnfocused">Pausar animações quando o NEXUS estiver fora de foco</span></label>
+        <p class="sub mono" data-i18n="colorsTitle">CORES</p>
+        <div class="colors">
+          <label><span data-i18n="colorRing">Aro</span><input type="color" name="color_ring"></label>
+          <label><span data-i18n="colorCore">Núcleo</span><input type="color" name="color_core"></label>
+          <label><span data-i18n="colorBg">Fundo</span><input type="color" name="color_bg"></label>
+        </div>
+        <div class="row-btns"><button class="btn-ghost" type="button" id="btnColorsReset" data-i18n="colorsReset">Cores originais</button></div>
         <div class="row-btns"><button class="btn-ghost" type="button" id="btnCenterRing" data-i18n="centerRing">Centralizar o aro</button></div>
       </section>
 

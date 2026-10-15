@@ -113,7 +113,16 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 - "Inicia um pomodoro"
 - "Na próxima vez que eu abrir, me lembra de continuar o projeto do app" → no próximo início: *"Olá, Alex, vamos continuar o projeto do app?"*
 
-Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia, `Ctrl+,` Configurações, `Ctrl+Shift+N` nova conversa, `Ctrl+H` conversas, `Ctrl+J` notificações, `Ctrl+T` transcrição.
+Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia, `Ctrl+,` Configurações, `Ctrl+Shift+N` nova conversa, `Ctrl+H` conversas, `Ctrl+J` notificações, `Ctrl+T` transcrição.
+
+### Novo visual, guia e atalhos (v0.16)
+
+- A tela mostra só o NEXUS: o aro com o núcleo brilhante, o estado (**AGUARDANDO**, OUVINDO…) e a última troca.
+  O nome fica no canto superior esquerdo; o resto aparece ao levar o mouse às bordas.
+- **F1** abre o **guia**: o que cada borda faz e todos os atalhos. Atalhos: `Ctrl+1` painel, `Ctrl+2` conversas,
+  `Ctrl+3` notificações, `Ctrl+4` biblioteca, `Ctrl+5` área de trabalho, `Ctrl+6` habilidades (os três últimos são
+  funções beta), `Ctrl+M` texto ⇄ áudio.
+- **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
 ### Modo usuário, modo desenvolvedor e Beta (v0.15.5)
 
@@ -326,4 +335,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.15.5 (protótipo)**.
+Versão atual: **v0.16.0 (protótipo)**.

@@ -4,10 +4,22 @@ function loadFonts(mode) {
   try { localStorage.setItem("nexus.net", mode); } catch (e) { /* ignore */ }
   if (mode === "offline" || document.getElementById("gfonts")) return;
   const l = Object.assign(document.createElement("link"), { id: "gfonts", rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" });
+    href: "https://fonts.googleapis.com/css2?family=Michroma&family=Orbitron:wght@600;700;800&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" });
   document.head.appendChild(l);
 }
 try { loadFonts(localStorage.getItem("nexus.net") || "hybrid"); } catch (e) { loadFonts("hybrid"); }
+
+/* v0.16: ring, core and background colours (Settings > Interface). Cached so the boot screen starts with them. */
+const COLOR_DEFAULTS = { color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c" };
+function setColors(src) {
+  const css = { color_ring: "--c-ring", color_core: "--c-core", color_bg: "--c-bg" }, used = {};
+  for (const [k, v] of Object.entries(css)) {
+    used[k] = /^#[0-9a-f]{6}$/i.test(src[k] || "") ? src[k] : COLOR_DEFAULTS[k];
+    document.documentElement.style.setProperty(v, used[k]);
+  }
+  try { localStorage.setItem("nexus.colors", JSON.stringify(used)); } catch (e) { /* ignore */ }
+}
+try { setColors(JSON.parse(localStorage.getItem("nexus.colors") || "{}")); } catch (e) { /* defaults from the CSS */ }
 
 /* N.E.X.U.S interface. Talks to Python through window.pywebview.api; Python pushes events via nexus.on(). */
 const $ = (s, el = document) => el.querySelector(s);
@@ -29,31 +41,44 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 
 /* ------------------------------------------------------------------ visuals */
 function ringsSVG(id) {
-  // Same ring stack as the landing page hero.
+  // v0.16 ring: thin light arcs with tick marks, a dotted ring, a segmented ring and a glowing core.
+  // Colours come from CSS variables (--c-ring, --c-core), so Settings > Interface can change them.
   const C = (r) => 2 * Math.PI * r;
-  const dash = (r, frac, offset = 0) => `stroke-dasharray="${C(r) * frac} ${C(r) * (1 - frac)}"` + (offset ? ` stroke-dashoffset="${offset}"` : "");
+  const arcs = (r, parts, gapFrac) => {  // `parts` equal arcs separated by gaps
+    const seg = C(r) / parts;
+    return `stroke-dasharray="${seg * (1 - gapFrac)} ${seg * gapFrac}"`;
+  };
   const boot = (delay, inner) => `<g class="ring-boot" style="--delay:${delay}s">${inner}</g>`;
   const spin = (dur, dir, inner) => `<g class="ring-spin" style="--dur:${dur}s;--dir:${dir}">${inner}</g>`;
+  const ticks = (r, n, len, cls, every = 1) => {
+    let out = "";
+    for (let i = 0; i < n; i += every) {
+      const a = (i / n) * 2 * Math.PI, c = Math.cos(a), s = Math.sin(a);
+      out += `<line x1="${(300 + r * c).toFixed(1)}" y1="${(300 + r * s).toFixed(1)}" x2="${(300 + (r + len) * c).toFixed(1)}" y2="${(300 + (r + len) * s).toFixed(1)}"/>`;
+    }
+    return `<g class="${cls}">${out}</g>`;
+  };
   return `<svg class="hud-rings" viewBox="0 0 600 600" aria-hidden="true">
   <defs>
-    <radialGradient id="${id}Core" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#0d1a2b" stop-opacity=".9"/><stop offset="60%" stop-color="#060b13" stop-opacity=".6"/><stop offset="100%" stop-color="#030508" stop-opacity="0"/></radialGradient>
-    <filter id="${id}Glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <radialGradient id="${id}Core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:var(--c-core-hot)"/><stop offset="22%" style="stop-color:var(--c-core)"/>
+      <stop offset="55%" style="stop-color:var(--c-core);stop-opacity:.35"/><stop offset="100%" style="stop-color:var(--c-core);stop-opacity:0"/>
+    </radialGradient>
+    <radialGradient id="${id}Halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:var(--c-core);stop-opacity:.28"/><stop offset="100%" style="stop-color:var(--c-core);stop-opacity:0"/>
+    </radialGradient>
+    <filter id="${id}Glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
-  <circle cx="300" cy="300" r="250" fill="url(#${id}Core)" class="ring-core"/>
-  ${boot(0.9, `<g class="crosshair"><line x1="300" y1="0" x2="300" y2="34" class="st-red"/><line x1="300" y1="566" x2="300" y2="600" class="st-red"/>
-    <line x1="300" y1="62" x2="300" y2="78" class="st-blue-bright"/><line x1="300" y1="522" x2="300" y2="538" class="st-red"/>
-    <line x1="286" y1="72" x2="314" y2="72" class="st-red thin"/><line x1="286" y1="528" x2="314" y2="528" class="st-red thin"/></g>`)}
-  ${boot(0, spin(140, "normal", `<circle cx="300" cy="300" r="292" class="st-faint" stroke-dasharray="2 7"/>`))}
-  ${boot(0.15, spin(48, "reverse", `<circle cx="300" cy="300" r="272" class="st-band" ${dash(272, 0.72)}/><circle cx="300" cy="300" r="279" class="st-faint"/>`))}
-  ${boot(0.3, spin(20, "normal", `<circle cx="300" cy="300" r="258" class="st-blue thin"/>
-    <circle cx="300" cy="300" r="258" class="st-red bold" ${dash(258, 0.06)} filter="url(#${id}Glow)"/>
-    <circle cx="300" cy="300" r="258" class="st-red bold" ${dash(258, 0.02, -810)}/>`))}
-  ${boot(0.45, spin(28, "reverse", `<circle cx="300" cy="300" r="244" class="st-blue-bright bold" ${dash(244, 0.17)} filter="url(#${id}Glow)"/>
-    <circle cx="300" cy="300" r="244" class="st-red" ${dash(244, 0.045, -140)}/>`))}
-  ${boot(0.6, spin(90, "normal", `<circle cx="300" cy="300" r="230" class="st-ticks" stroke-dasharray="1.445 10.598"/><circle cx="300" cy="300" r="224" class="st-faint"/>`))}
-  ${boot(0.75, `<g class="ring-sway" style="--dur:7s"><circle cx="300" cy="300" r="210" class="st-red bold" ${dash(210, 0.11, 36.3)} filter="url(#${id}Glow)"/></g>`)}
-  ${boot(0.9, spin(60, "reverse", `<circle cx="300" cy="300" r="196" class="st-blue thin" ${dash(196, 0.9)}/>`))}
-  ${boot(1, `<circle cx="300" cy="300" r="168" class="st-faint"/>`)}
+  <circle cx="300" cy="300" r="230" fill="url(#${id}Halo)" class="ring-halo"/>
+  ${boot(0, spin(200, "normal", ticks(268, 72, 7, "j-tick") + ticks(262, 72, 15, "j-tick strong", 9)))}
+  ${boot(0.15, spin(70, "reverse", `<circle cx="300" cy="300" r="246" class="j-arc" ${arcs(246, 4, 0.34)} filter="url(#${id}Glow)"/>`))}
+  ${boot(0.3, `<circle cx="300" cy="300" r="232" class="j-thin faint"/>`)}
+  ${boot(0.4, spin(110, "normal", `<circle cx="300" cy="300" r="214" class="j-thin" ${arcs(214, 3, 0.5)}/>`))}
+  ${boot(0.5, `<circle cx="300" cy="300" r="170" class="j-thin faint"/>`)}
+  ${boot(0.6, spin(48, "normal", `<circle cx="300" cy="300" r="150" class="j-dots"/>`))}
+  ${boot(0.7, spin(26, "reverse", `<circle cx="300" cy="300" r="128" class="j-seg" ${arcs(128, 9, 0.3)} filter="url(#${id}Glow)"/>`))}
+  ${boot(0.8, `<circle cx="300" cy="300" r="108" class="j-thin"/>`)}
+  ${boot(0.9, `<circle cx="300" cy="300" r="100" fill="url(#${id}Core)" class="ring-core"/>`)}
 </svg>`;
 }
 
@@ -101,8 +126,8 @@ window.nexus = {
       case "refresh": return loadDashboard();
       case "voice": return setVoiceState(p);
       case "heard": return onHeard(p);
-      case "speak_env": return ringSpeak(p);
-      case "mic_level": return (ringMicTarget = Math.max(ringMicTarget, p));
+      case "speak_env": ringSpeak(p); return wakeRing();
+      case "mic_level": ringMicTarget = Math.max(ringMicTarget, p); return wakeRing();
       case "control": return onControl(p);
       case "ai_state": return setAiState(p);
       case "alert": return onAlert(p);
@@ -186,7 +211,15 @@ function setAiState(p) {
 }
 
 /* ------------------------------------------------------------------ conversation */
+/* v0.16: the last exchange is shown under the ring (audio mode), like a two-line transcript */
+const plain = (t) => String(t || "").replace(/```[\s\S]*?```/g, " ").replace(/[*`#>]/g, "").replace(/\s+/g, " ").trim();
+function setExchange(who, text) {
+  if (who === "user") { $("#exUser").textContent = plain(text); $("#exNexus").textContent = ""; }
+  else $("#exNexus").textContent = plain(text);
+}
+
 function addMsg(kind, text, spoken = false) {
+  if (kind === "user" || (kind === "nexus" && text)) setExchange(kind, text);
   const el = document.createElement("div");
   el.className = `msg ${kind}`;
   const who = kind === "user" ? T("you") + (spoken ? " · 🎙 " + T("heard") : "") : kind === "nexus" ? "N.E.X.U.S" : "";
@@ -212,7 +245,7 @@ function onToken(tok) {
   s.text += tok;
   s.el.querySelector(".txt").innerHTML = md(s.text);
   $("#chat").scrollTop = $("#chat").scrollHeight;
-  if (!transcriptOn) caption(tail(s.text), 9000);
+  setExchange("nexus", tail(s.text));
   updateDock();
 }
 
@@ -234,6 +267,7 @@ function onDone(p) {
   if (!p.text) { s.el.remove(); streaming = null; setVoiceState("idle"); return; }  // pause/stop handled by the model
   s.el.querySelector(".txt").classList.remove("caret");
   s.el.querySelector(".txt").innerHTML = md(p.text) + (p.interrupted ? " <span class=\"muted\">…</span>" : "");
+  setExchange("nexus", p.text);
   streaming = null;
   state.can_repeat = true;
   if (!(state.ui_mode === "audio" && state.voice_enabled && p.speak)) setVoiceState("idle");
@@ -251,7 +285,6 @@ function onError(p) {
 function onHeard(p) {
   addMsg("user", p.text, true);
   if (p.control) setVoiceState("idle");
-  caption("“" + p.text + "”", 3500);
 }
 
 function onControl(p) {
@@ -329,6 +362,7 @@ function setVoiceState(st) {
   let shown = st;
   if (st === "idle" && state.ui_mode === "audio") shown = state.mic_muted ? "muted" : state.stt === "ready" ? "standby" : "idle";
   $("#core").dataset.state = shown;
+  if (st === "speaking") wakeRing();
   const label = $("#coreLabel");
   label.textContent = T("st_" + shown) || "";
   label.className = "core-label " + (["listening", "awake"].includes(shown) ? "red" : ["speaking", "thinking"].includes(shown) ? "blue" : "");
@@ -404,35 +438,30 @@ function ringSpeak(p) {
   ringEnvStart = performance.now();
 }
 
-let ringRunning = true;
+// v0.16: the loop sleeps while NEXUS is quiet. v0.15 ran it 60x/s forever: 3 CSS variables rewritten every frame
+// (each one restyles the whole ring and its glow) plus the pulse trace - ~210 DOM writes per second doing nothing.
+// The idle "breathing" is a CSS animation of the core now; voice and mic levels wake the loop up.
+let ringRunning = false, ringLast = { s: "", ai: "", mic: "" };
+function wakeRing() {
+  if (!ringRunning && !$("#app").classList.contains("bg")) { ringRunning = true; requestAnimationFrame(ringFrame); }
+}
 function ringFrame(now) {
   if ($("#app").classList.contains("bg")) { ringRunning = false; return; }  // v0.14: no work while unfocused
   let aiTarget = 0;
-  if (ringEnv && voiceState === "speaking") {
+  const speaking = ringEnv && voiceState === "speaking";
+  if (speaking) {
     const i = Math.floor((now - ringEnvStart) / 1000 / ringEnvDt);
     aiTarget = i < ringEnv.length ? ringEnv[i] : 0;
   }
   ringAi += (aiTarget - ringAi) * 0.3;
   ringMic += (ringMicTarget - ringMic) * 0.3;
   ringMicTarget *= 0.9;  // mic levels arrive ~16x/s; decay between updates
-  const breathe = 0.008 * Math.sin(now / 1400);
-  const ring = $("#ring");
-  ring.style.setProperty("--s", (1 + breathe + 0.14 * ringAi - 0.12 * ringMic).toFixed(4));
-  ring.style.setProperty("--ai", ringAi.toFixed(3));
-  ring.style.setProperty("--mic", ringMic.toFixed(3));
-  if ((pulseTick = (pulseTick + 1) % 2) === 0 && state.ui_mode === "audio") drawPulse(now);
+  const ring = $("#ring"), v = { s: (1 + 0.14 * ringAi - 0.12 * ringMic).toFixed(3), ai: ringAi.toFixed(2), mic: ringMic.toFixed(2) };
+  for (const k of ["s", "ai", "mic"]) if (v[k] !== ringLast[k]) { ring.style.setProperty("--" + k, v[k]); ringLast[k] = v[k]; ringWrites++; }
+  if (!speaking && ringAi < 0.004 && ringMic < 0.004 && ringMicTarget < 0.004) { ringRunning = false; return; }
   requestAnimationFrame(ringFrame);
 }
-
-// Pulse trace under the ring: a scrolling line driven by the same voice/mic levels as the ring.
-const PULSE_N = 60, pulse = new Array(PULSE_N).fill(0);
-let pulseTick = 0;
-function drawPulse(now) {
-  const level = Math.min(1, ringAi + ringMic);
-  pulse.shift();
-  pulse.push(level * Math.sin(now / 38) * (0.6 + 0.4 * Math.random()) + 0.04 * Math.sin(now / 420));
-  $("#pulseLine").setAttribute("points", pulse.map((v, i) => `${(i * 240 / (PULSE_N - 1)).toFixed(1)},${(12 - v * 11).toFixed(1)}`).join(" "));
-}
+let ringWrites = 0;  // diagnostics: CSS variable writes (read by the tests/benchmarks)
 
 /* ------------------------------------------------------------------ captions & notices (audio mode has no chat) */
 let captionTimer;
@@ -440,6 +469,7 @@ function applyInterface() {
   const app = $("#app");
   app.classList.toggle("no-hud", settings.show_hud === false);
   app.classList.toggle("reduce-motion", !!settings.reduce_motion);
+  setColors(settings);
   // v0.15.5: beta features that are off disappear from the interface (Settings > Beta)
   $("#btnWorkspaces").hidden = !feature("workspace");
   $("#btnLibrary").hidden = !feature("library");
@@ -447,6 +477,34 @@ function applyInterface() {
   const anyWork = feature("workspace") || feature("library");
   $('#railRight [data-i18n="wsRail"]').hidden = !anyWork;
   $('#railRight [data-i18n="convTitle"]').classList.toggle("rail-sep", anyWork);
+}
+
+/* ------------------------------------------------------------------ v0.16 shortcuts and guide HUD */
+const SHORTCUTS = [
+  { keys: "F1", label: "kGuide" },
+  { keys: "Ctrl+Espaço", label: "kTalk" },
+  { keys: "Ctrl+1", key: "1", label: "kPanel", run: () => { loadDashboard(); $("#panelDrawer").hidden = false; } },
+  { keys: "Ctrl+2", key: "2", label: "kConvs", run: () => openConversations("threads") },
+  { keys: "Ctrl+3", key: "3", label: "kNotif", run: () => openNotifications() },
+  { keys: "Ctrl+4", key: "4", label: "kLibrary", feature: "library", run: () => openLibrary() },
+  { keys: "Ctrl+5", key: "5", label: "kWorkspace", feature: "workspace", run: () => openWorkspaces() },
+  { keys: "Ctrl+6", key: "6", label: "kSkills", feature: "skills", run: () => openSkills() },
+  { keys: "Ctrl+M", key: "m", label: "kMode", run: () => dock(state.ui_mode === "audio" ? "text" : "audio") },
+  { keys: "Ctrl+,", label: "kSettings" },
+  { keys: "Ctrl+Shift+N", label: "kNewConv" },
+  { keys: "Ctrl+T", label: "kTranscript" },
+  { keys: "Esc", label: "kStop" },
+  { keys: "F11", label: "kFull" },
+];
+const SHORTCUT_KEYS = Object.fromEntries(SHORTCUTS.filter((x) => x.key).map((x) => [x.key, x]));
+
+function toggleGuide(on) {
+  const g = $("#guide"), show = on ?? g.hidden;
+  if (show) {
+    $("#guideKeys").innerHTML = SHORTCUTS.filter((x) => !x.feature || feature(x.feature))
+      .map((x) => `<li><kbd>${esc(x.keys.replace("Espaço", T("kSpace")))}</kbd><span>${esc(T(x.label))}</span></li>`).join("");
+  }
+  g.hidden = !show;
 }
 
 /* beta features (v0.15.5): developer mode turns all of them on */
@@ -795,6 +853,14 @@ function wire() {
       if (!r.ok) notice(T("voiceLoading") + (r.error && r.error !== "loading" ? ` (${r.error})` : ""));
     }
     if (e.key === "Escape" && confirmId) { answerConfirm(false); return; }
+    if (e.key === "F1" || (e.ctrlKey && e.key === "/")) { e.preventDefault(); toggleGuide(); return; }
+    if (e.key === "Escape" && !$("#guide").hidden) { toggleGuide(false); return; }
+    if (e.ctrlKey && !e.altKey && !e.shiftKey && SHORTCUT_KEYS[e.key]) {
+      const sc = SHORTCUT_KEYS[e.key];
+      e.preventDefault();
+      if (!sc.feature || feature(sc.feature)) { toggleGuide(false); sc.run(); }
+      return;
+    }
     if (e.key === "Escape") {
       const open = $$(".modal:not([hidden]), .drawer:not([hidden])");
       if (open.length) open.forEach((m) => (m.hidden = true)); else dock("interrupt");
@@ -886,6 +952,16 @@ function wire() {
   $("#btnProfileSkip").onclick = () => ($("#onboarding").hidden = true);
 
   $("#btnSettings").onclick = openSettings;
+  $("#btnGuide").onclick = () => toggleGuide(true);
+  $("#guide").onclick = () => toggleGuide(false);
+  const colorForm = $("#settingsForm");
+  ["color_ring", "color_core", "color_bg"].forEach((n) => (colorForm.elements[n].oninput = () =>
+    setColors({ color_ring: colorForm.elements.color_ring.value, color_core: colorForm.elements.color_core.value,
+      color_bg: colorForm.elements.color_bg.value })));
+  $("#btnColorsReset").onclick = () => {
+    for (const [k, v] of Object.entries(COLOR_DEFAULTS)) colorForm.elements[k].value = v;
+    setColors(COLOR_DEFAULTS);
+  };
   $("#btnTestVoice").onclick = testVoice;
   $("#settingsForm").elements.voice_gender.onchange = renderVoiceInfo;
   $("#settingsForm").addEventListener("submit", async (e) => {
@@ -1314,7 +1390,7 @@ function reportBackground() {
   bgState = st;
   const pause = st !== "visible" && settings.pause_when_unfocused !== false;
   $("#app").classList.toggle("bg", pause);
-  if (!pause && !ringRunning) { ringRunning = true; requestAnimationFrame(ringFrame); }
+  if (!pause) wakeRing();
   if (window.pywebview && api()) api().set_background(st);
 }
 
@@ -1480,7 +1556,7 @@ $$(".wordmark").forEach((el) => (el.innerHTML = wordmarkHTML()));
 requestAnimationFrame(() => $("#boot .wordmark").classList.add("is-on"));
 applyLang("pt");
 wire();
-requestAnimationFrame(ringFrame);
+wakeRing();
 
 if (window.pywebview && window.pywebview.api) start();
 else window.addEventListener("pywebviewready", start);

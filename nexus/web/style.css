@@ -659,3 +659,126 @@ svg, img { -webkit-user-drag: none; }
 .drop-zone { position: fixed; inset: 14px; z-index: 40; display: grid; place-items: center; border: 2px dashed rgba(130, 189, 246, .6);
   border-radius: 16px; background: rgba(4, 7, 12, .72); color: var(--blue-bright); font-size: 13px; letter-spacing: .12em;
   pointer-events: none; }
+
+/* ================================================================ v0.16 design
+   Clean screen: deep navy with a soft radial glow, one light ring with tick marks around a glowing core, the
+   state and the last exchange under it, the name in the top-left corner. Everything else stays at the edges
+   (revealed on hover) or in the guide HUD (F1). Ring, core and background colours are user settings. */
+:root {
+  --c-ring: #cfe4ff; --c-core: #2f86ff; --c-bg: #0b1f5c;
+  --f-brand: "Orbitron", "Bahnschrift", "Eurostile", "Arial", sans-serif;
+  --c-core-hot: color-mix(in srgb, var(--c-core) 35%, white);
+  --c-ring-soft: color-mix(in srgb, var(--c-ring) 40%, transparent);
+  --c-ring-faint: color-mix(in srgb, var(--c-ring) 16%, transparent);
+  --bg: color-mix(in srgb, var(--c-bg) 30%, #01030a); --bg-2: color-mix(in srgb, var(--c-bg) 22%, #040812);
+  --blue-bright: color-mix(in srgb, var(--c-ring) 70%, var(--c-core));
+}
+body { background: var(--bg); background-image: radial-gradient(ellipse 70% 75% at 50% 40%,
+  color-mix(in srgb, var(--c-bg) 92%, white 8%) 0%, var(--c-bg) 32%, color-mix(in srgb, var(--c-bg) 45%, #01030a) 72%, var(--bg) 100%); }
+.boot { background: transparent; }
+/* the old HUD dressing goes away */
+.hud-frame, .telemetry, .pulse, .app::after, .hero-connector, .boot .hud-corners, .boot .hud-sideticks { display: none !important; }
+
+/* ring */
+.hud-rings line, .hud-rings circle[class^="j-"] { fill: none; }
+.j-tick line { stroke: var(--c-ring-soft); stroke-width: 1.2; }
+.j-tick.strong line { stroke: var(--c-ring); stroke-width: 1.6; }
+.j-arc { stroke: var(--c-ring); stroke-width: 2.6; opacity: .9; }
+.j-thin { stroke: var(--c-ring-soft); stroke-width: 1.1; }
+.j-thin.faint { stroke: var(--c-ring-faint); }
+.j-dots { stroke: var(--c-ring); stroke-width: 7; stroke-dasharray: 1.1 5.5; opacity: .55; }
+.j-seg { stroke: var(--c-core-hot); stroke-width: 5; opacity: .75; }
+.ring-core { animation: coreBreath 4.5s ease-in-out infinite; }
+.ring-halo { animation: corePulse 4.5s ease-in-out infinite; }
+@keyframes coreBreath { 0%, 100% { transform: scale(.94); opacity: .9; } 50% { transform: scale(1.04); opacity: 1; } }
+.ring .hud-rings { filter: drop-shadow(0 0 calc(6px + var(--ai, 0) * 26px) color-mix(in srgb, var(--c-core) calc(35% + var(--ai, 0) * 50%), transparent))
+  drop-shadow(0 0 calc(var(--mic, 0) * 22px) color-mix(in srgb, var(--c-ring) calc(var(--mic, 0) * 80%), transparent)); }
+.core[data-state="listening"] .ring-core, .core[data-state="awake"] .ring-core { animation-duration: 1.2s; }
+.core[data-state="thinking"] .ring-core, .core[data-state="transcribing"] .ring-core { animation-duration: .8s; }
+.core-hover { display: none; }
+
+/* stage: the ring a little above the centre, state and exchange under it */
+.stage { justify-content: center; padding-bottom: 6vh; }
+.core { --size: min(56vh, 62vw, 560px); }
+.core-label { margin-top: 18px; font-family: var(--f-brand); font-weight: 700; font-size: 10.5px; letter-spacing: .5em; color: var(--c-ring);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--c-core) 60%, transparent); padding-left: .5em; }
+.core-label.red, .core-label.blue { color: var(--c-ring); }
+.exchange { margin-top: 14px; width: min(640px, 86vw); display: flex; flex-direction: column; align-items: center; gap: 6px;
+  font-family: var(--f-body); font-size: 14px; line-height: 1.45; color: color-mix(in srgb, var(--c-ring) 88%, white); }
+.ex-line { margin: 0; position: relative; padding-left: 30px; max-width: 100%; text-align: left;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.ex-line:empty { display: none; }
+.ex-line::before { content: ""; position: absolute; left: 0; top: .72em; width: 18px; height: 2px; border-radius: 1px; }
+.ex-line.user { color: color-mix(in srgb, var(--c-ring) 70%, transparent); -webkit-line-clamp: 2; }
+.ex-line.user::before { background: var(--c-ring-soft); }
+.ex-line.nexus::before { background: var(--c-core-hot); box-shadow: 0 0 8px var(--c-core); }
+.caption { font-size: 12.5px; letter-spacing: .04em; color: var(--c-ring-soft); margin-top: 8px; min-height: 0; }
+.app[data-mode="text"] .exchange, .app.transcript .exchange { display: none; }
+
+/* name in the corner */
+.brand-corner { position: fixed; top: 26px; left: 34px; z-index: 4; pointer-events: none; }
+.bc-name { margin: 0; font-family: var(--f-brand); font-weight: 800; font-size: 25px; line-height: 1; letter-spacing: .34em; color: #eef5ff;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--c-core) 55%, transparent); }
+.bc-sub { display: inline-block; margin: 7px 0 0; padding-bottom: 3px; font-family: var(--f-body); font-size: 9.5px; font-weight: 600;
+  letter-spacing: .08em; color: color-mix(in srgb, var(--c-ring) 75%, var(--c-core)); border-bottom: 1px solid var(--c-ring-soft); }
+.app.ws-mode .brand-corner { display: none; }
+.guide-hint { position: fixed; left: 34px; bottom: 22px; z-index: 4; background: none; border: 0; padding: 4px 0; font-size: 10px;
+  letter-spacing: .22em; color: var(--c-ring-soft); transition: color .2s; }
+.guide-hint:hover { color: var(--c-ring); }
+
+/* bars and panels pick up the navy */
+.topbar { background: linear-gradient(color-mix(in srgb, var(--bg) 96%, transparent), color-mix(in srgb, var(--bg) 82%, transparent)); }
+.dock, .rail { background: color-mix(in srgb, var(--bg-2) 92%, transparent); }
+.panel::before, .dock::before, .rail::before, .modal-box::before, .conv-box::before, .drawer-box::before { display: none; }
+
+/* guide HUD */
+.guide { position: fixed; inset: 0; z-index: 25; background: color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter: blur(2px);
+  animation: fadeIn .3s ease forwards; opacity: 0; color: var(--c-ring); }
+.g-call { position: absolute; display: flex; flex-direction: column; gap: 4px; max-width: 280px; font-size: 13px; line-height: 1.45;
+  color: color-mix(in srgb, var(--c-ring) 80%, white); }
+.g-call b { font-family: var(--f-brand); font-weight: 700; font-size: 10.5px; letter-spacing: .32em; color: var(--c-ring); }
+.g-call::before { content: ""; position: absolute; background: var(--c-ring-soft); }
+.g-top { top: 78px; left: 50%; transform: translateX(-50%); text-align: center; align-items: center; }
+.g-top::before { width: 1px; height: 52px; top: -60px; left: 50%; }
+.g-bottom { bottom: 92px; left: 50%; transform: translateX(-50%); text-align: center; align-items: center; }
+.g-bottom::before { width: 1px; height: 52px; bottom: -60px; left: 50%; }
+.g-left { left: 64px; top: 30%; }
+.g-left::before { height: 1px; width: 44px; left: -56px; top: .6em; }
+.g-right { right: 64px; top: 30%; text-align: right; align-items: flex-end; }
+.g-right::before { height: 1px; width: 44px; right: -56px; top: .6em; }
+.g-center { left: 50%; top: 44%; transform: translate(-50%, -50%); text-align: center; align-items: center; max-width: 240px; }
+.g-keys { position: absolute; right: 34px; bottom: 26px; width: min(330px, 40vw); padding: 14px 16px; border: 1px solid var(--c-ring-faint);
+  border-radius: var(--radius); background: color-mix(in srgb, var(--bg-2) 90%, transparent); }
+.g-kicker { margin: 0 0 8px; font-size: 10px; letter-spacing: .3em; color: var(--c-ring); }
+.g-list { list-style: none; margin: 0; padding: 0; font-size: 11.5px; }
+.g-list li { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--c-ring-faint); }
+.g-list kbd { font-family: var(--f-mono); color: #fff; white-space: nowrap; }
+.g-list span { color: color-mix(in srgb, var(--c-ring) 75%, transparent); text-align: right; }
+.g-close { margin: 10px 0 0; font-size: 10px; letter-spacing: .14em; color: var(--c-ring-soft); }
+.colors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.modal-box .colors input[type="color"] { -webkit-appearance: none; appearance: none; flex: none; width: 100%; height: 38px; padding: 3px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: none; cursor: pointer; }
+.colors input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.colors input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 4px; }
+@media (max-width: 900px) { .g-left, .g-right { display: none; } .g-keys { left: 16px; right: 16px; width: auto; } }
+/* messages in the navy palette */
+.msg { background: color-mix(in srgb, var(--bg-2) 85%, transparent); border-color: var(--c-ring-faint); }
+.msg.user { background: color-mix(in srgb, var(--c-core) 16%, transparent); border-color: color-mix(in srgb, var(--c-core) 40%, transparent); }
+.msg.nexus { border-left: 2px solid var(--c-core-hot); }
+.msg.nexus .who { color: var(--c-ring); }
+.composer { background: color-mix(in srgb, var(--bg-2) 92%, transparent); border-color: var(--c-ring-faint); }
+.app[data-mode="text"] .guide-hint, .app.ws-mode .guide-hint { display: none; }
+/* accents follow the ring/core colours (red stays only for errors and dangerous actions) */
+.kicker, .panel-title span:first-child, .toast b, .lv-badge b, .sk-rank, .sk-list .lv span { color: var(--c-ring); }
+.set-nav button.on, .notif-item.unread, .conv-card.current { border-left-color: var(--c-core-hot); }
+.tabs button.on { border-bottom-color: var(--c-core-hot); }
+.toast { border-color: var(--c-ring-faint); border-left-color: var(--c-core-hot); box-shadow: var(--shadow); }
+.sk-rank { border-color: var(--c-ring-soft); box-shadow: inset 0 0 18px color-mix(in srgb, var(--c-core) 25%, transparent); }
+.modal-box input[type="range"], .voice-row input[type="range"] { accent-color: var(--c-core); }
+.notif-badge { background: var(--c-core); box-shadow: 0 0 8px var(--c-core); }
+/* 'marks and glow' off: a plain ring */
+.app.no-hud .j-tick, .app.no-hud .ring-halo { display: none; }
+/* the top bar has its own name: the corner one steps aside while it is open */
+.brand-corner { transition: opacity .3s ease; }
+.app:has(.topbar.show) .brand-corner { opacity: 0; }
+.wm-dot { color: var(--c-core-hot); text-shadow: 0 0 12px var(--c-core); }

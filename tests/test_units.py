@@ -699,5 +699,23 @@ check("migration: titles from the first user message",
       [c["title"] for c in migrated.all("SELECT title FROM conversations ORDER BY id")] == ["oi", "e o clima?"])
 migrated.conn.close()
 
+# -- v0.16: interface texts exist in the three languages; colour settings are valid --------------------------------
+import re  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+WEB = Path(__file__).resolve().parent.parent / "nexus" / "web"
+_i18n = (WEB / "i18n.js").read_text("utf-8")
+_blocks = dict(zip(("pt", "en", "es"), re.split(r"\n  (?:pt|en|es): \{", _i18n)[1:]))
+_keys = {lang: set(re.findall(r"(?:^|[\s,{])([A-Za-z_]\w*): ", body)) for lang, body in _blocks.items()}
+_html = (WEB / "index.html").read_text("utf-8")
+_used = set(re.findall(r'data-i18n(?:-ph|-title)?="(\w+)"', _html))
+for lang in ("pt", "en", "es"):
+    missing = sorted(_used - _keys[lang])
+    check(f"i18n: every interface text exists in {lang}", not missing, str(missing[:8]))
+_guide = {"guideHint", "gKeys", "gClose", "kGuide", "kPanel", "kMode", "colorsTitle", "colorsReset"}
+check("i18n: guide HUD and colour texts in the three languages", all(_guide <= _keys[x] for x in _keys))
+check("colours: default ring/core/background are valid hex colours",
+      all(re.fullmatch(r"#[0-9a-f]{6}", str(settings[k])) for k in ("color_ring", "color_core", "color_bg")))
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)
