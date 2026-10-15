@@ -118,7 +118,13 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
 ### Novo visual, guia e atalhos (v0.16)
 
 - A tela mostra só o NEXUS: o aro com o núcleo brilhante, o estado (**AGUARDANDO**, OUVINDO…) e a última troca.
-  O nome fica no canto superior esquerdo; o resto aparece ao levar o mouse às bordas.
+  O nome aparece no canto superior esquerdo só enquanto o mouse se mexe. Sem interação por alguns minutos, o NEXUS
+  entra em repouso: só o aro, passeando pela tela.
+- **Modo de uso** (Configurações → Interface): **Computador** — cada menu (topo, esquerda, direita, embaixo) aparece
+  ao encostar o mouse, fica fixo ou desligado — ou **Somente atalhos + IA**, sem nenhum menu na tela
+  (`Ctrl+Shift+M` minimiza, `Ctrl+Shift+Q` fecha, `F11` tela cheia/normal).
+- Um menu por vez: o mesmo atalho abre e fecha; os painéis podem ser arrastados pelo topo. `Ctrl+Shift+X` fecha os
+  avisos. Sem IA disponível, o aro fica vermelho com um botão **Como resolver** (o NEXUS fala os passos).
 - **F1** abre o **guia**: o que cada borda faz e todos os atalhos. Atalhos: `Ctrl+1` painel, `Ctrl+2` conversas,
   `Ctrl+3` notificações, `Ctrl+4` biblioteca, `Ctrl+5` área de trabalho, `Ctrl+6` habilidades (os três últimos são
   funções beta), `Ctrl+M` texto ⇄ áudio.
@@ -335,4 +341,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.16.0 (protótipo)**.
+Versão atual: **v0.16.1 (protótipo)**.

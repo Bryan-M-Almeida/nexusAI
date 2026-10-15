@@ -118,6 +118,14 @@ DEFAULTS = {
     "beta_library": False,
     "beta_skills": False,
     "beta_browser": False,
+    # v0.16.1 layout: "computer" (menus for the mouse) or "shortcuts" (nothing on screen: shortcuts + voice only)
+    "ui_layout": "computer",
+    "bar_top": "hover",           # each menu: hover (appears at the screen edge) | fixed | off
+    "bar_left": "hover",
+    "bar_right": "hover",
+    "bar_bottom": "hover",
+    "ring_wander": True,          # the ring drifts around the screen by itself
+    "rest_minutes": 3,            # no interaction for this long: texts hide, only the ring plays (0 = never)
     # v0.16 interface colours (ring, core, background)
     "color_ring": "#cfe4ff",
     "color_core": "#2f86ff",

@@ -19,6 +19,7 @@ from .i18n import LANGS, detect, lang
 
 SENTENCE_END = re.compile(r"(?<=[.!?;:])\s+|\n+")
 _window: webview.Window | None = None
+_fullscreen = False
 _pending: list[str] = []
 _ui_ready = threading.Event()
 
@@ -150,7 +151,8 @@ class Api:
         step("voice", self._listener.model_state != "error", f"{settings['stt_model']} · {self._listener.model_state}")
         self._sync_listening()
         return {"profile": db.get_profile(), "lang": lang(), "llm": st, "settings": dict(settings),
-                "stt": self._listener.model_state, "version": __version__, "model_name": MODEL_NAME}
+                "stt": self._listener.model_state, "version": __version__, "model_name": MODEL_NAME,
+                "fullscreen": _fullscreen}
 
     def _warm_up(self):
         """Load the model and cache the fixed prompt while the boot animation plays (v0.6: 1st reply 30 s -> ~1 s)."""
@@ -582,7 +584,21 @@ class Api:
 
     # -- window ----------------------------------------------------------------
     def toggle_fullscreen(self):
+        """Returns the new state: the interface hides the window buttons in full screen (v0.16.1)."""
+        global _fullscreen
         _window.toggle_fullscreen()
+        _fullscreen = not _fullscreen
+        return _fullscreen
+
+    @staticmethod
+    def llm_status():
+        """Light AI check for the ring's "AI unavailable" state (polled only while it is down)."""
+        return llm.status()
+
+    def speak_help(self, text):
+        """"How to fix" on the ring: NEXUS says the steps out loud, even with the AI down."""
+        self._speaker.stop()
+        self._speaker.say(text, force=True, remember=False)
 
     def minimize(self):
         _window.minimize()
@@ -846,7 +862,7 @@ _mutex = None
 
 
 def main():
-    global _window
+    global _window, _fullscreen
     setup_logs()
     if "--selftest" in sys.argv:
         selftest()
@@ -856,10 +872,11 @@ def main():
     log.info(f"NEXUS {__version__} starting")
     threading.Thread(target=_daily_backup, daemon=True, name="backup").start()
     api = Api()
+    _fullscreen = bool(settings["start_fullscreen"] and not os.environ.get("NEXUS_WINDOWED"))
     _window = webview.create_window(
         "N.E.X.U.S", str(WEB_DIR / "index.html"), js_api=api,
         width=1360, height=860, min_size=(980, 660), background_color="#030508",
-        fullscreen=settings["start_fullscreen"] and not os.environ.get("NEXUS_WINDOWED"), text_select=True,
+        fullscreen=_fullscreen, text_select=True,
     )
     webview.start(debug=bool(os.environ.get("NEXUS_DEBUG")))
     llm.unload()  # window closed: give the VRAM back to games and other apps

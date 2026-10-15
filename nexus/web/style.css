@@ -782,3 +782,89 @@ body { background: var(--bg); background-image: radial-gradient(ellipse 70% 75% 
 .brand-corner { transition: opacity .3s ease; }
 .app:has(.topbar.show) .brand-corner { opacity: 0; }
 .wm-dot { color: var(--c-core-hot); text-shadow: 0 0 12px var(--c-core); }
+
+/* ================================================================ v0.16.1 cleaner screen
+   Nothing on the screen but the ring: the name shows only while the mouse moves, the top bar keeps just the
+   notifications, settings and window buttons, menus are one at a time and can be dragged. */
+.brand-corner, .guide-hint { opacity: 0; transition: opacity .5s ease; }
+.app.pointer .brand-corner, .app.pointer .guide-hint { opacity: 1; }
+.app.pointer:has(.topbar.show) .brand-corner { opacity: 0; }
+
+/* top bar: emptied */
+.topbar .brand, .topbar .chips, .topbar .lang-switch, #btnPanel { display: none !important; }
+.topbar { justify-content: flex-end; height: 50px; background: transparent; border-bottom: 0; backdrop-filter: none; }
+.topbar .icon-btn { border-color: transparent; background: color-mix(in srgb, var(--bg-2) 70%, transparent); }
+.topbar .icon-btn:hover { border-color: var(--c-ring-faint); }
+.app.is-full .win-btn, .app.is-full .win-sep { display: none !important; }
+
+/* edge menus: quick in, quicker out; "fixed" ones stay */
+.edge-bar { transition: transform .26s var(--ease-out), opacity .2s ease; }
+.edge-bar:not(.show) { transition: transform .18s ease-in, opacity .14s ease-in; }
+.rail.fixed, .dock.fixed, .topbar.fixed { transition: none; }
+
+/* notices */
+.toasts { gap: 6px; }
+.toast { min-width: 280px; max-width: 380px; padding: 9px 12px 10px; background: color-mix(in srgb, var(--bg-2) 94%, transparent);
+  border: 1px solid var(--c-ring-faint); border-left: 2px solid var(--c-core-hot); transition: opacity .28s, transform .28s; }
+.toast.leaving { opacity: 0; transform: translateX(16px); }
+.t-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.t-head b { margin: 0; font-family: var(--f-mono); font-size: 10px; letter-spacing: .16em; color: var(--c-ring); }
+.t-count { font-style: normal; font-family: var(--f-mono); font-size: 10px; color: var(--c-core-hot); }
+.t-more { margin-left: auto; background: none; border: 0; padding: 0 2px; font-family: var(--f-mono); font-size: 10px;
+  letter-spacing: .08em; color: var(--c-ring-soft); }
+.t-more:hover, .t-x:hover { color: #fff; }
+.t-x { background: none; border: 0; padding: 0 2px; font-size: 12px; line-height: 1; color: var(--c-ring-soft); }
+.t-head b + .t-count + .t-x { margin-left: auto; }
+.t-text { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--text); }
+.t-detail { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--c-ring-faint); font-size: 12.5px; line-height: 1.5;
+  color: color-mix(in srgb, var(--c-ring) 80%, transparent); }
+
+/* AI unavailable: the core turns red, the state says so and a button explains (out loud) how to fix it */
+.app.ai-down { --c-core: #e4574c; }
+.app.ai-down .core-label { color: #ffb3ad; }
+.ai-fix { margin-top: 10px; padding: 5px 14px; border-radius: 999px; background: color-mix(in srgb, #e4574c 14%, transparent);
+  border: 1px solid color-mix(in srgb, #e4574c 55%, transparent); color: #ffd5d1; font-family: var(--f-mono); font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase; }
+.ai-fix:hover { background: color-mix(in srgb, #e4574c 26%, transparent); }
+
+/* thinking: everything spins much faster until the answer arrives */
+.core[data-state="thinking"] .ring-spin, .core[data-state="transcribing"] .ring-spin { animation-duration: calc(var(--dur) / 9) !important; }
+
+/* the ring drifts by itself (audio mode) */
+@keyframes wander {
+  0%, 100% { translate: 0 0; } 20% { translate: 7vw -4vh; } 45% { translate: -5vw 4vh; } 70% { translate: -8vw -3vh; } 85% { translate: 4vw 3vh; }
+}
+.app.wander[data-mode="audio"]:not(.transcript):not(.ws-mode) .core { animation: wander 70s ease-in-out infinite; }
+
+/* rest: only the ring, playing */
+@keyframes play {
+  0%, 100% { translate: 0 0; scale: 1; rotate: 0deg; }
+  15% { translate: 18vw -10vh; scale: .82; rotate: 40deg; }
+  32% { translate: 24vw 12vh; scale: .7; rotate: -20deg; }
+  50% { translate: -6vw 16vh; scale: 1.05; rotate: 90deg; }
+  68% { translate: -24vw -6vh; scale: .76; rotate: 10deg; }
+  84% { translate: -12vw -14vh; scale: .9; rotate: -45deg; }
+}
+.app.resting .core { animation: play 46s ease-in-out infinite !important; }
+.app.resting .exchange, .app.resting .core-label, .app.resting .caption, .app.resting .ai-fix,
+.app.resting .brand-corner, .app.resting .guide-hint, .app.resting .temp-badge { opacity: 0 !important; transition: opacity 1.2s ease; }
+.exchange, .core-label, .caption { transition: opacity .6s ease; }
+
+/* menus: lighter, one at a time, draggable by the top */
+.drawer, .modal { background: color-mix(in srgb, var(--bg) 52%, transparent); backdrop-filter: blur(3px); }
+.drawer-box, .conv-box, .modal-box { background: color-mix(in srgb, var(--bg-2) 96%, transparent);
+  border: 1px solid var(--c-ring-faint); box-shadow: 0 24px 60px rgba(0, 0, 0, .45); }
+.drawer-box::after, .conv-box::after, .modal-box::after { content: ""; position: absolute; top: 9px; left: 50%; width: 42px; height: 4px;
+  margin-left: -21px; border-radius: 2px; background: var(--c-ring-faint); pointer-events: none; }
+.drawer-box, .conv-box, .modal-box.settings-box, .modal-box.reader-box { cursor: default; }
+.moving { transition: none !important; user-select: none; opacity: .96; }
+.panel { background: color-mix(in srgb, var(--bg) 40%, transparent); border-color: var(--c-ring-faint); }
+.rail, .dock { border-color: var(--c-ring-faint); }
+.rail-btn.on, .dock-btn.on { color: #fff; border-color: color-mix(in srgb, var(--c-core) 55%, transparent);
+  background: color-mix(in srgb, var(--c-core) 18%, transparent); }
+.two-cards { grid-template-columns: repeat(2, 1fr); }
+.bars-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+@media (max-width: 760px) { .bars-grid { grid-template-columns: 1fr; } }
+/* shortcuts-only layout: the guide only lists shortcuts (there are no edge menus to explain) */
+.app.layout-shortcuts ~ #guide .g-top, .app.layout-shortcuts ~ #guide .g-left, .app.layout-shortcuts ~ #guide .g-right,
+.app.layout-shortcuts ~ #guide .g-bottom { display: none; }

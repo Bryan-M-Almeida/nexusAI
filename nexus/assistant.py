@@ -21,7 +21,7 @@ inspired by J.A.R.V.I.S, running locally on the user's computer. You remember th
 schedule, notes and data, solve problems and act in real time through your tools.
 
 Rules:
-- {reply_lang} You understand Portuguese, English and Spanish.
+- You understand Portuguese, English and Spanish; the context of each message says which language to reply in.
 - Tone: {tone}. Be concise and natural: replies are often spoken aloud, so avoid long lists, tables and code unless asked.
 - ACTIONS REQUIRE TOOL CALLS. Saying you did something without calling the tool is a lie and is forbidden:
   log money/expenses/any measurement -> `record_data` (collection e.g. "gastos"/"expenses", one call per item);
@@ -73,7 +73,7 @@ WORKSPACE_IDENTITY = """You are N.E.X.U.S working inside the user's WORKSPACE "{
 Project description: {description}
 
 Rules:
-- {reply_lang} Be concise, precise and technical. No small talk.
+- Reply in the language the context asks for. Be concise, precise and technical. No small talk.
 - You have full freedom INSIDE the workspace folder: create, read, edit, move and delete files with the tools.
   Paths are relative to the workspace folder. You cannot touch anything outside it.
 - FILE CHANGES REQUIRE TOOL CALLS. Never say you created/edited/saved a file without calling the tool.
@@ -86,15 +86,18 @@ Rules:
   agenda, memories or other conversations unless asked."""
 
 
+LANG_NAMES = {"pt": "Brazilian Portuguese", "en": "English", "es": "Spanish"}
+
+
 def build_system() -> str:
     """Stable part of the prompt. Keeping it identical between turns lets Ollama reuse its KV cache
     (identity + rules + profile + tool schemas), so only the new context and message are processed."""
     prof = db.get_profile()
     if workspace.active:
         ws = workspace.active
-        return WORKSPACE_IDENTITY.format(name=ws["name"], description=ws["description"] or "-", reply_lang=t("reply_lang"))
+        return WORKSPACE_IDENTITY.format(name=ws["name"], description=ws["description"] or "-")
     return "\n".join([
-        IDENTITY.format(reply_lang=t("reply_lang"), tone=(prof or {}).get("tone", "cordial")),
+        IDENTITY.format(tone=(prof or {}).get("tone", "cordial")),
         f"\n## User profile\n{profile.describe(prof)}",
     ])
 
@@ -143,9 +146,7 @@ def workspace_context(user_text: str) -> str:
     recent = workspace.changes(6)
     if recent:
         parts.append("\n## Your latest changes (newest first)\n" + "\n".join(f"- {c['op']} {c['path']}" for c in recent))
-    msg_lang = detect(user_text)
-    if msg_lang:
-        parts.append(f"\nReply ONLY in {({'pt': 'Brazilian Portuguese', 'en': 'English', 'es': 'Spanish'})[msg_lang]}.")
+    parts.append(f"\nReply ONLY in {LANG_NAMES[detect(user_text) or lang()]}.")
     if MODES.get(settings["ai_mode"]):
         parts.append(MODES[settings["ai_mode"]])
     return "\n".join(parts)
@@ -217,9 +218,9 @@ def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     elif hits:
         parts.append("\n## Relevant knowledge (local base)\n" + "\n\n".join(
             f"[{h['title']} › {h['heading']}]\n{_clip(h['content'], KB_CHARS)}" for h in hits))
-    if msg_lang:
-        name = {"pt": "Brazilian Portuguese", "en": "English", "es": "Spanish"}[msg_lang]
-        parts.append(f"\nReply ONLY in {name}.")
+    # v0.16.1: the reply language lives here, not in the system prompt - switching PT/EN/ES changed the whole
+    # prompt prefix and the first answer in the new language re-read ~3k tokens (the slow "Hello" in English)
+    parts.append(f"\nReply ONLY in {LANG_NAMES[msg_lang or lang()]}.")
     if MODES.get(settings["ai_mode"]):
         parts.append(MODES[settings["ai_mode"]])
     if netprobe.effective() == "online" and settings["integrations"] and not hits:

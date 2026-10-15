@@ -714,6 +714,17 @@ for lang in ("pt", "en", "es"):
     check(f"i18n: every interface text exists in {lang}", not missing, str(missing[:8]))
 _guide = {"guideHint", "gKeys", "gClose", "kGuide", "kPanel", "kMode", "colorsTitle", "colorsReset"}
 check("i18n: guide HUD and colour texts in the three languages", all(_guide <= _keys[x] for x in _keys))
+_langs = {}
+for _l in ("pt", "en", "es"):
+    settings["language"] = _l
+    _langs[_l] = (assistant.build_system(), assistant.build_context("Oi"), assistant.build_context("Hello there, how are you?"))
+settings["language"] = "auto"
+check("language switch keeps the system prompt identical (cache stays valid)", _langs["pt"][0] == _langs["en"][0] == _langs["es"][0])
+check("reply language travels in the context", "Reply ONLY in English." in _langs["pt"][2]
+      and "Reply ONLY in Spanish." in _langs["es"][1])
+check("bars/layout/rest settings have defaults",
+      settings["ui_layout"] == "computer" and all(settings[k] == "hover" for k in ("bar_top", "bar_left", "bar_right", "bar_bottom"))
+      and int(settings["rest_minutes"]) >= 0)
 check("colours: default ring/core/background are valid hex colours",
       all(re.fullmatch(r"#[0-9a-f]{6}", str(settings[k])) for k in ("color_ring", "color_core", "color_bg")))
 

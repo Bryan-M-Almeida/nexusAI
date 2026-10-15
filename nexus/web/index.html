@@ -80,7 +80,12 @@
   </aside>
 
   <aside class="rail rail-right edge-bar" id="railRight">
-    <p class="rail-title mono" data-i18n="wsRail">TRABALHO</p>
+    <p class="rail-title mono" data-i18n="railPanel">PAINEL</p>
+    <button class="rail-btn" id="btnPanelRail"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span><b data-i18n="panelName">Painel</b><small data-i18n="panelHint">agenda, tarefas, memória e dados</small></span></button>
+    <button class="rail-btn" id="btnSkillsRail"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg>
+      <span><b data-i18n="skillsName">Habilidades</b><small data-i18n="skillsRailHint">ranks e níveis do NEXUS</small></span></button>
+    <p class="rail-title mono rail-sep" data-i18n="wsRail">TRABALHO</p>
     <button class="rail-btn" id="btnLibrary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4v16H4zM10 4h4v16h-4zM16.5 5l3.5-.8 3 15.6-3.5.8z"/></svg>
       <span><b data-i18n="libTitle">Biblioteca</b><small data-i18n="libHint">seus livros · ler ou ouvir como podcast</small></span></button>
     <button class="rail-btn" id="btnWorkspaces"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="1"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>
@@ -126,6 +131,7 @@
     </div>
     <svg class="pulse" id="pulse" viewBox="0 0 240 24" preserveAspectRatio="none" aria-hidden="true"><polyline id="pulseLine" points=""/></svg>
     <div class="core-label mono" id="coreLabel"></div>
+    <button class="ai-fix" id="btnAiFix" type="button" hidden data-i18n="aiFix">Como resolver</button>
     <div class="exchange" id="exchange" aria-live="polite">
       <p class="ex-line user" id="exUser"></p>
       <p class="ex-line nexus" id="exNexus"></p>
@@ -512,6 +518,23 @@
         <label class="check"><input type="checkbox" name="show_captions"><span data-i18n="showCaptions">Legenda da resposta no modo áudio</span></label>
         <label class="check"><input type="checkbox" name="reduce_motion"><span data-i18n="reduceMotion">Reduzir animações (PCs mais fracos)</span></label>
         <label class="check"><input type="checkbox" name="pause_when_unfocused"><span data-i18n="pauseUnfocused">Pausar animações quando o NEXUS estiver fora de foco</span></label>
+        <p class="sub mono" data-i18n="layoutTitle">MODO DE USO</p>
+        <div class="cards two-cards" id="layoutCards">
+          <button type="button" class="card-opt" data-layout="computer"><b data-i18n="layoutComputer">Computador</b><small data-i18n="layoutComputerHint">Para usar com o mouse: menus nas bordas da tela (cada um configurável abaixo).</small></button>
+          <button type="button" class="card-opt" data-layout="shortcuts"><b data-i18n="layoutShortcuts">Somente atalhos + IA</b><small data-i18n="layoutShortcutsHint">Nenhum menu na tela: tudo por atalhos (F1 mostra todos) e pela voz, inclusive fechar, minimizar e tela cheia.</small></button>
+        </div>
+        <input type="hidden" name="ui_layout">
+        <p class="sub mono" data-i18n="barsTitle">MENUS (MODO COMPUTADOR)</p>
+        <div class="bars-grid">
+          <label><span data-i18n="barTop">Barra superior (notificações e configurações)</span><select name="bar_top"></select></label>
+          <label><span data-i18n="barLeft">Esquerda: modos da IA</span><select name="bar_left"></select></label>
+          <label><span data-i18n="barRight">Direita: painel, trabalho e conversas</span><select name="bar_right"></select></label>
+          <label><span data-i18n="barBottom">Embaixo: controles de voz e texto</span><select name="bar_bottom"></select></label>
+        </div>
+        <p class="sub mono" data-i18n="ringTitle">ARO</p>
+        <label class="check"><input type="checkbox" name="ring_wander"><span data-i18n="ringWander">O aro se move sozinho pela tela</span></label>
+        <label><span data-i18n="restMinutes">Repouso depois de quantos minutos sem interação (0 = nunca)</span><input name="rest_minutes" type="number" min="0" max="120" step="1"></label>
+        <p class="hint" data-i18n="restHint">No repouso os textos somem e só o aro fica, se mexendo; qualquer tecla, movimento do mouse ou fala acorda o NEXUS.</p>
         <p class="sub mono" data-i18n="colorsTitle">CORES</p>
         <div class="colors">
           <label><span data-i18n="colorRing">Aro</span><input type="color" name="color_ring"></label>

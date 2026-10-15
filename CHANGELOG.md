@@ -8,6 +8,55 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.16.1 — Protótipo · 2026-10-15
+
+**Ajustes do novo visual: tela totalmente limpa, um menu por vez, dois modos de uso, avisos que não se acumulam e
+inglês sem demora.**
+
+### Novo
+- **Tela totalmente limpa**: só o aro. O nome NEXUS e o significado aparecem apenas enquanto o mouse se mexe.
+- **Modo de uso** (Configurações → Interface): **Computador** (menus para o mouse) ou **Somente atalhos + IA** — nada
+  na tela; tudo por atalhos (F1 lista todos) e pela voz, inclusive minimizar (Ctrl+Shift+M), fechar (Ctrl+Shift+Q)
+  e tela cheia/normal (F11).
+- **Cada menu configurável**: barra superior, esquerda (modos da IA), direita (painel, trabalho, conversas) e embaixo
+  (controles) podem **aparecer ao encostar o mouse**, ficar **sempre visíveis** ou ficar **desligados**.
+- **Barra superior esvaziada**: só notificações, configurações e os botões da janela — e em tela cheia nem os botões
+  da janela. Painel e habilidades foram para a borda direita; idioma e conexão ficam nas Configurações.
+- **Um menu por vez**: abrir outro (por clique ou atalho) fecha o anterior, e **o mesmo atalho fecha** o menu que
+  abriu (Ctrl+1 abre o painel, Ctrl+1 de novo fecha; vale também para Ctrl+, Ctrl+H, Ctrl+J e F1).
+- **Menus móveis**: arraste qualquer painel pela parte de cima.
+- **O aro se move sozinho** pela tela (pode desligar) e, **pensando, gira bem mais rápido até responder** — antes o
+  estado "pensando" era trocado por "em espera" quando o reconhecimento de voz terminava.
+- **Repouso**: depois de alguns minutos sem interação (padrão 3; 0 desliga), os textos somem e só o aro fica,
+  passeando e brincando pela tela. Qualquer tecla, movimento do mouse ou fala acorda o NEXUS.
+- **IA indisponível no próprio aro**: o núcleo fica vermelho, aparece "IA INDISPONÍVEL" e um botão **Como resolver**
+  — o NEXUS fala os passos (a voz funciona sem a IA) e mostra o texto. Ele confere sozinho a cada 20 s e volta ao
+  normal quando a IA responde.
+- **Avisos**: o mesmo aviso não se acumula mais (mostra ×2, ×3), cada um sai no seu tempo (7 s; parado com o mouse
+  em cima), no máximo 3 na tela, **✕** fecha um, **Ctrl+Shift+X** fecha todos e **mais** mostra uma explicação curta
+  (ex.: por que o reconhecimento de voz está sendo baixado).
+- Visual mais limpo dos painéis: fundos mais leves, bordas mais finas, uma "alça" no topo de cada painel.
+
+### Corrigido
+- **Os menus laterais demoravam a sair** (0,9 s) e às vezes **todos abriam juntos ao iniciar** (o NEXUS os mostrava
+  por 3,5 s para você descobri-los). Agora saem em ~0,2 s e nada abre sozinho.
+- **Vários menus abertos ao mesmo tempo** com atalhos ou cliques.
+
+### Desempenho
+- **Trocar de idioma não deixa mais a primeira resposta lenta** (NX-LLM-037): o idioma da resposta fazia parte do
+  prompt fixo; trocar PT → EN mudava o começo do prompt e o "Hello" relia ~3 mil tokens. Agora o idioma vai junto de
+  cada mensagem e o prompt fixo é igual nos três idiomas. Medido: **"Hello" depois de trocar para inglês 26,2 s →
+  1,3 s** (leitura do prompt 25,7 s → 0,9 s).
+
+### Testes desta versão
+- 225/225 testes unitários (3 novos: prompt fixo igual nos três idiomas, idioma da resposta no contexto, padrões
+  dos menus e do repouso).
+- 31/31 verificações de conversa com qwen3:8b (média 12,1 s, mediana 9,7 s, máximo 22,8 s) e 7/7 na área de trabalho.
+- Interface conferida no modo de prévia: tela limpa ao abrir, nome só com o mouse, atalhos que trocam e fecham
+  menus, avisos (×3, máximo 3, "mais"), IA indisponível no aro, modo somente atalhos, menu fixo, repouso e arrastar.
+
+---
+
 ## v0.16.0 — Protótipo · 2026-10-15
 
 **Novo visual: uma tela limpa, só o NEXUS no centro — o resto nas bordas, nos atalhos e no guia (F1).**

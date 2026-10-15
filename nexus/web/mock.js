@@ -8,7 +8,8 @@ if (!window.pywebview && location.search.includes("mock")) {
   const profile = { name: "Alex Martins", profession: "Full-Stack Developer", routine: "Starts at 9 AM · deep focus in the afternoon",
     interests: ["AI", "games", "coffee"], goals: ["Ship NEXUS"], profile: "developer", tone: "técnico e direto",
     modules: ["código", "agenda", "foco/pomodoro"], language: "pt-BR" };
-  const settings = { app_mode: "user", beta_library: true, color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c", llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
+  let mockFull = false;
+  const settings = { ui_layout: "computer", bar_top: "hover", bar_left: "hover", bar_right: "hover", bar_bottom: "hover", ring_wander: true, rest_minutes: 3, app_mode: "user", beta_library: true, color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c", llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, tts_volume: 100, llm_preset: "ollama", llm_api_key: "ollama",
     llm_temperature: 0.3, llm_context: 8192, history_turns: 12, auto_title: true, greet_on_start: true, start_fullscreen: true,
     mic_device: "", vad_threshold: 0.5, vad_silence: 0.7, reminder_leads: "60,10,0", speak_reminders: true,
@@ -112,7 +113,8 @@ if (!window.pywebview && location.search.includes("mock")) {
     undo_workspace: async () => ({ ok: true, path: "src/main.py", files: [], changes: [] }),
     confirm_command: async () => {}, state: async () => state(),
     report_issue: async () => ({ ok: true, file: "C:/NEXUS/reports/nexus-report-20261014-120000.md" }),
-    toggle_fullscreen: async () => {}, minimize: async () => {}, quit: async () => {},
+    toggle_fullscreen: async () => (mockFull = !mockFull), minimize: async () => {}, quit: async () => {},
+    llm_status: async () => llm, speak_help: async () => speak(4),
     set_temporary: async (on) => { temporary = on; return state(); },
     set_mic: async (muted) => { settings.mic_muted = muted; return state(); },
     set_ai_voice: async (on) => { settings.voice_enabled = on; return state(); },

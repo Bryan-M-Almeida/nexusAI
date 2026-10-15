@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 2.8  ·  Data: 2026-10-15  ·  Versão do app: 0.16.0
+ Versão do documento: 2.9  ·  Data: 2026-10-15  ·  Versão do app: 0.16.1
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -84,6 +84,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-034  "Não consigo abrir o site / tocar a música / ler o livro" (função beta desligada)
       NX-LLM-035  Leitura do prompt muito lenta em placas AMD (Vulkan + Flash Attention)
       NX-LLM-036  Lembrete marcado para depois de amanhã ("amanhã" virava o dia 17)
+      NX-LLM-037  Primeira resposta lenta depois de trocar de idioma
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -127,6 +128,9 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-UI-010   Notificação do Windows não aparece
       NX-UI-011   Resposta some da tela enquanto a voz continua falando
       NX-UI-012   Música ou link não abriu no navegador / abriu o vídeo errado
+      NX-UI-013   Vários menus abertos juntos / menus laterais demoravam a sair
+      NX-UI-014   Avisos acumulados que demoravam e sumiam todos de uma vez
+      NX-UI-015   "IA INDISPONÍVEL" no aro (núcleo vermelho)
  WRK  NX-WRK-001  A IA diz que criou/alterou um arquivo, mas nada mudou
       NX-WRK-002  "Fora da área de trabalho": caminho recusado
       NX-WRK-003  Comando não roda, demora ou fica esperando confirmação
@@ -633,6 +637,16 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Correção   : O contexto diz "Tomorrow = <dia>; day after tomorrow = <dia>".
                Reproduzido 3/3 antes e corrigido 3/3 depois.
 
+[NX-LLM-037] Primeira resposta lenta depois de trocar de idioma
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.16.1) Observado: SIM
+  Sintoma    : Depois de mudar para inglês, um simples "Hello" levou ~26 s;
+               as respostas seguintes voltavam a ser rápidas.
+  Causa      : O idioma da resposta fazia parte do prompt fixo (regras); mudar
+               de idioma mudava o começo do prompt e o Ollama relia ~3 mil
+               tokens.
+  Correção   : O prompt fixo é igual nos três idiomas e o idioma vai junto de
+               cada mensagem. Medido: 26,2 s -> 1,3 s.
+
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE
 ================================================================================
@@ -1101,6 +1115,31 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                (4) Se o YouTube mudar a página, abre a lista de resultados.
   Solução    : Diga artista + música; para Spotify/YouTube Music diga o nome
                do serviço ("toca X no Spotify").
+
+[NX-UI-013] Vários menus abertos juntos / menus laterais demoravam a sair
+  Severidade : BAIXA            Status: CORRIGIDO (v0.16.1) Observado: SIM
+  Correção   : Abrir um menu fecha o anterior e o mesmo atalho fecha o menu
+               aberto. Os menus das bordas saem em ~0,2 s (antes 0,9 s) e não
+               abrem mais todos juntos ao iniciar. Cada menu pode ficar fixo,
+               aparecer ao encostar o mouse ou ser desligado (Configurações >
+               Interface).
+
+[NX-UI-014] Avisos acumulados que demoravam e sumiam todos de uma vez
+  Severidade : BAIXA            Status: CORRIGIDO (v0.16.1) Observado: SIM
+  Sintoma    : "Preparando o modelo de voz..." aparecia várias vezes e todos
+               os avisos sumiam juntos depois de 12 s.
+  Correção   : O mesmo aviso vira um só (×2, ×3); cada um sai em 7 s; no
+               máximo 3 na tela; ✕ fecha um, Ctrl+Shift+X fecha todos e "mais"
+               explica o aviso.
+
+[NX-UI-015] "IA INDISPONÍVEL" no aro (núcleo vermelho)
+  Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : Nenhuma IA respondeu: Ollama fechado, modelo não baixado ou
+               provedor/chave de API com problema.
+  Solução    : Clique em "Como resolver" (o NEXUS fala os passos). Local: abra
+               o Ollama e baixe o modelo (ollama pull qwen3:8b). API: confira
+               provedor e chave em Configurações > Inteligência. O aro volta ao
+               normal sozinho em até 20 s depois de resolvido.
 
 ================================================================================
  WRK — ÁREA DE TRABALHO

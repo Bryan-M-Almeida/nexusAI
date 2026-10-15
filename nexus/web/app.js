@@ -188,18 +188,27 @@ async function start() {
   addMsg("nexus", hello);
   caption(hello, 7000);
   if (!profile) openOnboarding();
-  if (!st.llm.online || !st.llm.model_ready) notice(aiHelp(st.llm));
-  else if (state.ui_mode === "audio" && !state.mic_muted && st.stt === "missing") notice(T("voiceFirstUse"));
-  flashBars();
+  setFull(!!st.fullscreen);
+  if (!st.llm.online || !st.llm.model_ready) notice(aiHelp(st.llm), T("moreAi"));
+  else if (state.ui_mode === "audio" && !state.mic_muted && st.stt === "missing") notice(T("voiceFirstUse"), T("moreVoice"));
 }
 
 function aiHelp(llm) {
   return llm.online ? T("modelMissing", { model: llm.model }) : T("aiOfflineHelp", { model: llm.model });
 }
 
+let aiDown = false, aiPoll = null, aiHelpText = "";
 function setAi(llm) {
   $("#chipAi").classList.toggle("on", !!(llm.online && llm.model_ready));
   $("#chipAi").title = llm.online ? llm.model : T("offline");
+  // v0.16.1: no AI available -> the ring says so, with a "how to fix" button (NEXUS speaks the steps)
+  aiDown = !(llm.online && llm.model_ready);
+  aiHelpText = aiDown ? aiHelp(llm) : "";
+  $("#app").classList.toggle("ai-down", aiDown);
+  $("#btnAiFix").hidden = !aiDown;
+  if (aiDown && !aiPoll) aiPoll = setInterval(() => api().llm_status().then(setAi), 20000);
+  if (!aiDown && aiPoll) { clearInterval(aiPoll); aiPoll = null; }
+  setVoiceState(voiceState);
 }
 
 // Model loading during the boot animation (v0.6): amber while warming, blue when ready.
@@ -208,6 +217,7 @@ function setAiState(p) {
   chip.classList.toggle("warm", p.state === "warming");
   chip.classList.toggle("on", p.state === "ready");
   chip.title = p.state === "warming" ? T("aiWarming") : p.state === "ready" ? T("aiReady", { s: p.seconds }) : T("offline");
+  if (p.state === "ready" && aiDown) api().llm_status().then(setAi);
 }
 
 /* ------------------------------------------------------------------ conversation */
@@ -218,8 +228,11 @@ function setExchange(who, text) {
   else $("#exNexus").textContent = plain(text);
 }
 
+let aiBusy = false;
 function addMsg(kind, text, spoken = false) {
   if (kind === "user" || (kind === "nexus" && text)) setExchange(kind, text);
+  if (kind === "user") aiBusy = true;
+  activity();
   const el = document.createElement("div");
   el.className = `msg ${kind}`;
   const who = kind === "user" ? T("you") + (spoken ? " · 🎙 " + T("heard") : "") : kind === "nexus" ? "N.E.X.U.S" : "";
@@ -263,6 +276,7 @@ function onTool(p) {
 }
 
 function onDone(p) {
+  aiBusy = false;
   const s = ensureStream();
   if (!p.text) { s.el.remove(); streaming = null; setVoiceState("idle"); return; }  // pause/stop handled by the model
   s.el.querySelector(".txt").classList.remove("caret");
@@ -275,9 +289,10 @@ function onDone(p) {
 }
 
 function onError(p) {
+  aiBusy = false;
   if (streaming) { streaming.el.remove(); streaming = null; }
   addMsg("system", p.message).classList.add("error");
-  notice(p.message);
+  notice(p.message, T("moreError"));
   setVoiceState("idle");
   api().get_settings().then((r) => setAi(r.llm));
 }
@@ -361,10 +376,12 @@ function setVoiceState(st) {
   voiceState = st;
   let shown = st;
   if (st === "idle" && state.ui_mode === "audio") shown = state.mic_muted ? "muted" : state.stt === "ready" ? "standby" : "idle";
+  if (aiBusy && ["idle", "standby", "muted"].includes(shown)) shown = "thinking";  // v0.16.1: spins fast until it answers
+  if (shown !== "idle" && shown !== "standby" && shown !== "muted") activity();
   $("#core").dataset.state = shown;
   if (st === "speaking") wakeRing();
   const label = $("#coreLabel");
-  label.textContent = T("st_" + shown) || "";
+  label.textContent = aiDown && !aiBusy ? T("aiDown") : T("st_" + shown) || "";
   label.className = "core-label " + (["listening", "awake"].includes(shown) ? "red" : ["speaking", "thinking"].includes(shown) ? "blue" : "");
   $("#chipVoice").classList.toggle("on", state.ui_mode === "audio" && !state.mic_muted && state.stt === "ready");
   updateDock();
@@ -470,6 +487,9 @@ function applyInterface() {
   app.classList.toggle("no-hud", settings.show_hud === false);
   app.classList.toggle("reduce-motion", !!settings.reduce_motion);
   setColors(settings);
+  applyBars();
+  app.classList.toggle("wander", settings.ring_wander !== false);
+  $("#btnSkillsRail").hidden = !feature("skills");
   // v0.15.5: beta features that are off disappear from the interface (Settings > Beta)
   $("#btnWorkspaces").hidden = !feature("workspace");
   $("#btnLibrary").hidden = !feature("library");
@@ -480,28 +500,34 @@ function applyInterface() {
 }
 
 /* ------------------------------------------------------------------ v0.16 shortcuts and guide HUD */
+const openPanel = () => { loadDashboard(); $("#panelDrawer").hidden = false; };
 const SHORTCUTS = [
   { keys: "F1", label: "kGuide" },
   { keys: "Ctrl+Espaço", label: "kTalk" },
-  { keys: "Ctrl+1", key: "1", label: "kPanel", run: () => { loadDashboard(); $("#panelDrawer").hidden = false; } },
-  { keys: "Ctrl+2", key: "2", label: "kConvs", run: () => openConversations("threads") },
-  { keys: "Ctrl+3", key: "3", label: "kNotif", run: () => openNotifications() },
-  { keys: "Ctrl+4", key: "4", label: "kLibrary", feature: "library", run: () => openLibrary() },
-  { keys: "Ctrl+5", key: "5", label: "kWorkspace", feature: "workspace", run: () => openWorkspaces() },
-  { keys: "Ctrl+6", key: "6", label: "kSkills", feature: "skills", run: () => openSkills() },
+  { keys: "Ctrl+1", key: "1", panel: "panelDrawer", label: "kPanel", run: openPanel },
+  { keys: "Ctrl+2", key: "2", panel: "convDrawer", label: "kConvs", run: () => openConversations("threads") },
+  { keys: "Ctrl+3", key: "3", panel: "notifDrawer", label: "kNotif", run: () => openNotifications() },
+  { keys: "Ctrl+4", key: "4", panel: "libDrawer", label: "kLibrary", feature: "library", run: () => openLibrary() },
+  { keys: "Ctrl+5", key: "5", panel: "wsDrawer", label: "kWorkspace", feature: "workspace", run: () => openWorkspaces() },
+  { keys: "Ctrl+6", key: "6", panel: "skillsDrawer", label: "kSkills", feature: "skills", run: () => openSkills() },
+  { keys: "Ctrl+,", key: ",", panel: "settings", label: "kSettings", run: () => openSettings() },
+  { key: "h", panel: "convDrawer", run: () => openConversations("threads") },  // v0.10 aliases (not listed)
+  { key: "j", panel: "notifDrawer", run: () => openNotifications() },
   { keys: "Ctrl+M", key: "m", label: "kMode", run: () => dock(state.ui_mode === "audio" ? "text" : "audio") },
-  { keys: "Ctrl+,", label: "kSettings" },
   { keys: "Ctrl+Shift+N", label: "kNewConv" },
   { keys: "Ctrl+T", label: "kTranscript" },
+  { keys: "Ctrl+Shift+X", label: "kToasts" },
   { keys: "Esc", label: "kStop" },
   { keys: "F11", label: "kFull" },
+  { keys: "Ctrl+Shift+M", label: "kMin" },
+  { keys: "Ctrl+Shift+Q", label: "kQuit" },
 ];
 const SHORTCUT_KEYS = Object.fromEntries(SHORTCUTS.filter((x) => x.key).map((x) => [x.key, x]));
 
 function toggleGuide(on) {
   const g = $("#guide"), show = on ?? g.hidden;
   if (show) {
-    $("#guideKeys").innerHTML = SHORTCUTS.filter((x) => !x.feature || feature(x.feature))
+    $("#guideKeys").innerHTML = SHORTCUTS.filter((x) => x.keys && (!x.feature || feature(x.feature)))
       .map((x) => `<li><kbd>${esc(x.keys.replace("Espaço", T("kSpace")))}</kbd><span>${esc(T(x.label))}</span></li>`).join("");
   }
   g.hidden = !show;
@@ -527,13 +553,45 @@ function caption(text, ms = 3000) {
   captionTimer = setTimeout(() => el.classList.remove("show"), ms);
 }
 
-function notice(text) {
+/* v0.16.1 notices: the same text is never stacked (it counts ×2, ×3), each one leaves on its own timer, at most
+   3 on screen, ✕ closes one, Ctrl+Shift+X closes all, "more" shows a short explanation. */
+const TOAST_MAX = 3, TOAST_MS = 7000;
+function notice(text, more = "") {
+  if (!text) return null;
+  const box = $("#toasts");
+  const same = [...box.querySelectorAll(".toast[data-text]")].find((t) => t.dataset.text === text);
+  if (same) {
+    same.dataset.n = +(same.dataset.n || 1) + 1;
+    same.querySelector(".t-count").textContent = "×" + same.dataset.n;
+    armToast(same);
+    return same;
+  }
   const el = document.createElement("div");
   el.className = "toast";
-  el.innerHTML = `<b>NEXUS</b>${esc(text)}`;
-  $("#toasts").appendChild(el);
-  setTimeout(() => el.remove(), 12000);
+  el.dataset.text = text;
+  el.innerHTML = `<div class="t-head"><b>NEXUS</b><i class="t-count"></i>`
+    + (more ? `<button class="t-more" type="button">${esc(T("toastMore"))}</button>` : "")
+    + `<button class="t-x" type="button" title="${esc(T("close"))}">✕</button></div><p class="t-text">${esc(text)}</p>`
+    + (more ? `<p class="t-detail" hidden>${esc(more)}</p>` : "");
+  el.querySelector(".t-x").onclick = () => el.remove();
+  const mb = el.querySelector(".t-more");
+  if (mb) mb.onclick = () => {
+    const d = el.querySelector(".t-detail");
+    d.hidden = !d.hidden;
+    mb.textContent = T(d.hidden ? "toastMore" : "toastLess");
+  };
+  el.onmouseenter = () => clearTimeout(el._t);
+  el.onmouseleave = () => armToast(el, 3000);
+  box.appendChild(el);
+  while (box.querySelectorAll(".toast").length > TOAST_MAX) box.querySelector(".toast").remove();
+  armToast(el);
+  return el;
 }
+function armToast(el, ms = TOAST_MS) {
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.classList.add("leaving"); setTimeout(() => el.remove(), 280); }, ms);
+}
+function closeToasts() { $$("#toasts .toast").forEach((t) => t.remove()); }
 
 /* ------------------------------------------------------------------ edge bars: top bar and dock appear near the screen edges */
 const EDGE_TOP = 64, EDGE_BOTTOM = 110, EDGE_SIDE = 56;
@@ -541,16 +599,84 @@ const barTimers = {};
 function showBar(el, on) {
   clearTimeout(barTimers[el.id]);
   if (on) return el.classList.add("show");
-  barTimers[el.id] = setTimeout(() => el.classList.remove("show"), 900);
+  barTimers[el.id] = setTimeout(() => el.classList.remove("show"), 220);  // v0.16.1: was 900 ms - felt stuck
+}
+
+// v0.16.1: every menu is "hover" (appears at its screen edge), "fixed" or "off"; the shortcuts-only layout has none.
+const BAR_SETTING = { topbar: "bar_top", railLeft: "bar_left", railRight: "bar_right", dock: "bar_bottom" };
+function barMode(id) { return settings.ui_layout === "shortcuts" ? "off" : settings[BAR_SETTING[id]] || "hover"; }
+function applyBars() {
+  $("#app").classList.toggle("layout-shortcuts", settings.ui_layout === "shortcuts");
+  for (const id of Object.keys(BAR_SETTING)) {
+    const el = $("#" + id), m = barMode(id);
+    el.hidden = m === "off";
+    el.classList.toggle("fixed", m === "fixed");
+    el.classList.toggle("show", m === "fixed");
+  }
 }
 
 function trackEdges(e) {
+  pointerActive();
+  activity();
   const hover = (id) => $("#" + id).matches(":hover");
-  showBar($("#topbar"), e.clientY < EDGE_TOP || hover("topbar"));
-  showBar($("#dock"), e.clientY > innerHeight - EDGE_BOTTOM || hover("dock"));
-  showBar($("#railLeft"), e.clientX < EDGE_SIDE || hover("railLeft"));
-  showBar($("#railRight"), e.clientX > innerWidth - EDGE_SIDE || hover("railRight"));
+  const edge = { topbar: e.clientY < EDGE_TOP, dock: e.clientY > innerHeight - EDGE_BOTTOM,
+    railLeft: e.clientX < EDGE_SIDE, railRight: e.clientX > innerWidth - EDGE_SIDE };
+  for (const id of Object.keys(edge)) if (barMode(id) === "hover") showBar($("#" + id), edge[id] || hover(id));
 }
+
+// The name in the corner (and the F1 hint) only show while the mouse moves.
+let pointerTimer;
+function pointerActive() {
+  $("#app").classList.add("pointer");
+  clearTimeout(pointerTimer);
+  pointerTimer = setTimeout(() => $("#app").classList.remove("pointer"), 2600);
+}
+
+// Rest: no interaction for a while -> texts go away and only the ring stays, playing (Settings > Interface).
+let lastActivity = Date.now();
+function activity() {
+  lastActivity = Date.now();
+  $("#app").classList.remove("resting");
+}
+setInterval(() => {
+  const min = +settings.rest_minutes || 0;
+  if (!min || state.ui_mode === "text" || state.workspace || aiBusy || ["speaking", "listening", "thinking"].includes(voiceState)) return;
+  if (Date.now() - lastActivity > min * 60000) $("#app").classList.add("resting");
+}, 5000);
+
+/* Only one menu at a time: opening one (click or shortcut) closes the one that was open. */
+const EXCLUSIVE = ["panelDrawer", "convDrawer", "wsDrawer", "skillsDrawer", "libDrawer", "settings", "notifDrawer", "guide"];
+function initExclusivePanels() {
+  const obs = new MutationObserver((muts) => {
+    for (const m of muts) if (!m.target.hidden) for (const id of EXCLUSIVE) if (id !== m.target.id) $("#" + id).hidden = true;
+  });
+  for (const id of EXCLUSIVE) obs.observe($("#" + id), { attributes: true, attributeFilter: ["hidden"] });
+}
+const isOpen = (id) => !$("#" + id).hidden;
+
+/* Menus can be dragged by their top area. */
+function initMovable() {
+  let drag = null;
+  document.addEventListener("mousedown", (e) => {
+    const box = e.target.closest(".drawer-box, .conv-box, .modal-box");
+    if (!box || e.button !== 0 || box.closest("#confirmModal")) return;
+    if (e.target.closest("button, input, select, textarea, a, label, .list, .chat, .conv-body, .set-body *, .reader-text, .file-view, .book-grid")) return;
+    const r = box.getBoundingClientRect();
+    if (e.clientY - r.top > 52) return;
+    const [x0, y0] = (box.style.translate || "0px 0px").split(" ").map((v) => parseFloat(v) || 0);
+    drag = { box, sx: e.clientX, sy: e.clientY, x0, y0 };
+    box.classList.add("moving");
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (drag) drag.box.style.translate = `${drag.x0 + e.clientX - drag.sx}px ${drag.y0 + e.clientY - drag.sy}px`;
+  });
+  document.addEventListener("mouseup", () => { if (drag) drag.box.classList.remove("moving"); drag = null; });
+}
+
+/* Window state: no window buttons in full screen */
+function setFull(on) { state.fullscreen = on; $("#app").classList.toggle("is-full", on); }
+async function toggleFull() { setFull(await api().toggle_fullscreen()); }
 
 const BARS = ["topbar", "dock", "railLeft", "railRight"];
 function flashBars() {  // show every bar briefly once, so the user discovers them
@@ -595,7 +721,7 @@ async function dock(action) {
   else if (action === "mic") {
     const st = await api().set_mic(!state.mic_muted);
     applyState(st);
-    if (!st.mic_muted && st.stt !== "ready") notice(T("voiceLoading"));
+    if (!st.mic_muted && st.stt !== "ready") notice(T("voiceLoading"), T("moreVoice"));
   } else if (action === "ai") applyState(await api().set_ai_voice(!state.voice_enabled));
   else if (action === "interrupt") { if ($("#btnInterrupt").disabled) return; api().interrupt(); setVoiceState("idle"); }
   else if (action === "transcript") toggleTranscript();
@@ -706,6 +832,9 @@ function leadLabel(m) { return m >= 1440 ? T("leadDay") : m >= 60 ? `${m / 60} h
 
 function fillSettings() {
   const f = $("#settingsForm");
+  for (const name of Object.values(BAR_SETTING)) {  // v0.16.1 menus: hover / fixed / off
+    f.elements[name].innerHTML = ["hover", "fixed", "off"].map((v) => `<option value="${v}">${esc(T("bar_" + v))}</option>`).join("");
+  }
   for (const [k, v] of Object.entries(settings)) {
     const el = f.elements[k];
     if (!el || el.type === "hidden" || el.tagName === "SELECT" && k === "llm_preset" && !presets.length) continue;
@@ -713,6 +842,8 @@ function fillSettings() {
   }
   f.elements.network_mode.value = settings.network_mode || "hybrid";
   f.elements.app_mode.value = settings.app_mode || "user";
+  f.elements.ui_layout.value = settings.ui_layout || "computer";
+  $$("#layoutCards [data-layout]").forEach((b) => b.classList.toggle("on", b.dataset.layout === f.elements.ui_layout.value));
   const leads = String(settings.reminder_leads || "").split(",").map(Number);
   $("#leadChips").innerHTML = LEADS.map((m) => `<button type="button" class="chip-opt ${leads.includes(m) ? "on" : ""}" data-lead="${m}">${esc(leadLabel(m))}</button>`).join("")
     + `<span class="chip-opt on fixed">${esc(T("leadNow"))}</span>`;
@@ -850,7 +981,7 @@ function wire() {
     if (e.ctrlKey && e.code === "Space") {  // push-to-talk works in both modes
       e.preventDefault();
       const r = await api().push_to_talk();
-      if (!r.ok) notice(T("voiceLoading") + (r.error && r.error !== "loading" ? ` (${r.error})` : ""));
+      if (!r.ok) notice(T("voiceLoading") + (r.error && r.error !== "loading" ? ` (${r.error})` : ""), T("moreVoice"));
     }
     if (e.key === "Escape" && confirmId) { answerConfirm(false); return; }
     if (e.key === "F1" || (e.ctrlKey && e.key === "/")) { e.preventDefault(); toggleGuide(); return; }
@@ -858,20 +989,27 @@ function wire() {
     if (e.ctrlKey && !e.altKey && !e.shiftKey && SHORTCUT_KEYS[e.key]) {
       const sc = SHORTCUT_KEYS[e.key];
       e.preventDefault();
-      if (!sc.feature || feature(sc.feature)) { toggleGuide(false); sc.run(); }
+      if (sc.feature && !feature(sc.feature)) return;
+      if (sc.panel && isOpen(sc.panel)) { $("#" + sc.panel).hidden = true; return; }  // same shortcut closes it
+      toggleGuide(false);
+      sc.run();
       return;
+    }
+    if (e.ctrlKey && e.shiftKey && !e.altKey) {
+      const k = e.key.toLowerCase();
+      const act = { m: () => api().minimize(), q: () => api().quit(), x: closeToasts }[k];
+      if (act) { e.preventDefault(); act(); return; }
     }
     if (e.key === "Escape") {
       const open = $$(".modal:not([hidden]), .drawer:not([hidden])");
       if (open.length) open.forEach((m) => (m.hidden = true)); else dock("interrupt");
     }
-    if (e.key === "F11") { e.preventDefault(); api().toggle_fullscreen(); }
+    if (e.key === "F11") { e.preventDefault(); toggleFull(); }
     // v0.10 shortcuts: Ctrl+, settings · Ctrl+Shift+N new conversation · Ctrl+H conversations · Ctrl+J notifications
     // · Ctrl+T transcript (audio mode)
     if (e.ctrlKey && !e.altKey) {
       const k = e.key.toLowerCase();
-      const act = { ",": openSettings, h: () => openConversations("threads"), j: openNotifications,
-        t: () => state.ui_mode === "audio" && toggleTranscript(), n: e.shiftKey ? newConversation : null }[k];
+      const act = { t: () => state.ui_mode === "audio" && toggleTranscript(), n: e.shiftKey ? newConversation : null }[k];
       if (act) { e.preventDefault(); act(); }
     }
   });
@@ -887,7 +1025,19 @@ function wire() {
     if (b) copyText(b.closest(".msg").querySelector(".txt").innerText, b);
   });
   $("#btnMinimize").onclick = () => api().minimize();
-  $("#btnFullscreen").onclick = () => api().toggle_fullscreen();
+  $("#btnFullscreen").onclick = toggleFull;
+  $("#btnPanelRail").onclick = openPanel;
+  $$("#layoutCards [data-layout]").forEach((b) => (b.onclick = () => {
+    $("#settingsForm").elements.ui_layout.value = b.dataset.layout;
+    $$("#layoutCards [data-layout]").forEach((x) => x.classList.toggle("on", x === b));
+  }));
+  $("#btnSkillsRail").onclick = () => openSkills();
+  $("#btnAiFix").onclick = () => { api().speak_help(aiHelpText); notice(aiHelpText, T("moreAi")); };
+  document.addEventListener("keydown", activity);
+  document.addEventListener("mousedown", activity);
+  document.addEventListener("wheel", activity, { passive: true });
+  initExclusivePanels();
+  initMovable();
   $("#btnQuit").onclick = () => api().quit();
 
   $("#taskForm").addEventListener("submit", async (e) => {
