@@ -111,6 +111,24 @@ CREATE TABLE IF NOT EXISTS notifications (
     body TEXT NOT NULL DEFAULT '',
     read INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS workspaces (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    folder TEXT NOT NULL UNIQUE,
+    conversation_id INTEGER,
+    created TEXT NOT NULL,
+    updated TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS workspace_changes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id INTEGER NOT NULL,
+    ts TEXT NOT NULL,
+    op TEXT NOT NULL,
+    path TEXT NOT NULL,
+    backup TEXT NOT NULL DEFAULT '',
+    undone INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS reminders_sent (
     kind TEXT NOT NULL,
     item_id INTEGER NOT NULL,
@@ -150,6 +168,10 @@ class DB:
             self.conn.execute("ALTER TABLE messages ADD COLUMN conversation_id INTEGER")
             self.conn.execute("CREATE INDEX IF NOT EXISTS messages_conversation ON messages(conversation_id)")
             self._split_old_messages()
+            self.conn.commit()
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(conversations)")}
+        if "workspace_id" not in cols:  # v0.11: a workspace's conversation never shows up among normal ones
+            self.conn.execute("ALTER TABLE conversations ADD COLUMN workspace_id INTEGER")
             self.conn.commit()
 
     def _split_old_messages(self, gap_hours: float = 2):

@@ -112,10 +112,39 @@ CONVERSATION_IDLE = timedelta(hours=2)
 _current: int | None = None  # None = the next message opens a new conversation
 
 
+_workspace: int | None = None   # v0.11: id of the open workspace (its conversation is separate)
+_saved_current: int | None = None
+
+
+def enter_workspace(workspace_id: int, conversation_id: int | None) -> int:
+    """Switch the history to the workspace's own conversation (created on first use). Returns its id."""
+    global _current, _workspace, _saved_current
+    if _workspace is None:
+        _saved_current = _current
+    _workspace = workspace_id
+    if not conversation_id or not db.one("SELECT id FROM conversations WHERE id = ?", (conversation_id,)):
+        ts = now()
+        conversation_id = db.execute("INSERT INTO conversations(created, updated, workspace_id, title) VALUES (?,?,?,?)",
+                                     (ts, ts, workspace_id, "workspace")).lastrowid
+        db.execute("UPDATE workspaces SET conversation_id = ? WHERE id = ?", (conversation_id, workspace_id))
+    _current = conversation_id
+    return conversation_id
+
+
+def leave_workspace():
+    """Back to the normal conversation that was open before."""
+    global _current, _workspace
+    _workspace, _current = None, _saved_current
+
+
+def in_workspace() -> bool:
+    return _workspace is not None
+
+
 def current_conversation() -> int | None:
     """Open conversation id, or None if the next message starts a new one (also after 2 h of silence)."""
     global _current
-    if _current is not None:
+    if _current is not None and _workspace is None:  # a workspace keeps one continuous conversation
         row = db.one("SELECT updated FROM conversations WHERE id = ?", (_current,))
         if not row or datetime.now() - datetime.fromisoformat(row["updated"]) > CONVERSATION_IDLE:
             _current = None
@@ -147,10 +176,11 @@ def add_message(role: str, content: str):
     ts = now()
     if current_conversation() is None:
         # conversations that only got the opening greeting are noise: drop them before starting a new one
-        db.execute("DELETE FROM messages WHERE conversation_id IN (SELECT conversation_id FROM messages WHERE conversation_id IS NOT NULL "
-                   "GROUP BY conversation_id HAVING SUM(role = 'user') = 0)")
-        db.execute("DELETE FROM conversations WHERE id NOT IN (SELECT DISTINCT conversation_id FROM messages "
-                   "WHERE conversation_id IS NOT NULL)")
+        normal = "SELECT id FROM conversations WHERE workspace_id IS NULL"
+        db.execute(f"DELETE FROM messages WHERE conversation_id IN (SELECT conversation_id FROM messages "
+                   f"WHERE conversation_id IN ({normal}) GROUP BY conversation_id HAVING SUM(role = 'user') = 0)")
+        db.execute("DELETE FROM conversations WHERE workspace_id IS NULL AND id NOT IN "
+                   "(SELECT DISTINCT conversation_id FROM messages WHERE conversation_id IS NOT NULL)")
         _current = db.execute("INSERT INTO conversations(created, updated) VALUES (?, ?)", (ts, ts)).lastrowid
     db.execute("INSERT INTO messages(role, content, ts, conversation_id) VALUES (?,?,?,?)", (role, content, ts, _current))
     db.execute("UPDATE conversations SET updated = ? WHERE id = ?", (ts, _current))
@@ -187,7 +217,7 @@ def conversations(limit: int = 200) -> list[dict]:
     """Conversations with at least one user message, most recent first."""
     return db.all(
         "SELECT c.id, c.title, c.description, c.created, c.updated, COUNT(m.id) AS messages "
-        "FROM conversations c JOIN messages m ON m.conversation_id = c.id "
+        "FROM conversations c JOIN messages m ON m.conversation_id = c.id WHERE c.workspace_id IS NULL "
         "GROUP BY c.id HAVING SUM(m.role = 'user') > 0 ORDER BY c.updated DESC LIMIT ?", (limit,))
 
 
@@ -200,7 +230,8 @@ def timeline(limit: int = 300, before_id: int | None = None) -> list[dict]:
     """Every message of every conversation in chronological order (the "All" view), newest page first."""
     rows = db.all(
         "SELECT m.id, m.role, m.content, m.ts, m.conversation_id, c.title FROM messages m "
-        "LEFT JOIN conversations c ON c.id = m.conversation_id WHERE m.id < ? ORDER BY m.id DESC LIMIT ?",
+        "LEFT JOIN conversations c ON c.id = m.conversation_id WHERE m.id < ? AND c.workspace_id IS NULL "
+        "ORDER BY m.id DESC LIMIT ?",
         (before_id or 2 ** 62, limit))
     return list(reversed(rows))
 

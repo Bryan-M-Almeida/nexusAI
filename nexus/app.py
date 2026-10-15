@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import webview
 
 from . import (MODEL_NAME, __version__, assistant, bridge, control, i18n, knowledge, llm, memory, notify, profile,
-               scheduler, tools)
+               scheduler, tools, workspace)
 from .config import WEB_DIR, settings
 from .db import db
 from .i18n import LANGS, detect, lang
@@ -39,7 +39,8 @@ class Api:
     def __init__(self):
         from .voice import Listener, Speaker
 
-        self._brain = assistant.Assistant(self._on_brain_event, control_hook=self._speech_control)
+        self._brain = assistant.Assistant(self._on_brain_event, control_hook=self._speech_control,
+                                          confirm_hook=self._confirm_command)
         self._speaker = Speaker(lambda s: emit("voice", s), lambda payload: emit("speak_env", payload))
         self._listener = Listener(self._on_voice_text, lambda s: emit("voice", s), self._speaker,
                                   on_level=lambda level: emit("mic_level", level))
@@ -48,11 +49,26 @@ class Api:
         self._tts_buf, self._tts_streamed, self._reply_lang = "", False, None
         self.ai_state = "cold"  # cold | warming | ready | offline
 
+    def _confirm_command(self, command: str) -> bool:
+        """The AI wants to run a command in the workspace: ask the user (dialog + voice) and wait up to 3 min."""
+        import uuid
+
+        cid = uuid.uuid4().hex[:10]
+        item = workspace.request_confirmation(cid)
+        emit("confirm", {"id": cid, "command": command, "workspace": workspace.active["name"] if workspace.active else ""})
+        self._speaker.say(i18n.t("confirm_command"), remember=False, force=settings["voice_enabled"])
+        answered = item["event"].wait(180)
+        emit("confirm_done", {"id": cid, "ok": answered and item["ok"]})
+        return bool(answered and item["ok"])
+
+    def confirm_command(self, cid, ok):
+        workspace.answer_confirmation(cid, bool(ok))
+
     def _on_alert(self, alert):
         """Scheduler reminders and the daily briefing: notification center + in-app toast, and - outside quiet
         hours - a Windows notification and the voice (even in text mode; muting the AI voice silences it)."""
         title = {"event": i18n.t("notif_event"), "task": i18n.t("notif_task")}.get(alert["kind"], alert.get("title", "NEXUS"))
-        quiet = notify.in_quiet_hours()
+        quiet = notify.in_quiet_hours() or self.focus()  # focus mode: only the bell, no voice/pop-up
         item = notify.add(alert["kind"], title, alert["text"])
         emit("alert", {**alert, "notification": item, "quiet": quiet, "sound": settings["notify_sound"] and not quiet})
         if quiet:
@@ -65,6 +81,8 @@ class Api:
     def _on_brain_event(self, event, payload):
         """Forward to the UI and speak while the answer is still being generated (sentence by sentence)."""
         emit(event, payload)
+        if event == "done" and workspace.active:
+            emit("workspace", self.workspace_view())
         if event == "token":
             if not self._brain.cancel.is_set():
                 self._tts_buf += payload
@@ -190,7 +208,8 @@ class Api:
                 "voice_enabled": settings["voice_enabled"], "stt": self._listener.model_state,
                 "stt_error": self._listener.model_error, "ai_mode": settings["ai_mode"],
                 "temporary": memory.temporary, "can_repeat": bool(assistant.last_reply()),
-                "conversation": memory.current_conversation()}
+                "conversation": memory.current_conversation(), "focus": self.focus(),
+                "workspace": workspace.active}
 
     def interrupt(self):
         """Dock "interrupt" / Esc: stop speaking and cancel the answer being generated."""
@@ -255,6 +274,71 @@ class Api:
 
     def clear_history(self):
         memory.clear_history()
+
+    # -- focus mode and workspace (v0.11) -------------------------------------------------------------------------
+    @staticmethod
+    def focus() -> bool:
+        """Focus mode: chosen by the user, or automatic while a workspace is open (Settings)."""
+        return bool(settings["focus_mode"] or (workspace.active and settings["focus_in_workspace"]))
+
+    def set_focus(self, on):
+        settings.apply({"focus_mode": bool(on)})
+        return self.state()
+
+    def workspaces(self):
+        return workspace.listing()
+
+    def create_workspace(self, name, description=""):
+        ws = workspace.create(name, description)
+        return self.open_workspace(ws["id"])
+
+    def open_workspace(self, wid):
+        self._speaker.stop()
+        if memory.temporary:
+            memory.set_temporary(False)
+        ws = workspace.open_(int(wid))
+        memory.enter_workspace(ws["id"], ws["conversation_id"])
+        workspace.active = workspace.get(ws["id"])
+        return {**self.state(), "messages": memory.conversation_messages(memory.current_conversation()),
+                **self.workspace_view()}
+
+    def close_workspace(self):
+        self._speaker.stop()
+        workspace.close()
+        memory.leave_workspace()
+        return {**self.state(), "messages": memory.history(settings["history_turns"])}
+
+    def delete_workspace(self, wid):
+        if workspace.active and workspace.active["id"] == int(wid):
+            self.close_workspace()
+        workspace.delete(int(wid))
+        return workspace.listing()
+
+    def workspace_view(self):
+        """Files (with sizes) and the change journal for the side panel."""
+        if not workspace.active:
+            return {"files": [], "changes": []}
+        root = workspace.root()
+        files = [{"path": workspace.rel(p), "dir": p.is_dir(), "size": 0 if p.is_dir() else p.stat().st_size}
+                 for p in list(workspace._walk(root))[:500]]
+        return {"files": files, "changes": workspace.changes(40), "folder": str(root)}
+
+    def read_workspace_file(self, path):
+        try:
+            return workspace.read_file(path)
+        except workspace.WorkspaceError as exc:
+            return {"error": str(exc)}
+
+    def undo_workspace(self, change_id=None):
+        result = workspace.undo(int(change_id) if change_id else None)
+        return {**result, **self.workspace_view()}
+
+    def open_workspace_folder(self):
+        if workspace.active:
+            try:
+                os.startfile(workspace.root())
+            except Exception:
+                pass
 
     # -- conversations (v0.9) ----------------------------------------------------
     def conversations(self):

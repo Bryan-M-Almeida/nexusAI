@@ -97,6 +97,9 @@ window.nexus = {
       case "alert": return onAlert(p);
       case "profile": return onProfile(p);
       case "conversations": return !$("#convDrawer").hidden && renderConversations();
+      case "workspace": return renderWsPanel(p);
+      case "confirm": return askConfirm(p);
+      case "confirm_done": return (confirmId === p.id) && closeConfirm(p.ok);
     }
   },
 };
@@ -278,6 +281,7 @@ async function openNotifications() {
 
 function onAlert(a) {
   if (a.notification) setBadge(unread + 1);
+  if (a.quiet) return;  // quiet hours / focus mode: only the bell
   if (a.sound) chime();
   const el = document.createElement("div");
   el.className = "toast";
@@ -353,6 +357,12 @@ function applyState(st) {
   $("#btnTranscript").classList.toggle("on", transcriptOn);
   $("#btnTranscript").disabled = state.ui_mode === "text";
   $("#app").classList.toggle("temporary", state.temporary);
+  const ws = state.workspace;
+  $("#app").classList.toggle("ws-mode", !!ws);
+  $("#wsBar").hidden = $("#wsPanel").hidden = !ws;
+  if (ws) $("#wsName").textContent = ws.name;
+  $("#app").classList.toggle("focus", !!state.focus);
+  $("#btnFocus").classList.toggle("on", !!state.focus);
   if (state.ui_mode === "text") setTimeout(() => $("#prompt").focus(), 300);
   setVoiceState(voiceState === "speaking" ? "speaking" : "idle");
 }
@@ -445,7 +455,7 @@ function flashBars() {  // show every bar briefly once, so the user discovers th
 async function setAiMode(mode) {
   const st = await api().set_ai_mode(mode);
   applyState(st);
-  showTip(T(mode === "direct" ? "modeDirect" : "modeAssistant"));
+  showTip(T({ direct: "modeDirect", study: "modeStudy" }[mode] || "modeAssistant"));
   if (st.spoken) { caption(st.spoken, 3000); addMsg("system", st.spoken); }
 }
 
@@ -705,6 +715,7 @@ function wire() {
       const r = await api().push_to_talk();
       if (!r.ok) notice(T("voiceLoading") + (r.error && r.error !== "loading" ? ` (${r.error})` : ""));
     }
+    if (e.key === "Escape" && confirmId) { answerConfirm(false); return; }
     if (e.key === "Escape") {
       const open = $$(".modal:not([hidden]), .drawer:not([hidden])");
       if (open.length) open.forEach((m) => (m.hidden = true)); else dock("interrupt");
@@ -721,7 +732,7 @@ function wire() {
   });
 
   // Click outside a modal/drawer box closes it (press and release on the backdrop, so selecting text doesn't).
-  $$(".modal, .drawer").forEach((m) => {
+  $$(".modal:not(#confirmModal), .drawer").forEach((m) => {
     let downOnBackdrop = false;
     m.addEventListener("mousedown", (e) => (downOnBackdrop = e.target === m));
     m.addEventListener("click", (e) => { if (downOnBackdrop && e.target === m) m.hidden = true; });
@@ -842,6 +853,7 @@ function wire() {
   tickClock();
   setInterval(tickClock, 1000);
   wireRingDrag();
+  wireWorkspace();
   $("#btnNewConv").onclick = newConversation;
   $("#btnConvs").onclick = () => openConversations("threads");
   $$("#convTabs button").forEach((b) => (b.onclick = () => openConversations(b.dataset.ctab)));
@@ -1001,6 +1013,126 @@ async function newConversation() {
   addMsg("system", T("convNew"));
   setVoiceState("idle");
   caption(T("convNew"), 2500);
+}
+
+/* ------------------------------------------------------------------ focus mode (v0.11) */
+async function toggleFocus() {
+  const st = await api().set_focus(!state.focus);
+  applyState(st);
+  showTip(T(st.focus ? "focusOn" : "focusOff"));
+}
+
+/* ------------------------------------------------------------------ workspace (v0.11) */
+async function openWorkspaces() {
+  const list = await api().workspaces();
+  $("#wsList").innerHTML = list.map((w) => `
+    <div class="conv-card ${state.workspace && state.workspace.id === w.id ? "current" : ""}" data-wsopen="${w.id}">
+      <span class="t">${esc(w.name)}</span>
+      ${w.description ? `<span class="d">${esc(w.description)}</span>` : ""}
+      <span class="m">${esc(T("wsMeta", { n: w.files, date: fmtDate(w.updated) }))}</span>
+      <span class="acts"><button data-wsdel="${w.id}" title="✕">✕</button></span>
+    </div>`).join("") || `<p class="muted">${esc(T("wsEmpty"))}</p>`;
+  $("#wsDrawer").hidden = false;
+  setTimeout(() => $("#wsNewName").focus(), 50);
+}
+
+function enterWorkspaceView(r) {
+  applyState(r);
+  $("#chat").innerHTML = "";
+  addMsg("system", T("wsEntered", { name: r.workspace.name }));
+  for (const m of r.messages || []) addMsg(m.role === "user" ? "user" : "nexus", m.content);
+  renderWsPanel(r);
+  $("#wsDrawer").hidden = true;
+  setVoiceState("idle");
+  setTimeout(() => $("#prompt").focus(), 200);
+}
+
+async function exitWorkspace() {
+  const r = await api().close_workspace();
+  applyState(r);
+  $("#chat").innerHTML = "";
+  addMsg("system", T("wsLeft"));
+  for (const m of r.messages || []) addMsg(m.role === "user" ? "user" : "nexus", m.content);
+  setVoiceState("idle");
+}
+
+function fmtSize(b) { return b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`; }
+
+function renderWsPanel(v) {
+  if (!v || !v.files) return;
+  const files = v.files;
+  $("#wsCount").textContent = files.length ? ` · ${files.filter((f) => !f.dir).length}` : "";
+  $("#wsFiles").innerHTML = files.map((f) => {
+    const depth = f.path.split("/").length - 1, name = f.path.split("/").pop();
+    return `<li class="${f.dir ? "dir" : "file"}" style="--d:${depth}" ${f.dir ? "" : `data-wsfile="${esc(f.path)}"`}>
+      <span>${f.dir ? "▸ " : ""}${esc(name)}</span>${f.dir ? "" : `<small>${fmtSize(f.size)}</small>`}</li>`;
+  }).join("") || `<li class="empty">${esc(T("wsEmptyFiles"))}</li>`;
+  $("#wsChanges").innerHTML = (v.changes || []).map((c) => `
+    <li><span><b>${esc(T("op_" + c.op))}</b> ${esc(c.path)}<small>${esc(c.ts.slice(11, 16))}</small></span>
+      ${c.op === "command" ? "" : `<button class="link-btn" data-wsundo="${c.id}">${esc(T("wsUndo"))}</button>`}</li>`).join("")
+    || `<li class="empty">${esc(T("wsNoChanges"))}</li>`;
+}
+
+async function viewFile(path) {
+  const r = await api().read_workspace_file(path);
+  $("#filePath").textContent = path;
+  $("#fileView").textContent = r.error || r.content + (r.truncated ? "\n…" : "");
+  $("#fileModal").hidden = false;
+}
+
+async function undoChange(id) {
+  const r = await api().undo_workspace(id || null);
+  renderWsPanel(r);
+  if (r.ok) showTip(T("wsUndone", { path: r.path }));
+}
+
+let confirmId = null;
+function askConfirm(p) {
+  confirmId = p.id;
+  $("#confirmCmd").textContent = p.command;
+  $("#confirmModal").hidden = false;
+  chime();
+}
+function closeConfirm(ok) {
+  $("#confirmModal").hidden = true;
+  if (confirmId) showTip(T(ok ? "allowed" : "denied"));
+  confirmId = null;
+}
+function answerConfirm(ok) {
+  if (!confirmId) return;
+  api().confirm_command(confirmId, ok);
+  closeConfirm(ok);
+}
+
+function wireWorkspace() {
+  $("#btnWorkspaces").onclick = openWorkspaces;
+  $("#btnFocus").onclick = toggleFocus;
+  $("#wsNew").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r = await api().create_workspace($("#wsNewName").value, $("#wsNewDesc").value);
+    e.target.reset();
+    enterWorkspaceView(r);
+  });
+  $("#wsList").addEventListener("click", async (e) => {
+    const del = e.target.closest("[data-wsdel]"), open = e.target.closest("[data-wsopen]");
+    if (del) {
+      e.stopPropagation();
+      if (confirm(T("wsDelete"))) {
+        const wasOpen = state.workspace && String(state.workspace.id) === del.dataset.wsdel;
+        await api().delete_workspace(del.dataset.wsdel);
+        if (wasOpen) applyState(await api().state());
+        openWorkspaces();
+      }
+    } else if (open) enterWorkspaceView(await api().open_workspace(open.dataset.wsopen));
+  });
+  $("#btnWsExit").onclick = exitWorkspace;
+  $("#btnWsFolder").onclick = () => api().open_workspace_folder();
+  $("#btnWsUndo").onclick = () => undoChange();
+  $("#wsFiles").addEventListener("click", (e) => { const f = e.target.closest("[data-wsfile]"); if (f) viewFile(f.dataset.wsfile); });
+  $("#wsChanges").addEventListener("click", (e) => { const b = e.target.closest("[data-wsundo]"); if (b) undoChange(b.dataset.wsundo); });
+  $("#btnAllow").onclick = () => answerConfirm(true);
+  $("#btnDeny").onclick = () => answerConfirm(false);
+  $("#btnFileCopy").onclick = (e) => copyText($("#fileView").textContent, e.currentTarget);
 }
 
 /* ------------------------------------------------------------------ init */

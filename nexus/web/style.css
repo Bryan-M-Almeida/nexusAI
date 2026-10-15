@@ -441,6 +441,56 @@ button, .dock, .rail, .topbar, .core-label { user-select: none; }
   .two { grid-template-columns: 1fr; }
 }
 
+/* ---------------------------------------------------------------- v0.11 workspace, focus, study */
+.rail-sep { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.link-btn { background: none; border: 0; padding: 0; font-family: var(--f-mono); font-size: 10px; letter-spacing: .08em;
+  color: var(--blue-bright); text-transform: lowercase; }
+.link-btn:hover { color: var(--text); text-decoration: underline; }
+
+/* Workspace view: always shows the conversation (text layout), a bar on top and the files on the left. */
+.ws-bar { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 12px;
+  padding: 6px 8px 6px 14px; border: 1px solid rgba(61, 139, 219, .55); background: rgba(7, 11, 17, .9); backdrop-filter: blur(8px); }
+.ws-bar .ws-tag { font-size: 10px; letter-spacing: .2em; color: var(--red); }
+.ws-bar b { font-family: var(--f-body); font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: .02em; }
+.ws-bar .btn-ghost { padding: 4px 10px; font-size: 10px; }
+.ws-panel { position: fixed; top: 64px; bottom: 24px; left: 24px; width: min(280px, 24vw); z-index: 3; display: flex; flex-direction: column;
+  padding: 12px; border: 1px solid var(--line); background: rgba(7, 11, 17, .82); backdrop-filter: blur(8px); }
+.ws-panel .rail-title { display: flex; justify-content: space-between; align-items: baseline; }
+.ws-files, .ws-changes { list-style: none; margin: 0 0 10px; padding: 0; overflow-y: auto; overscroll-behavior: contain; }
+.ws-files { flex: 1.4; min-height: 80px; }
+.ws-changes { flex: 1; min-height: 60px; }
+.ws-files li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 4px 3px calc(4px + var(--d, 0) * 14px);
+  font-size: 14px; border-radius: 2px; }
+.ws-files li.file { cursor: pointer; }
+.ws-files li.file:hover { background: rgba(61, 139, 219, .1); }
+.ws-files li.dir { color: var(--muted); }
+.ws-files small, .ws-changes small { font-family: var(--f-mono); font-size: 10px; color: var(--muted); margin-left: 6px; }
+.ws-changes li { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 4px 2px;
+  border-bottom: 1px solid rgba(74, 144, 226, .08); font-size: 13px; overflow-wrap: anywhere; }
+.ws-changes b { font-weight: 600; color: var(--silver); }
+.ws-files .empty, .ws-changes .empty { color: var(--muted); font-style: italic; font-size: 13px; }
+.app.ws-mode[data-mode] .chatview { opacity: 1; pointer-events: auto; top: 64px; bottom: 24px; left: calc(min(280px, 24vw) + 48px); right: 24px;
+  width: auto; transform: none; }
+.app.ws-mode[data-mode] .stage { display: none; }
+.app.ws-mode .temp-badge { display: none; }
+.ws-new { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 8px; }
+.ws-new input { background: rgba(3, 5, 8, .6); border: 1px solid var(--line); padding: 8px 10px; outline: none; }
+
+/* Command confirmation and file viewer */
+.modal-box.confirm-box { width: min(560px, 100%); border-color: rgba(242, 179, 61, .7); }
+.confirm-box .kicker { color: #f2b33d; }
+.cmd, .file-view { font-family: var(--f-mono); font-size: 13px; background: rgba(3, 5, 8, .85); border: 1px solid var(--line);
+  padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.cmd { color: #ffd88a; }
+.modal-box.file-box { width: min(900px, 100%); }
+.file-view { max-height: 66vh; overflow: auto; white-space: pre; margin: 8px 0 0; }
+
+/* Focus mode: nothing moves or blinks except the conversation itself */
+.app.focus .hud-frame, .app.focus .telemetry, .app.focus .pulse, .app.focus::after { display: none; }
+.app.focus .ring-spin, .app.focus .ring-sway { animation-duration: calc(var(--dur) * 3); }
+.app.focus .chip .dot { animation: none; }
+.rail-btn#btnFocus.on { color: #f2b33d; border-color: rgba(242, 179, 61, .6); background: rgba(242, 179, 61, .1); }
+
 /* ---------------------------------------------------------------- modals & toasts */
 .modal { position: fixed; inset: 0; z-index: 20; background: rgba(3, 5, 8, .78); display: grid; place-items: center; padding: 20px; backdrop-filter: blur(4px); }
 .modal-box { width: min(560px, 100%); max-height: 92vh; overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line-strong); padding: 26px; position: relative; animation: rise .4s var(--ease-out); }

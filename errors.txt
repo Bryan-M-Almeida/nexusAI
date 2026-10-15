@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 2.1  ·  Date: 2026-10-14  ·  App version: 0.10.0
+ Document version: 2.2  ·  Date: 2026-10-14  ·  App version: 0.11.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -14,6 +14,7 @@ talking to the team. Areas:
   VOZ  - Speech recognition (Whisper) and speech synthesis (SAPI)
   DAT  - Database, memory and knowledge base
   UI   - Desktop interface (pywebview / WebView2)
+  WRK  - Workspace (isolated projects, the AI's files and commands)
   INT  - Landing page integration (JSON profile / local bridge)
   ENV  - Environment, installation and executable build
 
@@ -113,6 +114,10 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-UI-008   Text not selectable / no copy / conversation hidden in audio mode
       NX-UI-009   Interrupt/Repeat buttons clickable with nothing to do
       NX-UI-010   Windows notification doesn't appear
+ WRK  NX-WRK-001  The AI says it created/changed a file, but nothing changed
+      NX-WRK-002  "Outside the workspace": path refused
+      NX-WRK-003  Command doesn't run, takes long or waits for confirmation
+      NX-WRK-004  Undo didn't return to the expected state
  INT  NX-INT-001  Landing page has no real onboarding form yet
       NX-INT-002  Browser blocks the landing page request to 127.0.0.1
       NX-INT-003  Port 47800 busy: local bridge disabled
@@ -920,6 +925,52 @@ QUICK DIAGNOSTICS (run these before investigating)
   Solution   : Windows Settings > System > Notifications: turn off Do Not
                Disturb and allow "Windows PowerShell". The alert still happens
                inside NEXUS (sound, voice and bell) without the Windows one.
+
+================================================================================
+ WRK — WORKSPACE
+================================================================================
+
+[NX-WRK-001] The AI says it created/changed a file, but nothing changed
+  Severity   : MEDIUM           Status: MITIGATED          Observed: YES
+  Symptom    : The answer says "I created" / "I'll fix it", but the file list
+               and Changes don't change.
+  Cause      : The model sometimes announces the action instead of calling the
+               tool (v0.11 evaluation: "I'll fix it" after a failing test,
+               without fixing).
+  Fix        : Two safety nets (assistant._needs_file_tool): claiming a change
+               without a tool, or ending with a promise ("I'll fix it"), sends
+               the request back to the model to act immediately. Verified in
+               tests\workspace_eval.py.
+  Tip        : The CHANGES panel only shows what really changed.
+
+[NX-WRK-002] "Outside the workspace": path refused
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Cause      : Intentional protection. The AI only uses paths relative to the
+               workspace folder; "..", "C:\...", "~" and the internal .nexus
+               folder are refused. Tested in tests\test_units.py.
+  Solution   : To work with outside files, copy them into the workspace folder
+               ("Open folder" button on the top bar).
+
+[NX-WRK-003] Command doesn't run, takes long or waits for confirmation
+  Severity   : MEDIUM           Status: KNOWN              Observed: EXPECTED
+  Cause      : (1) Every command needs your confirmation; without an answer in
+               3 minutes it is denied. Esc also denies. (2) Commands have a
+               120 s limit (servers and programs that never end are stopped).
+               (3) The command runs in the Windows Command Prompt, in the
+               workspace folder: the program (python, node, git...) must be
+               installed and on the PATH.
+  Solution   : For long processes, run them yourself via "Open folder". If
+               you deny, tell the AI what you'd rather do.
+
+[NX-WRK-004] Undo didn't return to the expected state
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : Undo works per file: each write, edit or delete keeps the
+               previous version in .nexus/history. Effects of COMMANDS (files
+               created by a program, installed packages) are not in the
+               history and can't be undone.
+  Solution   : Use "undo" on the right change in the panel (newest first). Old
+               versions stay in .nexus/history inside the folder. Deleted
+               workspaces go to workspaces/.trash.
 
 ================================================================================
  INT — LANDING PAGE INTEGRATION

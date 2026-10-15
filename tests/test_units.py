@@ -261,6 +261,47 @@ from nexus import llm  # noqa: E402
 check("AI presets include local and cloud providers",
       {"ollama", "lmstudio", "openai", "anthropic", "gemini", "custom"} <= {x["id"] for x in llm.PRESETS})
 
+# -- workspace (v0.11): path jail, undo, separate conversation, confirmed commands -------------------------------
+from nexus import workspace  # noqa: E402
+
+ws = workspace.create("App de Finanças", "um app em Python")
+workspace.open_(ws["id"])
+ws_conv = memory.enter_workspace(ws["id"], ws["conversation_id"])
+check("workspace: folder created inside the data dir", workspace.root().is_dir() and "workspaces" in str(workspace.root()))
+for bad in ("../fora.txt", "C:/Windows/x.txt", "/../../x", "sub/../../x.txt", ".nexus/notes.md", "~/x"):
+    r = workspace.execute("write_file", {"path": bad, "content": "x"})
+    check(f"workspace: path jail blocks {bad!r}", "error" in r, str(r))
+r = workspace.execute("write_file", {"path": "src/main.py", "content": "print('v1')\n"})
+check("workspace: creates files in subfolders", r.get("ok") and (workspace.root() / "src/main.py").exists(), str(r))
+workspace.execute("edit_file", {"path": "src/main.py", "old_text": "v1", "new_text": "v2"})
+check("workspace: edit_file replaces a unique snippet", "v2" in workspace.read_file("src/main.py")["content"])
+check("workspace: edit_file refuses ambiguous snippets",
+      "error" in workspace.execute("edit_file", {"path": "src/main.py", "old_text": "zzz", "new_text": "y"}))
+workspace.undo()
+check("workspace: undo restores the previous version", "v1" in workspace.read_file("src/main.py")["content"])
+workspace.undo()
+check("workspace: undo of a created file removes it", not (workspace.root() / "src/main.py").exists())
+asked = []
+r = workspace.execute("run_command", {"command": "echo ola"}, ask=lambda c: asked.append(c) or False)
+check("workspace: commands need confirmation (denied = not run)", r.get("denied") and asked == ["echo ola"], str(r))
+r = workspace.execute("run_command", {"command": "echo ola"}, ask=lambda c: True)
+check("workspace: confirmed command runs in the workspace", r.get("exit_code") == 0 and "ola" in r.get("stdout", ""), str(r))
+memory.add_message("user", "crie o main.py")
+check("workspace: its conversation is not listed with normal ones", ws_conv not in {c["id"] for c in memory.conversations()})
+check("workspace: nor in the timeline", all(m["conversation_id"] != ws_conv for m in memory.timeline(500)))
+check("workspace: context has the files, not the user's memories",
+      "Workspace files" in assistant.build_context("oi") and "remember about the user" not in assistant.build_context("oi"))
+check("workspace: file tools offered, personal tools not",
+      {"write_file", "run_command"} <= {x["function"]["name"] for x in assistant.turn_tools()}
+      and "record_data" not in {x["function"]["name"] for x in assistant.turn_tools()})
+check("workspace: 'I'll fix it' without acting is sent back to the model",
+      assistant._needs_file_tool("O erro ocorre no import. Vou corrigir isso.", True) is not None
+      and assistant._needs_file_tool("Pronto: corrigi o import em test_calc.py.", True) is None)
+memory.leave_workspace(); workspace.close()
+check("workspace: leaving restores normal tools", "record_data" in {x["function"]["name"] for x in assistant.turn_tools()})
+workspace.delete(ws["id"])
+check("workspace: delete moves the folder to .trash", any((workspace.ROOT / ".trash").iterdir()))
+
 # migration of pre-v0.9 messages: a 2 h gap splits them into two conversations
 import sqlite3  # noqa: E402
 import tempfile  # noqa: E402

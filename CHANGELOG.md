@@ -8,6 +8,40 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.11.0 — Protótipo · 2026-10-14
+
+**Área de trabalho do NEXUS, modo foco e modo estudo.**
+
+### Área de trabalho (borda direita → *Área de trabalho*)
+- **Um espaço isolado por projeto**: pasta própria (`workspaces/<nome>` na pasta de dados), conversa própria e
+  anotações do projeto. A conversa **não aparece** em Conversas nem na linha do tempo, e a IA não usa suas memórias,
+  agenda nem outras conversas lá dentro (na avaliação ela não revelou a senha dita na conversa normal).
+- **Liberdade total dentro da pasta**: a IA lista, lê, cria, edita, move e apaga arquivos e pastas sozinha.
+  Fora dela, nada: caminhos com `..`, `C:\`, `~` ou a pasta interna `.nexus` são recusados.
+- **Sem conflito consigo mesma**: cada escrita/edição/exclusão guarda a versão anterior (`.nexus/history`) e pode
+  ser **desfeita** pelo painel; a edição só troca um trecho exato e único (não sobrescreve o que não leu).
+- **Comandos só com a sua confirmação** (rodar código, instalar pacotes): diálogo "Permitir / Negar", aviso por voz,
+  limite de 120 s, Esc ou 3 min sem resposta = negado.
+- Tela própria: barra "ÁREA DE TRABALHO · nome" (abrir pasta, sair), painel de **arquivos** (clique para ver o
+  conteúdo, com Copiar) e de **alterações** (desfazer cada uma ou a última).
+- Rede de segurança nova (NX-WRK-001): se a IA diz que mudou um arquivo sem ter mudado, ou termina com "vou
+  corrigir" sem corrigir, o pedido volta para ela agir.
+
+### Modo foco e modo estudo (borda esquerda)
+- **Modo foco**: sem distrações — lembretes só no sino (sem voz, pop-up ou som), HUD e pulso escondidos, aro mais
+  calmo. Liga sozinho na área de trabalho (opcional em Configurações → Geral).
+- **Modo Estudo**: a IA vira tutora — explica passo a passo com exemplo, confere se você entendeu com uma pergunta,
+  usa a base de conhecimento e corrige simulados na hora.
+
+### Testes desta versão
+- 126/126 testes unitários (21 novos: 6 tentativas de sair da pasta bloqueadas, edição única, desfazer, comando
+  negado/permitido, conversa separada, contexto sem dados pessoais, ferramentas certas em cada modo).
+- `tests/workspace_eval.py` com qwen3:8b: 7/7 (criou `calc.py` e `test_calc.py`, pediu confirmação e rodou os testes,
+  corrigiu o import que falhou, editou a função, não misturou com a conversa normal).
+- 26/26 verificações de conversa normal com qwen3:8b (sem regressão fora da área de trabalho).
+
+---
+
 ## v0.10.0 — Protótipo · 2026-10-14
 
 **Notificações e lembretes automáticos, Configurações completas e qualquer provedor de IA.**
@@ -360,8 +394,14 @@ NX-VOZ-016, NX-ENV-007).
 
 ## Próximas versões (planejamento)
 
-### v0.11.0 — Protótipo (próxima) · recursos novos
-- **Projetos** na lateral direita: a IA consulta e atualiza o projeto ativo com o usuário.
+### v0.12.0 — Protótipo (próxima) · conexão e desempenho
+- **Modos offline, internet e híbrido** (hoje o NEXUS já funciona como híbrido: IA, voz e memória locais; internet só
+  para clima, notícias, câmbio, Wikipédia, calendário e provedores na nuvem).
+- **Perfis de desempenho**: econômico, equilibrado (padrão) e **força total**, liberado só se o PC aguentar
+  (detecção de hardware).
+- **Requisitos mínimos e recomendados**, medidos com GPU e só com CPU.
+
+### v0.13.0 — Protótipo · habilidades
 - **Sistema de habilidades estilo Solo Leveling**: nível do NEXUS e de cada habilidade, subindo com o uso; minimalista.
 
 ### Versão final do protótipo

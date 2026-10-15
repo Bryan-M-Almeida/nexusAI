@@ -62,16 +62,36 @@
       <span><b data-i18n="modeAssistant">Assistente</b><small data-i18n="modeAssistantHint">completo e cordial</small></span></button>
     <button class="rail-btn" data-ai-mode="direct"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
       <span><b data-i18n="modeDirect">Direto</b><small data-i18n="modeDirectHint">curto e exato · mais rápido</small></span></button>
+    <button class="rail-btn" data-ai-mode="study"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>
+      <span><b data-i18n="modeStudy">Estudo</b><small data-i18n="modeStudyHint">tutor passo a passo</small></span></button>
+    <p class="rail-title mono rail-sep" data-i18n="focusTitle">FOCO</p>
+    <button class="rail-btn" id="btnFocus"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
+      <span><b data-i18n="focusMode">Modo foco</b><small data-i18n="focusHint">sem distrações · avisos só no sino</small></span></button>
   </aside>
 
   <aside class="rail rail-right edge-bar" id="railRight">
-    <p class="rail-title mono" data-i18n="convTitle">CONVERSA</p>
+    <p class="rail-title mono" data-i18n="wsRail">TRABALHO</p>
+    <button class="rail-btn" id="btnWorkspaces"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="1"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>
+      <span><b data-i18n="wsTitle">Área de trabalho</b><small data-i18n="wsHint">projetos isolados · a IA cria e edita arquivos</small></span></button>
+    <p class="rail-title mono rail-sep" data-i18n="convTitle">CONVERSA</p>
     <button class="rail-btn" id="btnNewConv"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M12 8v5M9.5 10.5h5"/></svg>
       <span><b data-i18n="newConv">Nova conversa</b><small data-i18n="newConvHint">começa do zero, a anterior fica salva</small></span></button>
     <button class="rail-btn" id="btnConvs"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13v9H8l-5 4z"/><path d="M8 18v1h8l5 3V10h-3"/></svg>
       <span><b data-i18n="convs">Conversas</b><small data-i18n="convsHint">histórico, descrições e linha do tempo</small></span></button>
     <button class="rail-btn" id="btnTemp"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/><path d="M12 8v4l2.5 2.5"/></svg>
       <span><b data-i18n="tempChat">Conversa temporária</b><small data-i18n="tempHint">não é salva nem memorizada</small></span></button>
+  </aside>
+  <div class="ws-bar mono" id="wsBar" hidden>
+    <span class="ws-tag" data-i18n="wsBadge">ÁREA DE TRABALHO</span><b id="wsName"></b>
+    <button class="btn-ghost" id="btnWsFolder" data-i18n="wsFolder">Abrir pasta</button>
+    <button class="btn-ghost" id="btnWsExit" data-i18n="wsExit">Sair</button>
+  </div>
+  <aside class="ws-panel" id="wsPanel" hidden>
+    <p class="rail-title mono"><span data-i18n="wsFiles">ARQUIVOS</span><span id="wsCount"></span></p>
+    <ul class="ws-files" id="wsFiles"></ul>
+    <p class="rail-title mono ws-ch-title"><span data-i18n="wsChanges">ALTERAÇÕES</span>
+      <button class="link-btn" id="btnWsUndo" data-i18n="wsUndoLast">desfazer a última</button></p>
+    <ul class="ws-changes" id="wsChanges"></ul>
   </aside>
   <div class="temp-badge mono" id="tempBadge" hidden>◌ <span data-i18n="tempBadge">CONVERSA TEMPORÁRIA · NÃO SERÁ SALVA</span></div>
 
@@ -194,6 +214,42 @@
   </div>
 </div>
 
+<!-- ============ WORKSPACES (v0.11) ============ -->
+<div class="drawer" id="wsDrawer" hidden>
+  <div class="conv-box">
+    <button class="icon-btn drawer-close" data-close aria-label="Close">✕</button>
+    <div class="notif-head"><h2 class="mono" data-i18n="wsTitleCaps">ÁREAS DE TRABALHO</h2></div>
+    <form class="ws-new" id="wsNew">
+      <input id="wsNewName" data-i18n-ph="wsNamePh" required maxlength="60">
+      <input id="wsNewDesc" data-i18n-ph="wsDescPh" maxlength="400">
+      <button class="btn-primary" type="submit" data-i18n="wsCreate">Criar</button>
+    </form>
+    <p class="hint" data-i18n="wsExplain">Cada área tem sua própria pasta, conversa e anotações. A IA pode criar e editar arquivos livremente lá dentro, sem tocar no resto do computador; tudo pode ser desfeito. Comandos (rodar código, instalar pacotes) só com a sua confirmação.</p>
+    <div class="conv-body" id="wsList"></div>
+  </div>
+</div>
+
+<div class="modal" id="confirmModal" hidden>
+  <div class="modal-box confirm-box">
+    <p class="mono kicker" data-i18n="confirmTitle">PERMITIR COMANDO?</p>
+    <p data-i18n="confirmText">O NEXUS quer executar este comando na pasta da área de trabalho:</p>
+    <pre class="cmd" id="confirmCmd"></pre>
+    <div class="row-btns">
+      <button class="btn-primary" id="btnAllow" data-i18n="allow">Permitir</button>
+      <button class="btn-ghost danger" id="btnDeny" data-i18n="deny">Negar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="fileModal" hidden>
+  <div class="modal-box file-box">
+    <button class="icon-btn drawer-close" data-close aria-label="Close">✕</button>
+    <p class="mono kicker" id="filePath"></p>
+    <pre class="file-view" id="fileView"></pre>
+    <div class="row-btns"><button class="btn-ghost" id="btnFileCopy" data-i18n="copy">Copiar</button></div>
+  </div>
+</div>
+
 <!-- ============ ONBOARDING ============ -->
 <div class="modal" id="onboarding" hidden>
   <div class="modal-box">
@@ -237,6 +293,7 @@
         <label class="check"><input type="checkbox" name="start_fullscreen"><span data-i18n="startFullscreen">Abrir em tela cheia</span></label>
         <label class="check"><input type="checkbox" name="auto_memory"><span data-i18n="autoMemory">Memorizar fatos automaticamente</span></label>
         <label class="check"><input type="checkbox" name="auto_title"><span data-i18n="autoTitle">A IA dá título e descrição às conversas</span></label>
+        <label class="check"><input type="checkbox" name="focus_in_workspace"><span data-i18n="focusInWs">Ligar o modo foco na área de trabalho</span></label>
         <label><span data-i18n="historyTurns">Mensagens lembradas na conversa (trocas)</span><input name="history_turns" type="number" min="2" max="40" step="1"></label>
         <p class="hint" data-i18n="historyTurnsHint">Mais trocas = mais contexto, respostas um pouco mais lentas.</p>
         <div class="row-btns"><button class="btn-ghost" type="button" id="btnReimport" data-i18n="reimport">Reimportar perfil</button></div>

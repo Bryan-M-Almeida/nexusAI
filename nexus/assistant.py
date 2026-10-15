@@ -5,12 +5,13 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import emergency, knowledge, llm, memory, profile, tools
+from . import emergency, knowledge, llm, memory, profile, tools, workspace
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
 
 MAX_TOOL_ROUNDS = 6
+MAX_WORKSPACE_ROUNDS = 14  # multi-file work needs more tool rounds
 KB_MIN_SCORE = -7.5  # calibrated on the seed books: real matches score below this, noise above
 ACTIONS_WINDOW_MIN = 15
 
@@ -62,10 +63,30 @@ def _pending_tasks():
     return tools.list_tasks("pending")
 
 
+WORKSPACE_IDENTITY = """You are N.E.X.U.S working inside the user's WORKSPACE "{name}" - a focused, isolated work area.
+Project description: {description}
+
+Rules:
+- {reply_lang} Be concise, precise and technical. No small talk.
+- You have full freedom INSIDE the workspace folder: create, read, edit, move and delete files with the tools.
+  Paths are relative to the workspace folder. You cannot touch anything outside it.
+- FILE CHANGES REQUIRE TOOL CALLS. Never say you created/edited/saved a file without calling the tool.
+- Read a file before editing it. Prefer `edit_file` (exact unique snippet) for small changes, `write_file` for new
+  files or full rewrites. Never paste whole files in the chat when you can write them; summarize what you changed.
+- `run_command` runs commands in the workspace folder only after the user confirms; say briefly why you need it.
+  If it is denied, do not retry: ask what to do instead.
+- Every change can be undone (`undo_change`); if something you did broke the project, undo or fix it.
+- Remember project decisions with `workspace_note`. Stay inside this project: don't bring up the user's personal
+  agenda, memories or other conversations unless asked."""
+
+
 def build_system() -> str:
     """Stable part of the prompt. Keeping it identical between turns lets Ollama reuse its KV cache
     (identity + rules + profile + tool schemas), so only the new context and message are processed."""
     prof = db.get_profile()
+    if workspace.active:
+        ws = workspace.active
+        return WORKSPACE_IDENTITY.format(name=ws["name"], description=ws["description"] or "-", reply_lang=t("reply_lang"))
     return "\n".join([
         IDENTITY.format(reply_lang=t("reply_lang"), tone=(prof or {}).get("tone", "cordial")),
         f"\n## User profile\n{profile.describe(prof)}",
@@ -92,11 +113,43 @@ MODES = {
                "or a minimal list only if steps are essential. No greetings, no filler, no follow-up questions, no "
                "emojis, no restating the question."),
 }
+MODES["study"] = (
+    "MODE STUDY: act as a patient tutor. Explain step by step with a simple example, check understanding with ONE "
+    "short question at the end, adapt to the user's level, prefer the knowledge base and cite it. In quizzes grade "
+    "each answer immediately (right/wrong, correct answer, one-line reason).")
 DIRECT_MAX_TOKENS = 320  # safety cap for the direct mode (the instruction keeps answers far below it)
+
+
+def workspace_context(user_text: str) -> str:
+    """Workspace turns: only the project (files, notes, recent changes) - never the user's personal data."""
+    now = datetime.now()
+    parts = [f"## Now\n{now.strftime('%Y-%m-%d %H:%M')}", "\n## Workspace files\n" + workspace.tree_text()]
+    notes = workspace.notes()
+    if notes:
+        parts.append("\n## Project notes\n" + notes)
+    recent = workspace.changes(6)
+    if recent:
+        parts.append("\n## Your latest changes (newest first)\n" + "\n".join(f"- {c['op']} {c['path']}" for c in recent))
+    msg_lang = detect(user_text)
+    if msg_lang:
+        parts.append(f"\nReply ONLY in {({'pt': 'Brazilian Portuguese', 'en': 'English', 'es': 'Spanish'})[msg_lang]}.")
+    if MODES.get(settings["ai_mode"]):
+        parts.append(MODES[settings["ai_mode"]])
+    return "\n".join(parts)
+
+
+def turn_tools() -> list:
+    """Tool schemas for this turn: the workspace has its own file tools plus a few safe general ones."""
+    if workspace.active:
+        keep = {"search_knowledge", "wikipedia", "get_datetime", "conversation_control"}
+        return workspace.SCHEMAS + [x for x in tools.SCHEMAS if x["function"]["name"] in keep]
+    return tools.SCHEMAS
 
 
 def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     """Per-message context, sent right before the user's message. Only what this message needs."""
+    if workspace.active and not emergency_topic:
+        return workspace_context(user_text)
     now = datetime.now()
     msg_lang = detect(user_text)
     wd = WEEKDAYS[msg_lang or lang()]  # weekday names already in the reply language: small models mistranslate them
@@ -229,6 +282,26 @@ def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None
     return None
 
 
+FILE_CLAIM = re.compile(r"\b(criei|editei|salvei|alterei|atualizei|escrevi|removi|apaguei|created|edited|saved|"
+                        r"updated|wrote|deleted|removed|cre[eé]|edit[eé]|guard[eé]|actualic[eé]|borr[eé])\b", re.I)
+
+
+FILE_PROMISE = re.compile(r"\b(vou (corrigir|ajustar|criar|editar|alterar|atualizar|consertar|implementar)|"
+                          r"i('ll| will) (fix|correct|update|create|edit|change|implement)|let me (fix|update|create|edit)|"
+                          r"voy a (corregir|arreglar|crear|editar|cambiar|actualizar))\b", re.I)
+
+
+def _needs_file_tool(reply: str, acted: bool) -> str | None:
+    """Workspace safety nets: claiming a file change without a tool call, or ending the turn with a promise
+    ("I'll fix it") instead of doing it (seen in the v0.11 evaluation after a failing test)."""
+    if not acted and FILE_CLAIM.search(reply):
+        return ("You said you changed files but you did NOT call any file tool, so nothing changed. Call write_file / "
+                "edit_file / make_folder / delete_file now, then summarize briefly.")
+    if FILE_PROMISE.search(reply):
+        return "Don't announce it: do it now with the file tools, then summarize what you changed in one or two sentences."
+    return None
+
+
 def _history_messages():
     return [{"role": m["role"], "content": m["content"]} for m in memory.history(settings["history_turns"])]
 
@@ -236,7 +309,7 @@ def _history_messages():
 def warm_up() -> dict:
     """Run during the boot animation: load the model and cache the fixed prompt prefix (system + tools)."""
     return llm.prefill([{"role": "system", "content": build_system()}, *_history_messages(),
-                        {"role": "user", "content": "ok"}], tools.SCHEMAS)
+                        {"role": "user", "content": "ok"}], turn_tools())
 
 
 def last_reply() -> str:
@@ -245,9 +318,10 @@ def last_reply() -> str:
 
 
 class Assistant:
-    def __init__(self, emit, control_hook=lambda action: None):
+    def __init__(self, emit, control_hook=lambda action: None, confirm_hook=lambda command: False):
         self.emit = emit  # emit(event: str, payload) -> pushes to the UI
         self.control_hook = control_hook  # executes pause/resume/stop on the speaker
+        self.confirm_hook = confirm_hook  # asks the user to allow a workspace command (blocks; returns bool)
         self.lock = threading.Lock()
         self.cancel = threading.Event()
         self.emergencies = emergency.Tracker()
@@ -293,10 +367,11 @@ class Assistant:
         memory.add_message("user", text)
         reply, changed, nudged, finished, round_text, called = "", False, False, False, "", set()
         try:
-            for _ in range(MAX_TOOL_ROUNDS):
+            schemas = turn_tools()
+            for _ in range(MAX_WORKSPACE_ROUNDS if workspace.active else MAX_TOOL_ROUNDS):
                 round_text, calls = "", None
                 cap = DIRECT_MAX_TOKENS if settings["ai_mode"] == "direct" else None
-                for kind, value in llm.stream_chat(messages, tools.SCHEMAS, max_tokens=cap):
+                for kind, value in llm.stream_chat(messages, schemas, max_tokens=cap):
                     if self.cancel.is_set():
                         break
                     if kind == "token":
@@ -309,7 +384,8 @@ class Assistant:
                     reply = round_text
                     break
                 if not calls:
-                    nudge = None if nudged else _needs_tool(round_text, changed, text, called)
+                    nudge = None if nudged else (_needs_file_tool(round_text, changed) if workspace.active
+                                                 else _needs_tool(round_text, changed, text, called))
                     if nudge:  # the model claimed/deferred an action without calling a tool: ask again once
                         nudged = True
                         self.emit("reset", None)
@@ -335,8 +411,12 @@ class Assistant:
                         if final is not None:  # pause/stop/resume/repeat end the turn without another model round
                             reply, finished = final, True
                     else:
-                        result = tools.execute(c["name"], args)
-                        changed |= c["name"] in tools.MUTATING
+                        if workspace.active and c["name"] in workspace.FILE_TOOLS:
+                            result = workspace.execute(c["name"], args, ask=self.confirm_hook)
+                            changed |= c["name"] in workspace.MUTATING
+                        else:
+                            result = tools.execute(c["name"], args)
+                            changed |= c["name"] in tools.MUTATING
                         called.add(c["name"])
                     messages.append({"role": "tool", "tool_call_id": c["id"], "name": c["name"],
                                      "content": json.dumps(result, ensure_ascii=False, default=str)[:6000]})
@@ -357,10 +437,10 @@ class Assistant:
         # Automatic memory: only self-statements, never in emergencies or temporary conversations, and not when
         # the model already called `remember` this turn (no second LLM pass).
         if (settings["auto_memory"] and reply and not finished and not topic and "remember" not in called
-                and not memory.temporary and memory.states_fact(text)):
+                and not memory.temporary and not workspace.active and memory.states_fact(text)):
             threading.Thread(target=self._extract_memories, args=(text, reply), daemon=True).start()
         cid = memory.current_conversation()
-        if reply and not interrupted and cid and not memory.temporary and settings["auto_title"]:
+        if reply and not interrupted and cid and not memory.temporary and settings["auto_title"] and not workspace.active:
             threading.Thread(target=self._title_conversation, args=(cid,), daemon=True).start()
 
     def _title_conversation(self, cid: int):

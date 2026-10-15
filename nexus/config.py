@@ -68,6 +68,9 @@ DEFAULTS = {
     "show_hud": True,             # telemetry, corners and pulse around the ring
     "show_captions": True,        # audio mode: the reply as a caption while it is generated
     "reduce_motion": False,       # stops the ring animations (low-end PCs / preference)
+    # v0.11 ----------------------------------------------------------------------------------------------------
+    "focus_mode": False,          # no distractions: reminders only in the bell, minimal interface
+    "focus_in_workspace": True,   # focus mode turns on by itself while a workspace is open
 }
 
 

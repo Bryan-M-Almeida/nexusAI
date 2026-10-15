@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 2.1  ·  Data: 2026-10-14  ·  Versão do app: 0.10.0
+ Versão do documento: 2.2  ·  Data: 2026-10-14  ·  Versão do app: 0.11.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -14,6 +14,7 @@ com a equipe. Áreas:
   VOZ  - Reconhecimento de fala (Whisper) e síntese de voz (SAPI)
   DAT  - Banco de dados, memória e base de conhecimento
   UI   - Interface desktop (pywebview / WebView2)
+  WRK  - Área de trabalho (projetos isolados, arquivos e comandos da IA)
   INT  - Integração com a landing page (perfil JSON / ponte local)
   ENV  - Ambiente, instalação e build do executável
 
@@ -111,6 +112,10 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-UI-008   Texto não selecionável / sem copiar / conversa invisível no modo áudio
       NX-UI-009   Botões Interromper/Repetir clicáveis sem nada para fazer
       NX-UI-010   Notificação do Windows não aparece
+ WRK  NX-WRK-001  A IA diz que criou/alterou um arquivo, mas nada mudou
+      NX-WRK-002  "Fora da área de trabalho": caminho recusado
+      NX-WRK-003  Comando não roda, demora ou fica esperando confirmação
+      NX-WRK-004  Desfazer não voltou ao estado esperado
  INT  NX-INT-001  Landing ainda não possui formulário de onboarding real
       NX-INT-002  Navegador bloqueia o envio da landing para 127.0.0.1
       NX-INT-003  Porta 47800 ocupada: ponte local desativada
@@ -919,6 +924,52 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Solução    : Configurações do Windows > Sistema > Notificações: desative o
                "Não perturbe" e permita o "Windows PowerShell". O aviso continua
                no NEXUS (som, voz e sino) mesmo sem a notificação do Windows.
+
+================================================================================
+ WRK — ÁREA DE TRABALHO
+================================================================================
+
+[NX-WRK-001] A IA diz que criou/alterou um arquivo, mas nada mudou
+  Severidade : MÉDIA            Status: MITIGADO           Observado: SIM
+  Sintoma    : A resposta fala "criei"/"vou corrigir", mas a lista de arquivos
+               e as Alterações não mudam.
+  Causa      : O modelo às vezes anuncia a ação em vez de chamar a ferramenta
+               (na avaliação da v0.11: "Vou corrigir isso" após um teste
+               falhar, sem corrigir).
+  Correção   : Duas redes de segurança (assistant._needs_file_tool): afirmar
+               uma mudança sem ferramenta, ou terminar com uma promessa ("vou
+               corrigir"), devolve o pedido ao modelo para agir na hora.
+               Verificado em tests\workspace_eval.py.
+  Dica       : O painel ALTERAÇÕES mostra só o que realmente mudou.
+
+[NX-WRK-002] "Fora da área de trabalho": caminho recusado
+  Severidade : BAIXA            Status: CONHECIDO          Observado: SIM
+  Causa      : Proteção intencional. A IA só usa caminhos relativos à pasta da
+               área de trabalho; "..", "C:\...", "~" e a pasta interna .nexus
+               são recusados. Testado em tests\test_units.py.
+  Solução    : Para trabalhar com arquivos de fora, copie-os para a pasta da
+               área de trabalho (botão "Abrir pasta" na barra superior).
+
+[NX-WRK-003] Comando não roda, demora ou fica esperando confirmação
+  Severidade : MÉDIA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : (1) Todo comando precisa da sua confirmação; sem resposta em
+               3 minutos ele é negado. Esc também nega. (2) Comandos têm
+               limite de 120 s (servidores e programas que não terminam são
+               interrompidos). (3) O comando roda no Prompt de Comando do
+               Windows, na pasta da área de trabalho: o programa (python, node,
+               git...) precisa estar instalado e no PATH.
+  Solução    : Para processos longos, rode você mesmo pelo botão "Abrir
+               pasta". Se negar, diga à IA o que prefere fazer.
+
+[NX-WRK-004] Desfazer não voltou ao estado esperado
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : Desfazer age por arquivo: cada escrita, edição ou exclusão
+               guarda a versão anterior em .nexus/history. Efeitos de COMANDOS
+               (arquivos criados por um programa, pacotes instalados) não
+               entram no histórico e não podem ser desfeitos.
+  Solução    : Use "desfazer" na alteração certa no painel (as mais novas
+               primeiro). As versões antigas ficam em .nexus/history dentro da
+               pasta. Áreas apagadas vão para workspaces/.trash.
 
 ================================================================================
  INT — INTEGRAÇÃO COM A LANDING PAGE

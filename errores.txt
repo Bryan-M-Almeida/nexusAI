@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 2.1  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.10.0
+ Versión del documento: 2.2  ·  Fecha: 2026-10-14  ·  Versión de la app: 0.11.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -14,6 +14,7 @@ hablar con el equipo. Áreas:
   VOZ  - Reconocimiento de voz (Whisper) y síntesis de voz (SAPI)
   DAT  - Base de datos, memoria y base de conocimiento
   UI   - Interfaz de escritorio (pywebview / WebView2)
+  WRK  - Área de trabajo (proyectos aislados, archivos y comandos de la IA)
   INT  - Integración con la landing page (perfil JSON / puente local)
   ENV  - Entorno, instalación y compilación del ejecutable
 
@@ -114,6 +115,10 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-UI-008   Texto no seleccionable / sin copiar / conversación invisible en modo audio
       NX-UI-009   Botones Interrumpir/Repetir clicables sin nada que hacer
       NX-UI-010   La notificación de Windows no aparece
+ WRK  NX-WRK-001  La IA dice que creó/cambió un archivo, pero nada cambió
+      NX-WRK-002  "Fuera del área de trabajo": ruta rechazada
+      NX-WRK-003  El comando no se ejecuta, tarda o espera confirmación
+      NX-WRK-004  Deshacer no volvió al estado esperado
  INT  NX-INT-001  La landing aún no tiene un formulario de registro real
       NX-INT-002  El navegador bloquea el envío de la landing a 127.0.0.1
       NX-INT-003  Puerto 47800 ocupado: puente local desactivado
@@ -957,6 +962,53 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Solución   : Configuración de Windows > Sistema > Notificaciones: desactiva
                "No molestar" y permite "Windows PowerShell". El aviso sigue
                dentro de NEXUS (sonido, voz y campana) sin la de Windows.
+
+================================================================================
+ WRK — ÁREA DE TRABAJO
+================================================================================
+
+[NX-WRK-001] La IA dice que creó/cambió un archivo, pero nada cambió
+  Gravedad   : MEDIA            Estado: MITIGADO           Observado: SÍ
+  Síntoma    : La respuesta dice "creé"/"voy a corregirlo", pero la lista de
+               archivos y los Cambios no cambian.
+  Causa      : El modelo a veces anuncia la acción en lugar de llamar a la
+               herramienta (evaluación de la v0.11: "Voy a corregirlo" tras un
+               test fallido, sin corregir).
+  Corrección : Dos redes de seguridad (assistant._needs_file_tool): afirmar un
+               cambio sin herramienta, o terminar con una promesa ("voy a
+               corregirlo"), devuelve la petición al modelo para que actúe al
+               momento. Verificado en tests\workspace_eval.py.
+  Consejo    : El panel CAMBIOS solo muestra lo que cambió de verdad.
+
+[NX-WRK-002] "Fuera del área de trabajo": ruta rechazada
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: SÍ
+  Causa      : Protección intencional. La IA solo usa rutas relativas a la
+               carpeta del área de trabajo; "..", "C:\...", "~" y la carpeta
+               interna .nexus se rechazan. Probado en tests\test_units.py.
+  Solución   : Para trabajar con archivos de fuera, cópialos a la carpeta del
+               área de trabajo (botón "Abrir carpeta" en la barra superior).
+
+[NX-WRK-003] El comando no se ejecuta, tarda o espera confirmación
+  Gravedad   : MEDIA            Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : (1) Todo comando necesita tu confirmación; sin respuesta en
+               3 minutos se deniega. Esc también deniega. (2) Los comandos
+               tienen un límite de 120 s (servidores y programas que no
+               terminan se detienen). (3) El comando se ejecuta en el Símbolo
+               del sistema de Windows, en la carpeta del área de trabajo: el
+               programa (python, node, git...) debe estar instalado y en el
+               PATH.
+  Solución   : Para procesos largos, ejecútalos tú desde "Abrir carpeta". Si
+               deniegas, dile a la IA qué prefieres hacer.
+
+[NX-WRK-004] Deshacer no volvió al estado esperado
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : Deshacer actúa por archivo: cada escritura, edición o borrado
+               guarda la versión anterior en .nexus/history. Los efectos de
+               los COMANDOS (archivos creados por un programa, paquetes
+               instalados) no entran en el historial y no se pueden deshacer.
+  Solución   : Usa "deshacer" en el cambio correcto del panel (los más nuevos
+               primero). Las versiones antiguas quedan en .nexus/history dentro
+               de la carpeta. Las áreas borradas van a workspaces/.trash.
 
 ================================================================================
  INT — INTEGRACIÓN CON LA LANDING PAGE

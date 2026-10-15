@@ -99,6 +99,19 @@ Exemplo pronto em [examples/profile.example.json](examples/profile.example.json)
 
 Atalhos: `Ctrl+Espaço` fala (push-to-talk, nos dois modos), `Esc` interrompe a fala e a resposta em andamento (ou fecha janelas abertas), `F11` sai/entra da tela cheia, `Ctrl+,` Configurações, `Ctrl+Shift+N` nova conversa, `Ctrl+H` conversas, `Ctrl+J` notificações, `Ctrl+T` transcrição.
 
+### Área de trabalho (v0.11)
+
+*Borda direita → Área de trabalho*: crie um espaço por projeto (nome + descrição). Cada um tem **pasta, conversa e anotações próprias**, separadas das conversas normais e dos seus dados pessoais.
+
+- A IA tem **liberdade total dentro da pasta**: lista, lê, cria, edita e apaga arquivos sozinha; nada fora dela.
+- Toda alteração pode ser **desfeita** pelo painel da esquerda (*Alterações*); clique em um arquivo para ver o conteúdo.
+- **Comandos** (rodar código, instalar pacotes) pedem a sua **confirmação** a cada vez.
+- *Abrir pasta* abre a pasta no Explorer; *Sair* volta para a conversa normal.
+
+Exemplo: *"Crie um calc.py com soma e média e um teste"* → *"Rode os testes"* (você confirma) → *"Faça a média aceitar lista vazia"*.
+
+**Modo foco** (borda esquerda): sem distrações, lembretes só no sino; liga sozinho na área de trabalho. **Modo Estudo**: a IA explica passo a passo e confere se você entendeu.
+
 ### Notificações e lembretes (v0.10)
 
 Com o NEXUS aberto (pode estar minimizado), compromissos e tarefas com prazo são avisados com as antecedências escolhidas em *Configurações → Notificações* (padrão: 1 h, 10 min e na hora): pelo **sino** da barra superior, por **notificação do Windows**, **som** e **voz** (também no modo texto). Há **horário silencioso** (só o sino) e um **resumo do dia** opcional, falado no horário escolhido.
@@ -198,6 +211,7 @@ Os testes **sempre** usam uma pasta de dados temporária, então nunca tocam nos
 ```powershell
 .\.venv\Scripts\python tests\test_units.py          # segundos, sem IA
 .\.venv\Scripts\python tests\conversation_eval.py   # alguns minutos, precisa do Ollama e de internet
+.\.venv\Scripts\python tests\workspace_eval.py      # área de trabalho com a IA real (arquivos e comandos)
 .\.venv\Scripts\python tests\bench_latency.py --warm # tempos de resposta
 .\.venv\Scripts\python tests\bench_voice.py         # fim de fala e precisão do reconhecimento
 ```
@@ -233,7 +247,9 @@ nexus/
   emergency.py  modo emergência: protocolo de primeiros socorros instantâneo e literal do manual
   integrations.py clima, notícias, câmbio, Wikipédia e calendário ICS (sem chaves de API)
   tts.py        motor de voz: vozes SAPI/OneCore, gênero, efeitos J.A.R.V.I.S/robô
-  scheduler.py  lembretes em tempo real
+  scheduler.py  lembretes com antecedências, resumo do dia, sincronização do calendário
+  notify.py     central de notificações, notificação do Windows, horário silencioso
+  workspace.py  área de trabalho: pasta isolada, ferramentas de arquivo, desfazer, comandos confirmados
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -245,4 +261,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.10.0 (protótipo)**.
+Versão atual: **v0.11.0 (protótipo)**.
