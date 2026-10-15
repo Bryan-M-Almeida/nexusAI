@@ -23,7 +23,8 @@ def max_allowed() -> tuple[bool, str]:
 def settings_for(profile: str) -> dict:
     if profile == "economy":
         # Lighter on everything: smaller context, faster speech recognition, model released sooner, no extra AI calls.
-        return {"llm_context": 4096, "history_turns": 6, "stt_model": "base", "stt_beam": 1, "llm_keep_alive": "10m",
+        # 6144, not 4096: the rules + 34 tool schemas alone take ~3.1k tokens (v0.15.1 measurement)
+        return {"llm_context": 6144, "history_turns": 6, "stt_model": "base", "stt_beam": 1, "llm_keep_alive": "10m",
                 "llm_num_gpu": -1, "auto_title": False, "reduce_motion": True, "show_hud": False, "performance": "economy"}
     if profile == "max":
         ok, _ = max_allowed()

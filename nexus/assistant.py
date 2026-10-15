@@ -30,7 +30,9 @@ Rules:
   "learn/aprenda/aprende" -> `learn_knowledge`; reminders -> `set_reminder`; appointments -> `add_event`; to-dos -> `add_task`;
   the user tells you their name -> `update_profile` (field "name").
 - NEVER store anything the user did not ask to store: "let's study X", questions, explanations, lessons, plans
-  and quiz answers are conversation, not data - just answer (teach, explain, ask). No `record_data` for them.
+  and quiz questions/answers are conversation, not data - just answer (teach, explain, ask). Never call
+  `record_data`, `learn_knowledge`, `save_note` or `remember` for them, and never search the knowledge base for
+  "simulado"/"quiz" itself: write the questions from what you know.
 - Resolve relative dates with the calendar below; never compute weekdays yourself. Use ISO datetimes.
 - Never show JSON, tool names or internal steps to the user; just give the final answer.
 - Questions about agenda, schedule, commitments or pending items: answer from BOTH the "Upcoming
@@ -106,6 +108,13 @@ TIME_WORDS = re.compile(
     r"schedule\w*|remind\w*|meeting|appointment|event|deadline|tasks?|to-?do|pending|"
     r"hoy|ma[nñ]ana|ayer|lunes|martes|mi[eé]rcoles|jueves|viernes|recu[eé]rd\w*|cita|reuni[oó]n|tareas?|pendientes?|"
     r"\d{1,2}\s?h\b|\d{1,2}:\d{2})\b", re.IGNORECASE)
+EXPLICIT_REMEMBER = re.compile(r"\b(lembr[ae]|guard[ae]|memoriz\w*|anot[ae]|remember|note that|recuerda|no olvides|"
+                               r"apunta)\b", re.IGNORECASE)
+ACTION_REF = re.compile(
+    r"\b(cancel\w*|desfa\w*|desfiz|apag\w*|remov\w*|exclu\w*|corrig\w*|alter\w*|mud[ae] (isso|o que)|"
+    r"o que (voc[eê] )?(fez|registrou|anotou|salvou|marcou|agendou)|registrou|anotou|salvou|marcou|agendou|"
+    r"(o )?[uú]ltim[oa]|isso que|undo|delete|remove|change (that|it)|what did you|you (just )?(logged|saved|added)|"
+    r"deshaz|borra\w*|elimina\w*|qu[eé] (hiciste|registraste|guardaste))\b", re.IGNORECASE)
 ABOUT_ME = re.compile(r"\b(sobre mim|me conhece|sabe de mim|about me|know me|sobre m[ií]|me conoces|lembra de mim|"
                       r"meu nome|my name|mi nombre)\b", re.IGNORECASE)
 KB_CHARS = 650
@@ -176,7 +185,9 @@ def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     # Only what NEXUS did moments ago in this session ("cancel what you just scheduled"); older actions
     # pulled unrelated topics into ambiguous questions (NX-LLM-019).
     recent = max(memory.session_start(), (now - timedelta(minutes=ACTIONS_WINDOW_MIN)).isoformat(timespec="seconds"))
-    actions = memory.recent_actions(5, since=recent)
+    # v0.15.1: only when the message talks about something NEXUS did - a short reply like "Letra A" (a quiz answer)
+    # was matched to "logged 30 reais in books" sitting in this log.
+    actions = memory.recent_actions(5, since=recent) if ACTION_REF.search(user_text) else []
     if actions:
         parts.append("\n## Log of your recent actions (history only, NOT appointments)\n" + "\n".join(
             f"- {a['ts'][11:16]} {a['summary']}" for a in actions))
@@ -256,6 +267,9 @@ INTENTS = [
     (re.compile(r"^\W*(nexus\W+)?(registr[ae]|anot[ae]|log|track|record|apunta)\b", re.I),
      {"record_data", "save_note", "add_task", "remember"}, "record_data"),
     (REPORT_RE, {"report_issue"}, "report_issue"),
+    # "lê o livro X": v0.15.1 eval - the model answered "Lendo Dom Robo para você" without starting anything
+    (re.compile(r"\b(l[eê]|leia|ler|continu[ae] (a )?(ler|leitura)|read|lee|leer)\b.{0,25}\b(livro|book|libro)\b", re.I),
+     {"read_book", "list_books"}, "read_book"),
 ]
 
 
@@ -338,8 +352,86 @@ def attachment_context(question: str, attachments: list[dict]) -> str:
     return "\n".join(parts)
 
 
-def _history_messages():
-    return [{"role": m["role"], "content": m["content"]} for m in memory.history(settings["history_turns"])]
+# v0.15.1 token budget. Measured with qwen3:8b: rules + 34 tool schemas = 3,111 tokens; 12 long exchanges took a
+# prompt to 7,746 of 8,192, and a longer conversation overflowed it - Ollama then drops the START of the prompt (the
+# rules), so answers came out cut ("d)") and confused (a quiz answer logged as an expense). The history now has to
+# fit what is left after the fixed prompt, this turn's context and room for the answer.
+ANSWER_RESERVE = 1200          # tokens kept free for the reply
+HISTORY_MAX_TOKENS = 2500      # longer histories made answers slow (7k-token prompts: 75-108 s) and confused
+OLD_REPLY_CHARS = 1200         # older long answers (news lists, lessons) are shortened in the history
+
+
+def _looping(text: str) -> bool:
+    """A reply that keeps repeating itself: its last 60 characters already appear 3+ times in the last 1,500."""
+    tail = text[-60:].strip()
+    return len(tail) >= 40 and text[-1500:].count(tail) >= 3
+
+
+def _trim_loop(text: str) -> str:
+    """Keep the reply up to where the repetition starts (the first copy of the repeated part stays)."""
+    tail = text[-60:].strip()
+    first = text.find(tail)
+    second = text.find(tail, first + len(tail)) if first != -1 else -1
+    if second <= 0:
+        return text.rstrip() + " …"
+    cut = max(text.rfind(p, 0, second) for p in (". ", "! ", "? ", "\n"))  # end at a whole sentence
+    return text[: cut + 1 if cut > 0 else second].rstrip()
+
+
+def est_tokens(text: str) -> int:
+    """Conservative estimate (pt/en/es prose ~3.3 chars per token; JSON packs a bit more)."""
+    return int(len(text) / 2.8) + 4  # calibrated: a 7,290-token prompt was estimated low with 3.3
+
+
+_anchors: dict = {}  # conversation -> id of the first message the model still sees (ids are unique; times tie)
+WINDOW_REFILL = 0.55  # after a jump, the window keeps this share of its limits (room to grow again)
+
+
+def _history_messages(extra_tokens: int = 0) -> list[dict]:
+    """The open conversation's recent exchanges that fit the context. The window does NOT slide one message per
+    turn: that changed the start of the prompt every time, so Ollama's cache never hit and long conversations paid
+    ~40 s per answer (v0.15.1 eval). It stays anchored and, when it gets full, jumps ahead to the newest ~half -
+    the prompt prefix then stays identical for several turns. Long answers are shortened the same way every turn
+    (also for stability)."""
+    rows = memory.history(200)
+    fixed = est_tokens(build_system()) + int(len(json.dumps(turn_tools(), ensure_ascii=False)) / 4.5)
+    budget = min(HISTORY_MAX_TOKENS, int(settings["llm_context"]) - fixed - extra_tokens - ANSWER_RESERVE)
+    max_msgs = int(settings["history_turns"]) * 2
+    items = []
+    for m in rows:
+        content = m["content"]
+        if m["role"] == "assistant" and len(content) > OLD_REPLY_CHARS:
+            content = content[:OLD_REPLY_CHARS] + " […]"
+        items.append({"role": m["role"], "content": content, "id": m.get("id", 0), "cost": est_tokens(content)})
+    key = "temp" if memory.temporary else memory.current_conversation()
+    anchor = _anchors.get(key)
+    if anchor is not None and not any(m["id"] == anchor for m in items):
+        anchor = None  # history cleared / temporary chat restarted: start over instead of sending nothing
+    window = [m for m in items if anchor is None or m["id"] >= anchor]
+    if len(window) > max_msgs or sum(m["cost"] for m in window) > budget:
+        keep, used = [], 0
+        for m in reversed(items):
+            if len(keep) >= max(2, int(max_msgs * WINDOW_REFILL)) or used + m["cost"] > budget * WINDOW_REFILL:
+                break
+            keep.insert(0, m)
+            used += m["cost"]
+        if not keep and items:  # a single huge message: send just the newest one
+            keep = items[-1:]
+        window = keep
+    while window and window[0]["role"] == "assistant":  # never start with an answer whose question was dropped
+        window.pop(0)
+    if window:
+        _anchors[key] = window[0]["id"]
+    return [{"role": m["role"], "content": m["content"]} for m in window]
+
+
+def side_messages(instruction: str) -> list[dict]:
+    """Background jobs (title, memory extraction) reuse the conversation's exact prompt prefix - rules, tool schemas
+    and history - and only add their request at the end. Ollama keeps ONE prompt cache: a job with a different
+    prompt evicted it and the user's next message re-read ~5k tokens (measured 38.5 s instead of ~2 s, v0.15.1)."""
+    request = "(Internal request from NEXUS itself, not from the user. Do not call tools.)\n" + instruction
+    return [{"role": "system", "content": build_system()}, *_history_messages(est_tokens(request)),
+            {"role": "user", "content": request}]
 
 
 def warm_up() -> dict:
@@ -405,8 +497,9 @@ class Assistant:
             text_for_history = f"{text}\n[{names}]"
         else:
             text_for_history = text
-        messages = [{"role": "system", "content": build_system()}, *_history_messages(),
-                    {"role": "user", "content": f"<context>\n{context}\n</context>\n\n{text}"}]
+        turn = f"<context>\n{context}\n</context>\n\n{text}"
+        messages = [{"role": "system", "content": build_system()}, *_history_messages(est_tokens(turn)),
+                    {"role": "user", "content": turn}]
         previous = last_reply()
         memory.add_message("user", text_for_history)
         reply, changed, nudged, finished, round_text, called = "", False, False, False, "", set()
@@ -416,16 +509,21 @@ class Assistant:
             schemas = turn_tools()
             for _ in range(MAX_WORKSPACE_ROUNDS if workspace.active else MAX_TOOL_ROUNDS):
                 round_text, calls = "", None
-                cap = DIRECT_MAX_TOKENS if settings["ai_mode"] == "direct" else None
+                cap = DIRECT_MAX_TOKENS if settings["ai_mode"] == "direct" else ANSWER_RESERVE
                 for kind, value in llm.stream_chat(messages, schemas, max_tokens=cap):
                     if self.cancel.is_set():
                         break
                     if kind == "token":
                         round_text += value
+                        if len(round_text) > 600 and len(round_text) % 40 < len(value) and _looping(round_text):
+                            round_text = _trim_loop(round_text)
+                            break  # the model fell into a loop (v0.15.1 eval: a joke repeated for 43 minutes)
                         if not topic:  # first-aid follow-ups are checked (emergency.guard) before being shown
                             self.emit("token", value)
                     elif kind == "tool_calls":
                         calls = value
+                if _looping(round_text):  # short loops end before the in-stream check runs
+                    round_text = _trim_loop(round_text)
                 if self.cancel.is_set():
                     reply = round_text
                     break
@@ -467,6 +565,10 @@ class Assistant:
                         if workspace.active and c["name"] in workspace.FILE_TOOLS:
                             result = workspace.execute(c["name"], args, ask=self.confirm_hook)
                             changed |= c["name"] in workspace.MUTATING
+                        elif memory.temporary and c["name"] == "remember" and not EXPLICIT_REMEMBER.search(text):
+                            # temporary chat: nothing is memorized unless the user explicitly asks (v0.15.1 eval:
+                            # "I have a turtle called Jorge" was saved by the model on its own)
+                            result = {"skipped": "temporary chat - facts are only saved when the user asks to"}
                         else:
                             result = tools.execute(c["name"], args)
                             changed |= c["name"] in tools.MUTATING
@@ -476,7 +578,13 @@ class Assistant:
                 if finished:
                     break
         except llm.LLMOffline as exc:
-            self.emit("error", {"message": t("llm_offline"), "detail": str(exc)})
+            from .logs import log
+
+            detail = str(exc.detail).replace(settings["llm_api_key"], "***") if settings["llm_api_key"] else exc.detail
+            log.warning(f"AI request failed: kind={exc.kind} status={exc.status} server={llm._base()} "
+                        f"model={settings['llm_model']} detail={detail[:300]}")
+            self.emit("error", {"message": t("llm_err_" + exc.kind, model=settings["llm_model"]), "detail": detail[:300],
+                                "kind": exc.kind})
             return
         interrupted = self.cancel.is_set()
         reply = (reply or ("" if finished or interrupted else round_text)).strip()
@@ -508,12 +616,10 @@ class Assistant:
         if not row or row["titled_at"] == -1 or not (row["n"] >= 2 and row["titled_at"] == 0 or row["n"] >= 8):
             return
         final = row["n"] >= 8
-        talk = "\n".join(f"{m['role']}: {m['content'][:400]}" for m in memory.conversation_messages(cid)[-8:])
-        prompt = ("Give this conversation a short title (max 6 words) and a one-sentence description of what it is "
-                  f"about, in the language of the conversation. Answer ONLY with JSON "
-                  f'{{"title": str, "description": str}}.\n\n{talk}')
+        prompt = ("Give the conversation above a short title (max 6 words) and a one-sentence description of what "
+                  'it is about, in its language. Answer ONLY with JSON {"title": str, "description": str}.')
         try:
-            out = llm.complete([{"role": "user", "content": prompt}])
+            out = llm.complete(side_messages(prompt), tools=turn_tools(), max_tokens=120)
             data = json.loads(re.search(r"\{.*\}", out, re.DOTALL).group(0))
             title = str(data.get("title", "")).strip().strip('"')
         except Exception:
@@ -558,7 +664,7 @@ class Assistant:
             f"USER MESSAGE: {user_text}"
         )
         try:
-            out = llm.complete([{"role": "user", "content": prompt}])
+            out = llm.complete(side_messages(prompt), tools=turn_tools(), max_tokens=200)  # keeps the prompt cache
             match = re.search(r"\[.*\]", out, re.DOTALL)
             facts = json.loads(match.group(0)) if match else []
         except Exception:

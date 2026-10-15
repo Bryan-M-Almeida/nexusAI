@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 2.6  ·  Data: 2026-10-15  ·  Versão do app: 0.15.0
+ Versão do documento: 2.7  ·  Data: 2026-10-15  ·  Versão do app: 0.15.1
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -75,6 +75,11 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-025  "Não entendi" sem explicação (ex.: piada repetida em vez de explicada)
       NX-LLM-026  Provedor na nuvem: "sem conexão", chave recusada ou modelo não usa ferramentas
       NX-LLM-027  Registrou "dados" que o usuário não pediu (ex.: "vamos estudar JS")
+      NX-LLM-028  Resposta cortada ou confusa em conversa longa (contexto estourado)
+      NX-LLM-029  Resposta lenta logo depois de outra (cache apagado por tarefa de fundo)
+      NX-LLM-030  Respostas lentas em conversas longas (histórico deslizante sem cache)
+      NX-LLM-031  Erro de API mostrado como "inicie o Ollama" (chave, créditos, limite)
+      NX-LLM-032  Resposta em loop infinito (a mesma frase sem parar)
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -531,6 +536,52 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                conversa, não dados. Também: quando o usuário diz o próprio
                nome, a IA atualiza o perfil. Verificado em
                tests\conversation_eval.py ("vamos estudar JS").
+
+[NX-LLM-028] Resposta cortada ou confusa em conversa longa (contexto estourado)
+  Severidade : ALTA             Status: CORRIGIDO (v0.15.1) Observado: SIM
+  Sintoma    : Numa conversa longa, a pergunta de um simulado parou em "d)" e a
+               resposta "Letra A" foi tratada como registro de um gasto antigo.
+  Causa      : Regras + 34 ferramentas = 3.111 tokens; com o histórico, o prompt
+               passou de 8.192 e o Ollama cortou o começo (as regras).
+  Correção   : Orçamento do histórico (até 2.500 tokens, 1.200 livres para a
+               resposta); trocas antigas saem primeiro e respostas antigas
+               longas são encurtadas. Testado em tests\test_units.py.
+
+[NX-LLM-029] Resposta lenta logo depois de outra (cache apagado por tarefa de fundo)
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.15.1) Observado: SIM
+  Causa      : O título automático e a extração de memórias usavam um prompt
+               diferente; o Ollama tem um único cache e a mensagem seguinte
+               reprocessava ~5 mil tokens (38,5 s medidos só na leitura).
+  Correção   : As tarefas de fundo reaproveitam o mesmo começo de prompt da
+               conversa (assistant.side_messages).
+
+[NX-LLM-030] Respostas lentas em conversas longas (histórico deslizante sem cache)
+  Severidade : MÉDIA            Status: MITIGADO (v0.15.1)  Observado: SIM
+  Causa      : A janela do histórico andava uma mensagem por vez, mudando o
+               começo do prompt; o Ollama relia quase tudo (~245 tokens/s na
+               RX 6600 XT).
+  Correção   : Janela ancorada que pula de uma vez quando enche: 19,2 s ->
+               14,4 s por resposta da 9ª mensagem em diante
+               (tests\bench_long_conversation.py).
+  Limite     : O bloco de contexto de cada mensagem (hora, trechos da base)
+               não fica no histórico, então a última troca ainda é relida
+               (~4-9 s). Otimização futura.
+
+[NX-LLM-031] Erro de API mostrado como "inicie o Ollama" (chave, créditos, limite)
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.15.1) Observado: SIM
+  Correção   : llm.classify() separa chave recusada (401/403), sem créditos ou
+               pagamento (402 / "quota"), limite de uso (429), modelo
+               inexistente (404), provedor fora do ar (5xx), sem conexão e
+               modo offline; cada um com sua mensagem nos 3 idiomas. O código e
+               a resposta do provedor vão para logs/nexus.log, sem a chave.
+
+[NX-LLM-032] Resposta em loop infinito (a mesma frase sem parar)
+  Severidade : ALTA             Status: CORRIGIDO (v0.15.1) Observado: SIM
+  Sintoma    : Na avaliação, "me conta uma piada" repetiu o mesmo trecho até
+               encher o contexto: 43 minutos para uma resposta.
+  Correção   : Teto de ~1.200 tokens por resposta e detector de repetição
+               (assistant._looping / _trim_loop): o loop é cortado e a resposta
+               termina na primeira frase completa. Testado em tests\test_units.py.
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE

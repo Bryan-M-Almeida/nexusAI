@@ -171,7 +171,7 @@ def open_conversation(conversation_id: int) -> bool:
 def add_message(role: str, content: str):
     global _current
     if temporary:
-        _temp.append({"role": role, "content": content, "ts": now()})
+        _temp.append({"role": role, "content": content, "ts": now(), "id": len(_temp) + 1})
         return
     ts = now()
     if current_conversation() is None:
@@ -208,7 +208,7 @@ def history(turns: int) -> list[dict]:
     cid = current_conversation()
     if cid is None:
         return []
-    rows = db.all("SELECT role, content, ts FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?",
+    rows = db.all("SELECT id, role, content, ts FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?",
                   (cid, turns * 2))
     return list(reversed(rows))
 

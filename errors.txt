@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 2.6  ·  Date: 2026-10-15  ·  App version: 0.15.0
+ Document version: 2.7  ·  Date: 2026-10-15  ·  App version: 0.15.1
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -77,6 +77,11 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-025  "I didn't understand" without an explanation (e.g. joke repeated)
       NX-LLM-026  Cloud provider: "no connection", key rejected or model doesn't use tools
       NX-LLM-027  Stored "data" the user didn't ask for (e.g. "let's study JS")
+      NX-LLM-028  Answer cut off or confused in a long conversation (context overflow)
+      NX-LLM-029  Slow answer right after another (cache evicted by a background job)
+      NX-LLM-030  Slow answers in long conversations (sliding history without cache)
+      NX-LLM-031  API error shown as "start Ollama" (key, credits, limit)
+      NX-LLM-032  Answer stuck in an endless loop (the same sentence over and over)
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -533,6 +538,51 @@ QUICK DIAGNOSTICS (run these before investigating)
                conversation, not data. Also: when the user says their name,
                the AI updates the profile. Verified in
                tests\conversation_eval.py ("vamos estudar JS").
+
+[NX-LLM-028] Answer cut off or confused in a long conversation (context overflow)
+  Severity   : HIGH             Status: FIXED (v0.15.1)    Observed: YES
+  Symptom    : In a long conversation a quiz question stopped at "d)" and the
+               answer "Letra A" was handled as logging an old expense.
+  Cause      : Rules + 34 tools = 3,111 tokens; with the history the prompt
+               went past 8,192 and Ollama dropped its start (the rules).
+  Fix        : History budget (up to 2,500 tokens, 1,200 left for the answer);
+               oldest exchanges go first and long old answers are shortened.
+               Tested in tests\test_units.py.
+
+[NX-LLM-029] Slow answer right after another (cache evicted by a background job)
+  Severity   : MEDIUM           Status: FIXED (v0.15.1)    Observed: YES
+  Cause      : The automatic title and memory extraction used a different
+               prompt; Ollama has a single cache, so the next message re-read
+               ~5k tokens (38.5 s measured just for reading).
+  Fix        : Background jobs reuse the conversation's exact prompt prefix
+               (assistant.side_messages).
+
+[NX-LLM-030] Slow answers in long conversations (sliding history without cache)
+  Severity   : MEDIUM           Status: MITIGATED (v0.15.1) Observed: YES
+  Cause      : The history window moved one message per turn, changing the
+               start of the prompt; Ollama re-read almost everything (~245
+               tokens/s on the RX 6600 XT).
+  Fix        : Anchored window that jumps when full: 19.2 s -> 14.4 s per
+               answer from the 9th message on (tests\bench_long_conversation.py).
+  Limit      : Each message's context block (time, knowledge excerpts) isn't
+               kept in the history, so the last exchange is still re-read
+               (~4-9 s). Future optimization.
+
+[NX-LLM-031] API error shown as "start Ollama" (key, credits, limit)
+  Severity   : MEDIUM           Status: FIXED (v0.15.1)    Observed: YES
+  Fix        : llm.classify() tells apart rejected key (401/403), no credits or
+               payment (402 / "quota"), usage limit (429), unknown model (404),
+               provider down (5xx), no connection and offline mode, each with
+               its own message in the 3 languages. The provider's code and
+               answer go to logs/nexus.log, without the key.
+
+[NX-LLM-032] Answer stuck in an endless loop (the same sentence over and over)
+  Severity   : HIGH             Status: FIXED (v0.15.1)    Observed: YES
+  Symptom    : In the evaluation, "tell me a joke" repeated the same passage until
+               the context was full: 43 minutes for one answer.
+  Fix        : ~1,200-token cap per answer and a repetition detector
+               (assistant._looping / _trim_loop): the loop is cut and the answer
+               ends at the first complete sentence. Tested in tests\test_units.py.
 
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS

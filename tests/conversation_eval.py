@@ -108,7 +108,8 @@ ask("Eu tenho uma tartaruga chamada Jorge.")
 time.sleep(6)
 memory.set_temporary(False)
 check("temporária: nada salvo no histórico", db.one("SELECT COUNT(*) n FROM messages")["n"] == saved)
-check("temporária: nenhuma memória automática", len(memory.all_memories()) == memories_before,
+check("temporária: nenhuma memória automática",  # only this chat's fact (other jobs may still be finishing)
+      not any("tartaruga" in m["content"].lower() or "jorge" in m["content"].lower() for m in memory.all_memories()),
       str([m["content"] for m in memory.all_memories()]))
 settings["ai_mode"] = "assistant"
 long_answer = ask("O que é a técnica Pomodoro?")

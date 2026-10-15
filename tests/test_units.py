@@ -1,6 +1,7 @@
 """Fast checks that need no AI server.   Run:  .venv\\Scripts\\python tests\\test_units.py"""
 import _isolated  # noqa: F401  (must be first: isolates the data folder)
 
+import json
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -397,6 +398,9 @@ check("API key: local placeholder stays as is", protect("ollama") == "ollama")
 from nexus import logs  # noqa: E402
 
 logs.setup().info("unit-test-marker")
+import sys as _sys  # noqa: E402
+
+_sys.excepthook = _sys.__excepthook__  # the app logs crashes to the file; tests must still show them
 check("log file written", "unit-test-marker" in logs.tail(5))
 
 # -- v0.14: links spoken as site names, caches, background, local <-> API switch -------------------------------
@@ -515,6 +519,101 @@ big = "Introdução. " * 300 + " O capítulo sobre fotossíntese explica a cloro
 ctx = assistant.attachment_context("o que diz sobre fotossíntese?", [{"name": "livro.pdf", "text": big}])
 check("attachments: big files send the start plus the passages that match the question",
       "fotossíntese" in ctx and len(ctx) <= assistant.ATTACH_CHARS + 400)
+
+# -- v0.15.1: the prompt never overflows the context; background jobs keep the prompt cache ---------------------
+memory.new_conversation()
+for i in range(15):
+    memory.add_message("user", f"Pergunta {i} sobre produtividade?")
+    memory.add_message("assistant", "Resposta longa sobre foco e hábitos. " * 60)
+cfg["llm_context"] = 8192
+hist = assistant._history_messages(300)
+check("budget: history stays within its token cap",
+      sum(assistant.est_tokens(m["content"]) for m in hist) <= assistant.HISTORY_MAX_TOKENS, str(len(hist)))
+check("budget: the newest exchange is kept", hist[-1]["content"].startswith("Resposta longa") and "Pergunta 14" in hist[-2]["content"])
+check("budget: history never starts with an answer whose question was dropped", hist[0]["role"] == "user")
+check("budget: older long answers are shortened", any(m["content"].endswith("[…]") for m in hist[:-2]) or len(hist) <= 2)
+fixed = assistant.est_tokens(assistant.build_system()) + len(json.dumps(assistant.turn_tools())) // 4
+check("budget: fixed prompt + history + answer room fit the 8k context",
+      fixed + sum(assistant.est_tokens(m["content"]) for m in hist) + 300 + assistant.ANSWER_RESERVE <= 8192)
+memory.new_conversation()
+assistant._anchors.clear()
+cfg["history_turns"] = 6
+starts = []
+for i in range(14):
+    memory.add_message("user", f"msg {i}?")
+    memory.add_message("assistant", f"resposta {i}.")
+    starts.append(assistant._history_messages(100)[0]["content"])
+changes = sum(1 for a, b in zip(starts, starts[1:]) if a != b)
+check("window: the start of the history stays put for several turns (prompt cache hits)", changes <= 4, str(starts))
+check("window: it never exceeds the configured exchanges", len(assistant._history_messages(100)) <= 12)
+memory.set_temporary(True)
+for i in range(12):
+    memory.add_message("user", f"t{i}?"); memory.add_message("assistant", f"r{i}.")
+assistant._history_messages(100)
+memory.set_temporary(False); memory.set_temporary(True)  # a new temporary chat: ids start again at 1
+memory.add_message("user", "nova conversa temporária?")
+check("window: a restarted temporary chat is not left empty", assistant._history_messages(100)[-1]["content"] == "nova conversa temporária?")
+memory.set_temporary(False)
+cfg["history_turns"] = 12
+side = assistant.side_messages("Give this conversation a title.")
+nxt = [{"role": "system", "content": assistant.build_system()}, *assistant._history_messages(50)]
+check("side jobs reuse the conversation's prompt prefix (prompt cache stays valid)",
+      side[0] == nxt[0] and side[1:3] == nxt[1:3])
+
+# -- v0.15.1: AI/API failures get the right explanation and are logged (never with the key) ---------------------
+for status, body, kind in ((401, '{"error":{"message":"Incorrect API key provided"}}', "auth"),
+                           (429, '{"error":{"type":"insufficient_quota"}}', "billing"), (402, "", "billing"),
+                           (429, "Rate limit reached", "rate"), (404, "model 'x' not found", "model"),
+                           (503, "overloaded", "server")):
+    check(f"API error HTTP {status} -> {kind}", _llm.classify(status, body) == kind)
+errors = []
+cfg["llm_api_key"] = "sk-secret-123"
+_llm.stream_chat = lambda *a, **k: (_ for _ in ()).throw(_llm.LLMOffline("HTTP 401: bad key sk-secret-123", status=401))
+assistant.Assistant(lambda e, p: errors.append(p) if e == "error" else None).ask("oi")
+_llm.stream_chat = real_stream
+check("API error: the user is told the key was refused (not 'start Ollama')",
+      errors and errors[0]["kind"] == "auth" and "Ollama" not in errors[0]["message"], str(errors))
+check("API error: logged with the reason but without the key",
+      "kind=auth" in logs.tail(5) and "sk-secret-123" not in logs.tail(5) and "sk-secret-123" not in errors[0]["detail"])
+cfg["llm_api_key"] = "ollama"
+
+# -- v0.15.1: loops cut, answers capped, action log only when relevant --------------------------------------------
+loop = "Claro! " + "O barman pergunta de novo: você quer gelo? O programador diz que não. " * 8
+check("loop guard: a repeating reply is detected", assistant._looping(loop))
+check("loop guard: normal text is not", not assistant._looping("Uma resposta normal. " + " ".join(f"item {i}" for i in range(200))))
+check("loop guard: trimmed to the first full repetition", assistant._trim_loop(loop).count("barman") == 1
+      and assistant._trim_loop(loop).endswith("não."))
+script = iter([[("token", loop[i:i + 20]) for i in range(0, len(loop), 20)] + [("done", None)]])
+_llm.stream_chat = lambda *a, **k: iter(next(script))
+memory.new_conversation()
+assistant.Assistant(lambda e, p: None).ask("me conta uma piada")
+_llm.stream_chat = real_stream
+check("loop guard: the saved reply has no repetition", memory.history(1)[-1]["content"].count("barman") == 1,
+      memory.history(1)[-1]["content"][:200])
+
+db.log_action("dados", "Registrou em 'gastos': 30 livros")
+check("action log: not shown for a short unrelated reply ('Letra A')", "recent actions" not in assistant.build_context("Letra A"))
+check("action log: shown when the user refers to it", "recent actions" in assistant.build_context("cancela o que você registrou"))
+
+# -- v0.15.1: temporary chat - the model can't memorize on its own ------------------------------------------------
+def remember_script():
+    return iter([[("tool_calls", [{"id": "r1", "name": "remember", "arguments": '{"content": "tem uma tartaruga Jorge"}'}])],
+                 [("token", "Que legal!"), ("done", None)]])
+
+
+before_mem = len(memory.all_memories())
+memory.set_temporary(True)
+script = remember_script()
+_llm.stream_chat = lambda *a, **k: iter(next(script))
+assistant.Assistant(lambda e, p: None).ask("Eu tenho uma tartaruga chamada Jorge.")
+blocked = len(memory.all_memories()) == before_mem
+script = remember_script()
+assistant.Assistant(lambda e, p: None).ask("Lembra que eu tenho uma tartaruga chamada Jorge.")
+allowed = len(memory.all_memories()) == before_mem + 1
+_llm.stream_chat = real_stream
+memory.set_temporary(False)
+check("temporary chat: the model can't memorize facts on its own", blocked)
+check("temporary chat: an explicit 'lembra que...' still works", allowed)
 
 # migration of pre-v0.9 messages: a 2 h gap splits them into two conversations
 import sqlite3  # noqa: E402

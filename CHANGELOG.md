@@ -8,6 +8,48 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.15.1 — Protótipo · 2026-10-15
+
+**Só correções: respostas cortadas e confusas em conversas longas, e lentidão depois do título automático.**
+
+### Corrigido
+- **Respostas cortadas ou sem sentido em conversas longas** (NX-LLM-028): medido com qwen3:8b, as regras + 34
+  ferramentas já ocupam **3.111 tokens**; com 12 trocas longas o prompt chegava a **7.746 de 8.192**, e numa
+  conversa maior passava do limite — o Ollama então corta o **começo** (as regras). Foi isso que fez a pergunta do
+  simulado parar em "d)" e "Letra A" virar registro de gasto. Agora o histórico enviado tem um orçamento (até
+  2.500 tokens, sempre sobrando 1.200 para a resposta): as trocas mais antigas saem primeiro, respostas antigas
+  longas são encurtadas e o histórico nunca começa por uma resposta sem a pergunta.
+- **Resposta muito lenta depois de outra** (NX-LLM-029): o título automático e a extração de memórias rodavam com
+  um prompt diferente e apagavam o único cache do Ollama — a mensagem seguinte reprocessava ~5 mil tokens
+  (**38,5 s** só para ler o prompt). Agora essas tarefas reaproveitam exatamente o começo do prompt da conversa e
+  só acrescentam o pedido no final, e o cache continua valendo.
+- **Histórico que "deslizava" a cada mensagem** (NX-LLM-030): o começo do prompt mudava sempre e o cache do Ollama
+  quase não servia. Agora a janela fica parada e, quando enche, pula de uma vez para a metade mais recente.
+  Medido em 16 perguntas seguidas (`tests/bench_long_conversation.py`), da 9ª em diante: **19,2 s → 14,4 s por
+  resposta (−25%)** e leitura do prompt **14,8 s → 10,5 s**.
+- **Erros de API sempre diziam "inicie o Ollama"** (NX-LLM-031): agora cada caso tem sua mensagem — chave recusada,
+  sem créditos/pagamento, limite de uso, modelo inexistente, provedor fora do ar, sem conexão, modo offline — e o
+  motivo vai para `logs/nexus.log` (sem a chave), aparecendo também no "Relatar erro".
+- **"Lê o livro X" respondia "lendo…" sem ler** (avaliação): a rede de segurança agora exige a ferramenta do livro.
+- **Resposta em loop infinito** (NX-LLM-032): na avaliação, uma piada se repetiu até encher o contexto — **43 minutos**.
+  Agora cada resposta tem um teto (~1.200 tokens) e um detector de repetição corta o loop na primeira frase completa.
+- **"Letra A" virava o gasto de R$ 30** (a mesma falha do simulado, outra causa): o registro das últimas ações ia no
+  contexto de toda mensagem; uma resposta curta e ambígua se agarrava a ele. Agora só entra quando a mensagem fala
+  de algo que o NEXUS fez ("cancela o que você registrou", "o que você anotou").
+- **Conversa temporária memorizava sozinha** (avaliação): "Eu tenho uma tartaruga chamada Jorge" foi guardado porque a
+  própria IA chamou `remember`. Na conversa temporária isso agora só acontece com pedido explícito ("lembra que…").
+- **Perfil Econômico** usava contexto 4.096, menor que as regras + ferramentas: passou para 6.144.
+- Simulados: a IA não guarda mais perguntas/respostas como conhecimento ou notas (só `record_data` era proibido).
+- Testes: o teste do arquivo de log trocava o tratador de erros do Python e escondia falhas dos testes seguintes.
+
+### Testes desta versão
+- 203/203 testes unitários (25 novos: orçamento e janela do histórico, prefixo das tarefas de fundo, erros de API,
+  detector de loop, registro de ações, conversa temporária).
+- 31/31 verificações de conversa com qwen3:8b (inclui simulado, piada, "lê o livro"); tempo médio 10,6 s,
+  mediana 9,3 s, máximo 26,4 s (na rodada da v0.15.0 houve uma resposta de 43 min por loop).
+
+---
+
 ## v0.15.0 — Protótipo · 2026-10-15
 
 **Arquivos, Biblioteca com modo podcast, navegador, conexão automática e um visual mais suave.**

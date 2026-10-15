@@ -13,7 +13,30 @@ calls_log: list = []   # every call's stats (benchmarks read and clear it)
 
 
 class LLMOffline(Exception):
-    pass
+    """Any failure talking to the AI. kind tells the user what to do (v0.15.1: everything used to say "start Ollama",
+    even an API key without credits): local_down | network | offline_mode | auth | billing | rate | model | server |
+    other."""
+
+    def __init__(self, detail: str, status: int | None = None, kind: str | None = None):
+        super().__init__(detail)
+        self.detail, self.status = detail, status
+        self.kind = kind or classify(status, detail)
+
+
+def classify(status: int | None, detail: str = "") -> str:
+    d = (detail or "").lower()
+    if status in (402,) or any(w in d for w in ("insufficient_quota", "billing", "credit", "payment", "quota")):
+        return "billing"
+    if status in (401, 403) or any(w in d for w in ("invalid api key", "invalid_api_key", "unauthorized",
+                                                     "permission", "incorrect api key", "authentication")):
+        return "auth"
+    if status == 429 or "rate limit" in d or "rate_limit" in d:
+        return "rate"
+    if status == 404 or ("model" in d and ("not found" in d or "does not exist" in d)):
+        return "model"
+    if status and status >= 500:
+        return "server"
+    return "other"
 
 
 # Settings > AI provider (v0.10). Every one speaks the OpenAI chat-completions format; Ollama also gets its
@@ -80,12 +103,13 @@ def stream_chat(messages: list, tools: list | None = None, temperature: float | 
     {"id", "name", "arguments": <json string>} whichever backend is used."""
     temperature = settings["llm_temperature"] if temperature is None else temperature
     if offline_blocked():
-        raise LLMOffline("offline mode: the AI server is on the internet - choose Ollama or LM Studio")
+        raise LLMOffline("offline mode: the AI server is on the internet - choose Ollama or LM Studio", kind="offline_mode")
     stream = _stream_ollama if _is_ollama() else _stream_openai
     try:
         yield from stream(messages, tools, temperature, max_tokens)
-    except httpx.HTTPError as exc:
-        raise LLMOffline(str(exc)) from exc
+    except httpx.HTTPError as exc:  # no answer at all: local server closed or no connection to the provider
+        raise LLMOffline(str(exc) or exc.__class__.__name__,
+                         kind="local_down" if is_local_url() else "network") from exc
 
 
 # While the app is open the model stays in VRAM (reloading costs ~7 s + re-processing the prompt ~20 s);
@@ -178,7 +202,7 @@ def _stream_ollama(messages, tools, temperature, max_tokens=None):
     with httpx.stream("POST", f"{_ollama_root()}/api/chat", json=body, timeout=TIMEOUT) as r:
         if r.status_code >= 400:
             r.read()
-            raise LLMOffline(f"HTTP {r.status_code}: {r.text[:300]}")
+            raise LLMOffline(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code)
         for line in r.iter_lines():
             if not line.strip():
                 continue
@@ -211,7 +235,7 @@ def _stream_openai(messages, tools, temperature, max_tokens=None):
     with httpx.stream("POST", f"{_base()}/chat/completions", json=body, headers=_headers(), timeout=TIMEOUT) as r:
         if r.status_code >= 400:
             r.read()
-            raise LLMOffline(f"HTTP {r.status_code}: {r.text[:300]}")
+            raise LLMOffline(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code)
         for line in r.iter_lines():
             if not line.startswith("data:"):
                 continue
@@ -233,6 +257,8 @@ def _stream_openai(messages, tools, temperature, max_tokens=None):
     yield ("tool_calls", [calls[i] for i in sorted(calls)]) if calls else ("done", None)
 
 
-def complete(messages: list, temperature: float = 0.2) -> str:
-    """Non-streaming helper for background jobs (memory extraction)."""
-    return "".join(text for kind, text in stream_chat(messages, temperature=temperature) if kind == "token")
+def complete(messages: list, temperature: float = 0.2, tools: list | None = None, max_tokens: int | None = None) -> str:
+    """Non-streaming helper for background jobs (titles, memory extraction). Passing the conversation's own
+    tools/prefix keeps Ollama's single prompt cache valid (see assistant.side_messages)."""
+    return "".join(text for kind, text in stream_chat(messages, tools=tools, temperature=temperature,
+                                                      max_tokens=max_tokens) if kind == "token")
