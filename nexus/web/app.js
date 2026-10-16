@@ -1,6 +1,6 @@
 /* Fonts from Google only when not offline (v0.12). The last known mode is cached so the boot animation doesn't
    flash fallback fonts; offline it falls back to Bahnschrift / Segoe UI / Consolas, already in the CSS. */
-const LEGAL_VERSION = "1.0";  // nexus/legal.py VERSION
+const LEGAL_VERSION = "1.1";  // nexus/legal.py VERSION
 function termsAccepted() { try { return localStorage.getItem("nexus.terms") === LEGAL_VERSION; } catch (e) { return false; } }
 function loadFonts(mode) {
   try { localStorage.setItem("nexus.net", mode); } catch (e) { /* ignore */ }

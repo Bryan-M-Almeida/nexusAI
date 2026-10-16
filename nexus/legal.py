@@ -5,8 +5,8 @@ from datetime import datetime
 
 from .config import settings
 
-VERSION = "1.0"   # bump when the texts change in substance: everybody is asked again
-DATE = "2026-10-15"
+VERSION = "1.1"   # bump when the texts change in substance: everybody is asked again
+DATE = "2026-10-16"
 
 
 def accepted() -> bool:

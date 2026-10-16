@@ -363,8 +363,30 @@ nexus/
   web/          interface (HTML/CSS/JS); abra web/index.html?mock no navegador para editar o visual sem o Python
 ```
 
+## Licença
+
+O NEXUS é software livre sob a **Licença MIT** — veja [LICENSE](LICENSE). © 2026 Bryan Maciel de Almeida.
+Você pode usar, copiar, modificar e distribuir o código (inclusive comercialmente), mantendo o aviso de direitos autorais
+e a licença. Os Termos de Uso e a Política de Privacidade do aplicativo ficam em Configurações → Privacidade e termos.
+
+Componentes de terceiros e suas licenças:
+
+| Componente | Licença |
+|---|---|
+| pywebview | BSD-3-Clause |
+| faster-whisper, CTranslate2 | MIT |
+| ONNX Runtime (Silero VAD) | MIT |
+| httpx, NumPy, pypdf, PyAV | BSD-3-Clause |
+| sounddevice, comtypes | MIT |
+| Hugging Face Hub, tokenizers | Apache-2.0 |
+| PyInstaller (só para gerar o executável) | GPL-2.0 com exceção para o executável gerado |
+| Ollama (instalado à parte) | MIT |
+| Modelo Qwen3 (baixado pelo Ollama) | Apache-2.0 |
+| Modelos Whisper (baixados na primeira voz) | MIT |
+| Fontes Michroma, Orbitron, Inter, Rajdhani, JetBrains Mono | SIL Open Font License 1.1 |
+
 ## Versões
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.17.0 (protótipo)**.
+Versão atual: **v0.17.1 (protótipo)**.

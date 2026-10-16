@@ -799,6 +799,10 @@ check("terms: Terms of Use and Privacy Policy in the three languages",
       all(re.search(rf"\b{lng}: {{\s*terms: `", _legal_js) for lng in ("pt", "en", "es")) and _legal_js.count("privacy: `") == 3)
 check("privacy policy names every outside service NEXUS talks to",
       all(_legal_js.count(x) >= 3 for x in ("Open-Meteo", "Frankfurter", "Wikip", "Hugging Face", "Google Fonts", "Cloudflare", "DPAPI")))
+_lic = (WEB.parent.parent / "LICENSE").read_text("utf-8")
+check("license: MIT file present and the terms say so in the three languages (hackathon rule)",
+      _lic.startswith("MIT License") and "Bryan Maciel de Almeida" in _lic
+      and all(x in _legal_js for x in ("Licença MIT", "MIT License", "Licencia MIT")))
 _gs = gpu_tune.status()
 check("gpu tuning: status reports card, backend and setting", set(_gs) >= {"amd", "vulkan", "applied", "suggest", "installed"})
 check("colours: default ring/core/background are valid hex colours",

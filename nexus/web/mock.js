@@ -38,7 +38,7 @@ if (!window.pywebview && location.search.includes("mock")) {
     boot: async () => {
       ["memory", "knowledge", "ai", "voice"].forEach((k, i) => emit("boot", { key: k, ok: true, detail: ["3", "198", "qwen3:8b", "small"][i] }, 600 + i * 200));
       return { profile, lang: "pt", llm, settings, stt: "ready", version: "0.17.0", model_name: "NEX-1.0",
-        terms: { accepted: mockTerms, version: "1.0", accepted_at: mockTerms ? new Date().toISOString() : "" } };
+        terms: { accepted: mockTerms, version: "1.1", accepted_at: mockTerms ? new Date().toISOString() : "" } };
     },
     greet: async () => { speak(2.5, 200); return "Olá, Alex, o que teremos para hoje?"; },
     history: async () => [],
@@ -117,8 +117,8 @@ if (!window.pywebview && location.search.includes("mock")) {
     toggle_fullscreen: async () => (mockFull = !mockFull), minimize: async () => {}, quit: async () => {},
     llm_status: async () => llm, speak_help: async () => speak(4),
     hold_start: async () => ({ ok: true }), hold_stop: async () => {},
-    accept_terms: async () => { mockTerms = true; return { accepted: true, version: "1.0", accepted_at: new Date().toISOString() }; },
-    revoke_terms: async () => { mockTerms = false; return { accepted: false, version: "1.0" }; },
+    accept_terms: async () => { mockTerms = true; return { accepted: true, version: "1.1", accepted_at: new Date().toISOString() }; },
+    revoke_terms: async () => { mockTerms = false; return { accepted: false, version: "1.1" }; },
     gpu_tune_status: async () => ({ amd: true, vulkan: true, applied: mockGpu, suggest: true, installed: true }),
     gpu_tune: async (on) => { mockGpu = !!on; return { amd: true, vulkan: true, applied: mockGpu, suggest: true, installed: true, restarted: true }; },
     optimize: async (k) => (k === "data" ? { ok: true, backup: "C:/x/nexus-backup-test.zip", rss_mb: 120 } : { ok: true, freed_mb: 312.4, rss_mb: 188.1, freed_disk_mb: 1.2 }),

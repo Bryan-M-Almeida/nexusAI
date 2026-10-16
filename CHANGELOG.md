@@ -8,6 +8,25 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.17.1 — Protótipo · 2026-10-16
+
+**Licença MIT.**
+
+### Novo
+- **Licença MIT** (arquivo `LICENSE`, © 2026 Bryan Maciel de Almeida). As regras do hackathon AMD Developer Hackathon:
+  ACT III (lablab.ai) pedem envios "originais, de código aberto e compatíveis com a Licença MIT", com repositório
+  público no GitHub.
+- Termos de Uso **versão 1.1** (PT/EN/ES): a cláusula 11 passa a explicar a licença — o código pode ser usado,
+  modificado, distribuído e vendido mantendo o aviso de direitos autorais; uma versão modificada não pode se apresentar
+  como o NEXUS oficial. Como o texto mudou, todos aceitam de novo uma vez.
+- README: seção Licença com os componentes de terceiros e suas licenças (todas compatíveis com a MIT).
+
+### Testes desta versão
+- 248/248 testes unitários (1 novo: arquivo LICENSE MIT e a licença citada nos termos dos 3 idiomas).
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.17.0 — Protótipo · 2026-10-15
 
 **Termos de Uso e Política de Privacidade (nada é captado nem enviado antes do aceite) e otimização do Ollama para
