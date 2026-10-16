@@ -419,4 +419,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.18.0 (protótipo)**.
+Versão atual: **v0.18.1 (protótipo)**.

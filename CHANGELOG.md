@@ -8,6 +8,40 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.18.1 — Protótipo · 2026-10-16
+
+**Correção: o NEXUS não fala mais sozinho (eco da própria voz, emojis lidos em voz alta e frases inventadas com o
+microfone parado).**
+
+### Corrigido
+- **NX-VOZ-019 — o NEXUS ouvia a própria voz e respondia a ela.** Visto no uso real: depois de uma resposta que
+  terminava com 😄, chegou a mensagem "Cara sorrindo de boca aberta e olha o sonho". A voz do Windows lia o emoji pelo
+  nome, e com o microfone do DroidCam (com atraso, pelo Wi-Fi) o fim da fala chegava depois da proteção de eco.
+  - Emojis aparecem na tela mas **não são lidos** em voz alta.
+  - O NEXUS guarda o que disse nos últimos segundos: uma frase ouvida até 2,5 s depois que ele parou e que repete um
+    trecho de 4 ou mais palavras dele é descartada. Mais tarde, só uma repetição quase literal — escolher uma das
+    opções que ele ofereceu ("jogar um jogo de perguntas") continua valendo como resposta.
+- **NX-VOZ-020 — frases inventadas pelo Whisper** com ruído ("Você tem um clima? Você tem um clima? Você tem um
+  clima?", "Legendas pela comunidade Amara.org"): na escuta contínua, trechos de baixa confiança ou repetitivos, créditos
+  de legenda e a mesma frase 3 vezes são descartados. O apertar-para-falar continua como antes.
+
+### Qualidade (medido com áudio real: voz do NEXUS sintetizada, Whisper small)
+- Eco: **3/3 descartados** (antes 0/3 — todos viravam mensagens do usuário).
+- Respostas do usuário: **3/3 aceitas** ("Conta uma piada", "Quero jogar perguntas e respostas", "Me fala sobre
+  filosofia estoica").
+- Ruído puro: **3/3 sem texto** (o filtro novo sozinho deixava passar "Legendas pela comunidade Amara.org"; as regras
+  foram combinadas).
+- Na noite de 15/10, 5 de 12 mensagens "do usuário" pareciam eco ou ruído — cada uma custava uma resposta da IA (~5 s de
+  placa de vídeo) e uma fala que ninguém pediu.
+
+### Testes desta versão
+- 284/284 testes unitários (5 novos: emojis não lidos, eco descartado logo depois da fala, respostas que reaproveitam
+  palavras aceitas, frases inventadas e repetidas, e a escuta completa: eco, repetição e ruído nunca chegam à IA e a
+  resposta real chega).
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.18.0 — Protótipo · 2026-10-16
 
 **Central de integrações (12 integrações + as suas), respostas ao vivo sem a IA, controle de mídia e abrir aplicativos

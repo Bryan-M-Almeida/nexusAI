@@ -973,5 +973,56 @@ check("beta: media and apps start off for users", not features.enabled("media") 
 check("terms 1.2: new services are listed (and accepted again)", _legal.VERSION == "1.2" and all(
     w in (_isolated.ROOT / "nexus" / "web" / "legal.js").read_text("utf-8") for w in ("CoinGecko", "MyMemory", "Nager.Date")))
 
+# -- v0.18.1: the microphone hearing NEXUS itself or noise ----------------------------------------------------------
+check("speech: emojis are not read aloud", voice.clean_for_speech("Vamos brincar. 😄 Posso contar uma piada 👍🏽 ✓")
+      == "Vamos brincar. Posso contar uma piada")
+_said = ("Claro, Bryan! Vamos brincar. Que tipo de brincadeira você quer? Posso contar uma piada, jogar um jogo de "
+         "perguntas e respostas, ou algo mais? cara sorrindo de boca aberta")
+check("echo: NEXUS's own words coming back right after it spoke are ignored",
+      voice.is_echo("Cara sorrindo de boca aberta e olha o sonho", _said)
+      and voice.is_echo("Jogar um jogo de perguntas e respostas, ou algo mais.", _said))
+check("echo: replies that reuse its words still count",
+      not voice.is_echo("Conta uma piada", _said) and not voice.is_echo("Me fala sobre filosofia estoica", _said)
+      and not voice.is_echo("sim, jogar um jogo de perguntas", _said, right_after=False))
+check("noise: Whisper's invented phrases and loops are dropped",
+      voice.is_hallucination("Você tem um clima? Você tem um clima? Você tem um clima?")
+      and voice.is_hallucination("Legendas pela comunidade de Amara.org") and not voice.is_hallucination("Qual a previsão do tempo?")
+      and not voice.is_hallucination("Sim. Sim. Pode marcar às dez."))
+
+
+class _Seg:
+    def __init__(self, text, nsp=0.1, lp=-0.3, cr=1.2):
+        self.text, self.no_speech_prob, self.avg_logprob, self.compression_ratio = text, nsp, lp, cr
+
+
+class _Model:
+    def __init__(self, segs):
+        self.segs = segs
+
+    def transcribe(self, *a, **k):
+        return iter(self.segs), None
+
+
+class _Spk:
+    def recent_speech(self):
+        return _said
+    ended_at = 0.0
+
+
+_heard = []
+_lst = voice.Listener.__new__(voice.Listener)
+_lst.model_state, _lst.mode, _lst.background, _lst.awake_until = "ready", "live", False, 0
+_lst.on_text, _lst.on_state, _lst.speaker, _lst.dropped = (lambda t, d: _heard.append(t)), (lambda s: None), _Spk(), []
+_lst.model = object()
+cfg["require_wake_word"], cfg["bg_wake_only"] = False, True
+_lst.seg_start = _lst.speaker.ended_at + 1.0
+for _segs in ([_Seg(" Que tipo de brincadeira você quer?")], [_Seg(" Você tem um clima?"), _Seg(" Você tem um clima?"),
+                                                              _Seg(" Você tem um clima?")],
+              [_Seg(" Obrigado.", nsp=0.9, lp=-0.9)], [_Seg(" Conta uma piada.")]):
+    _lst.model = _Model(_segs)
+    _lst._handle(np.zeros(16000, dtype=np.float32), False)
+check("listening: echo, loops and noise never reach the AI; the real reply does",
+      _heard == ["Conta uma piada."] and [r for r, _ in _lst.dropped] == ["echo", "noise"], f"{_heard} {_lst.dropped}")
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 3.4  ·  Date: 2026-10-16  ·  App version: 0.18.0
+ Document version: 3.5  ·  Date: 2026-10-16  ·  App version: 0.18.1
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -109,6 +109,8 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-VOZ-016  Name pronounced "NÊXUS" (or spelled "N, E, X, U, S")
       NX-VOZ-017  Poor recognition: wrong words, wrong language, invented sentences
       NX-VOZ-018  Links read out letter by letter
+      NX-VOZ-019  NEXUS talked by itself: it heard its own voice and took it as yours
+      NX-VOZ-020  Invented phrases with nobody talking ("Você tem um clima?" 3x, subtitle credits)
  DAT  NX-DAT-001  Knowledge base doesn't find an existing topic
       NX-DAT-002  Imported PDF has no text ("Could not extract text")
       NX-DAT-003  "Invalid date" when creating an event/task
@@ -784,6 +786,8 @@ QUICK DIAGNOSTICS (run these before investigating)
                only accepts short control commands ("pause", "stop", "hold
                on...") up to 4 s long; everything else is ignored (see
                NX-VOZ-013). There is a 250 ms margin after speech ends.
+               v0.18.1: what is heard right after and repeats a stretch of
+               what NEXUS just said is discarded (see NX-VOZ-019).
   Tips       : Use headphones; mute the AI voice from the dock if needed.
 
 [NX-VOZ-006] No Spanish voice / voice in the wrong language
@@ -915,6 +919,31 @@ QUICK DIAGNOSTICS (run these before investigating)
                (pt.wikipedia.org -> "wikipedia", g1.globo.com.br -> "globo");
                Markdown links only speak their text. The screen still shows
                the full link. Tested in tests\test_units.py.
+
+[NX-VOZ-019] NEXUS talked by itself: it heard its own voice and took it as yours
+  Severity   : HIGH             Status: FIXED (v0.18.1)    Observed: YES
+  Symptom    : In audio mode, with the user silent, messages like "Cara
+               sorrindo de boca aberta e olha o sonho" showed up and NEXUS
+               answered them.
+  Cause      : (1) The Windows voice read emojis by name ("😄" -> "grinning
+               face with big eyes"). (2) With a delayed microphone (DroidCam
+               over Wi-Fi) or loudspeakers, the end of NEXUS's speech reached the
+               microphone after it had stopped talking, outside the echo
+               protection (NX-VOZ-005).
+  Fix        : Emojis are not read aloud. NEXUS keeps what it said in the last
+               seconds; a phrase heard up to 2.5 s after it stopped that repeats
+               a stretch of 4+ of its words is discarded (later, only an almost
+               literal repetition). Tested with real audio: 3/3 echoes
+               discarded, 3/3 user replies accepted (including "conta uma
+               piada" after "posso contar uma piada").
+
+[NX-VOZ-020] Invented phrases with nobody talking ("Você tem um clima?" 3x, subtitle credits)
+  Severity   : MEDIUM           Status: FIXED (v0.18.1)    Observed: YES
+  Cause      : On noise Whisper sometimes "invents" speech: subtitle credits
+               ("Legendas pela comunidade Amara.org") or one sentence repeated.
+  Fix        : While listening continuously (not push-to-talk), low-confidence
+               or repetitive segments are dropped, as are subtitle credits and
+               the same sentence 3 times. Pure noise: 3/3 without text.
 
 ================================================================================
  DAT — DATA, MEMORY AND KNOWLEDGE

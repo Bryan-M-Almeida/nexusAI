@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 3.4  ·  Data: 2026-10-16  ·  Versão do app: 0.18.0
+ Versão do documento: 3.5  ·  Data: 2026-10-16  ·  Versão do app: 0.18.1
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -107,6 +107,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-VOZ-016  Nome pronunciado "NÊXUS" (ou soletrado "N, E, X, U, S")
       NX-VOZ-017  Reconhecimento ruim: palavras trocadas, idioma errado, frases inventadas
       NX-VOZ-018  Links lidos letra por letra
+      NX-VOZ-019  O NEXUS falava sozinho: ouvia a própria voz e mandava como se fosse você
+      NX-VOZ-020  Frases inventadas com o microfone parado ("Você tem um clima?" 3x, "Legendas…")
  DAT  NX-DAT-001  Base de conhecimento não encontra um assunto existente
       NX-DAT-002  PDF importado sem texto ("Não consegui extrair texto")
       NX-DAT-003  "Data inválida" ao criar evento/tarefa
@@ -785,6 +787,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                ativo, mas só aceita comandos de controle curtos ("pausa",
                "para", "espera aí...") de até 4 s; o resto é ignorado (ver
                NX-VOZ-013). Ao terminar de falar há 250 ms de margem.
+               v0.18.1: o que for ouvido logo depois e repetir um trecho do
+               que o NEXUS acabou de dizer é descartado (ver NX-VOZ-019).
   Dicas      : Use fone de ouvido; desative a voz da IA pela dock se
                necessário.
 
@@ -918,6 +922,33 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                "wikipedia", g1.globo.com.br -> "globo"); links em Markdown
                falam só o texto. A tela continua mostrando o link completo.
                Testado em tests\test_units.py.
+
+[NX-VOZ-019] O NEXUS falava sozinho: ouvia a própria voz e mandava como se fosse você
+  Severidade : ALTA             Status: CORRIGIDO (v0.18.1) Observado: SIM
+  Sintoma    : No modo áudio, sem o usuário falar, apareciam mensagens como
+               "Cara sorrindo de boca aberta e olha o sonho" e o NEXUS
+               respondia a elas.
+  Causa      : (1) A voz do Windows lia emojis pelo nome ("😄" -> "cara
+               sorrindo de boca aberta"). (2) Com microfone com atraso
+               (DroidCam pelo Wi-Fi) ou caixas de som, o fim da fala do NEXUS
+               chegava ao microfone depois que ele já tinha terminado de falar,
+               fora da proteção de eco (NX-VOZ-005).
+  Correção   : Emojis não são lidos em voz alta. O NEXUS guarda o que disse
+               nos últimos segundos; uma frase ouvida até 2,5 s depois que ele
+               parou e que repete um trecho de 4+ palavras do que ele disse é
+               descartada (mais tarde, só uma repetição quase literal). Testado
+               com áudio real: 3/3 ecos descartados, 3/3 respostas do usuário
+               aceitas (inclusive "conta uma piada" depois de "posso contar
+               uma piada").
+
+[NX-VOZ-020] Frases inventadas com o microfone parado ("Você tem um clima?" 3x, "Legendas…")
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.18.1) Observado: SIM
+  Causa      : Com ruído, o Whisper às vezes "inventa" fala: créditos de
+               legenda ("Legendas pela comunidade Amara.org") ou a mesma frase
+               repetida.
+  Correção   : Na escuta contínua (não no apertar-para-falar) trechos de baixa
+               confiança ou repetitivos são descartados, assim como créditos de
+               legenda e a mesma frase 3 vezes. Ruído puro: 3/3 sem texto.
 
 ================================================================================
  DAT — DADOS, MEMÓRIA E CONHECIMENTO

@@ -2,6 +2,7 @@
 import pathlib
 import queue
 import re
+import unicodedata
 import threading
 import time
 
@@ -17,6 +18,8 @@ FRAMES_PER_SECOND = RATE / FRAME
 WAKE_RE = re.compile(r"\b(n[eéêiy]?[xk]+s?[ iuoe]*[sz]|n[eé]c?k?s[uo]s|nexo|next? ?us|nex us|nek us)\b[\s,.!?:;-]*",
                      re.IGNORECASE)
 ENV_STEP = 0.04  # seconds per point of the speech envelope sent to the UI ring
+ECHO_TAIL = 2.5   # v0.18.1: an utterance starting this soon after NEXUS went quiet may be its own voice (mic delay)
+ECHO_WINDOW = 12  # v0.18.1: seconds after NEXUS speaks in which its own words coming back are ignored
 MAX_CONTROL_SECONDS = 4  # while NEXUS speaks, only short utterances ("pausa", "stop") are considered
 
 
@@ -47,7 +50,50 @@ def clean_for_speech(text: str) -> str:
 
     text = URL_RE.sub(spoken, text)
     text = re.sub(r"[*_`#>|]", "", text)
+    # v0.18.1: emojis and pictographs are shown, not read aloud (SAPI read "😄" as "cara sorrindo de boca aberta")
+    text = "".join(" " if unicodedata.category(c) in ("So", "Sk", "Cs") or c in "\u200d\ufe0f\u20e3" else c for c in text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+# -- v0.18.1: what the microphone hears that isn't the user -----------------------------------------------------------
+HALLUCINATIONS = re.compile(r"legendas? (pela|por|da) comunidade|amara\.org|obrigad[oa] por assistir|inscreva-se|"
+                            r"se inscrev[ae]|ative o sininho|thanks? (you )?for watching|subtitles by|please subscribe|"
+                            r"subt[ií]tulos (realizados|por|de la comunidad)|gracias por ver|suscr[ií]bete", re.I)
+
+
+def _words(text: str, min_len: int = 3) -> list[str]:
+    text = unicodedata.normalize("NFKD", text.lower()).encode("ascii", "ignore").decode()
+    return [w for w in re.findall(r"[a-z0-9]+", text) if len(w) >= min_len]
+
+
+def is_echo(text: str, recent_speech: str, right_after: bool = True) -> bool:
+    """The transcript is NEXUS's own voice coming back through the microphone (loudspeakers, or a microphone with
+    delay like DroidCam over Wi-Fi): a run of at least 4 words NEXUS just said, making up half of what was heard.
+    A reply that reuses a few of its words ("conta uma piada" after "posso contar uma piada") is not echo, and later
+    than ECHO_TAIL after NEXUS went quiet only an almost literal repetition counts (choosing one of the options it
+    offered - "jogar um jogo de perguntas" - is an answer)."""
+    import difflib
+
+    words, spoken = _words(text, 1), _words(recent_speech, 1)
+    if len(words) < 4 or not spoken:
+        return False
+    m = difflib.SequenceMatcher(None, words, spoken, autojunk=False).find_longest_match(0, len(words), 0, len(spoken))
+    if right_after:
+        return m.size >= 4 and m.size / len(words) >= 0.5
+    return m.size >= 8 and m.size / len(words) >= 0.9
+
+
+def is_hallucination(text: str) -> bool:
+    """Whisper inventing speech on noise: subtitle credits, or the same sentence over and over
+    ("Você tem um clima? Você tem um clima? Você tem um clima?")."""
+    if HALLUCINATIONS.search(text):
+        return True
+    parts = [re.sub(r"\W+", " ", x).strip().lower() for x in re.split(r"(?<=[.!?])\s+", text) if x.strip()]
+    if len(parts) >= 3:
+        top = max(set(parts), key=parts.count)
+        return parts.count(top) >= 3 and len(top.split()) >= 2  # "Sim. Sim. Pode marcar às dez." is a real answer
+    words = text.lower().split()
+    return len(words) >= 6 and len(set(words)) <= len(words) // 3
 
 
 def speech_allowed() -> bool:
@@ -70,6 +116,8 @@ class Speaker:
         self.paused = threading.Event()
         self._resume = threading.Event()
         self.last_text = ""
+        self.recent: list[tuple[float, str]] = []  # v0.18.1: (time, text) spoken lately - the echo check compares
+        self.ended_at = 0.0                         # when the voice last went quiet
         self.voices: list[dict] = []
         self.error: str | None = None
         self._ready = threading.Event()
@@ -86,6 +134,13 @@ class Speaker:
             self.last_text = text
         self.interrupt.clear()
         self.q.put((text, lang_code, on_done))  # on_done(): called only if the text was spoken to the end
+
+    def recent_speech(self) -> str:
+        """What NEXUS said in the last ECHO_WINDOW seconds (empty when it has been quiet for that long)."""
+        now = time.time()
+        if not self.speaking.is_set() and now - self.ended_at > ECHO_WINDOW:
+            return ""
+        return " ".join(x for t, x in self.recent if now - t < ECHO_WINDOW + 60)
 
     def repeat(self, intro: str = ""):
         if not self.last_text:
@@ -176,6 +231,8 @@ class Speaker:
             self.speaking.set()
             self.on_state("speaking")
             spoken = tts.pronounce(text, code, voice.gender if voice else "male")
+            now = time.time()
+            self.recent = [(t, x) for t, x in self.recent if now - t < ECHO_WINDOW] + [(now, text + " " + spoken)]
             sentences, i = tts.split_sentences(spoken), 0
             try:
                 while i < len(sentences) and not self.interrupt.is_set():
@@ -202,6 +259,7 @@ class Speaker:
                     self.error = str(exc)
             if self.q.empty():
                 time.sleep(0.25)  # let the room echo die before the mic goes back to full listening
+                self.ended_at = time.time()
                 self.speaking.clear()
                 self.on_state("idle")
 
@@ -327,6 +385,8 @@ class Listener:
         self.mode = "off"
         self.live = False  # continuous listening wanted (audio mode with mic unmuted)
         self.awake_until = 0.0
+        self.dropped: list[tuple[str, str]] = []
+        self.seg_start = 0.0  # v0.18.1: (reason, text) the microphone heard but wasn't the user
         self.background = False  # window minimized/unfocused (v0.14): only "Nexus ..." is accepted
         self.released = False  # Whisper freed while minimized (reloaded when the window comes back)
         self._stream = None
@@ -501,6 +561,8 @@ class Listener:
                 during = during_speech
                 det.max_frames = int((MAX_CONTROL_SECONDS if during else 30) * FRAMES_PER_SECOND)
             event = det.feed(frame)
+            if event == "start":
+                self.seg_start = time.time()  # v0.18.1: when this utterance began (echo check)
             if event in ("start", "speech") and not during_speech:
                 tick += 1
                 if tick % 2 == 0:  # ~16 updates per second for the UI ring
@@ -538,8 +600,23 @@ class Listener:
             normalize_audio(audio), language=self.stt_language(),
             beam_size=1 if during_speech else max(1, int(settings["stt_beam"])),
             vad_filter=False, condition_on_previous_text=False, initial_prompt=initial_prompt(name))
-        # drop segments Whisper itself flags as non-speech (hallucinations on noise: "Obrigado.", "Legendas...")
-        text = " ".join(s.text for s in segments if s.no_speech_prob < 0.6 or s.avg_logprob > -0.6).strip()
+        # drop segments Whisper itself flags as non-speech (hallucinations on noise: "Obrigado.", "Legendas...").
+        # v0.18.1: while listening by itself (not push-to-talk) also low-confidence and repetitive segments
+        if was_ptt:
+            kept = [s for s in segments if s.no_speech_prob < 0.6 or s.avg_logprob > -0.6]
+        else:
+            kept = [s for s in segments if (s.no_speech_prob < 0.6 or s.avg_logprob > -0.6)
+                    and s.avg_logprob > -1.1 and getattr(s, "compression_ratio", 1.0) < 2.4]
+        text = " ".join(s.text for s in kept).strip()
+        if text and not was_ptt:
+            if is_hallucination(text):
+                self.dropped.append(("noise", text))
+                text = ""
+            elif not during_speech and is_echo(text, self.speaker.recent_speech(),
+                                               right_after=self.seg_start - self.speaker.ended_at < ECHO_TAIL):
+                self.dropped.append(("echo", text))
+                text = ""
+            del self.dropped[:-20]
         if not during_speech:
             self.on_state("standby" if self.mode == "live" else "idle")
         if not text:
