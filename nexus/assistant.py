@@ -5,7 +5,7 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import emergency, features, knowledge, llm, memory, netprobe, profile, skills, tools, workspace
+from . import emergency, features, knowledge, llm, memory, netprobe, profile, skills, tools, ui_nav, workspace
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
@@ -56,7 +56,9 @@ Rules:
   "shall we start?" at most once; if the user already agreed, just start.
 - If the user didn't understand something specific (a joke, a word, a step), explain its MEANING in simple
   words (for a joke: the wordplay and why it is funny). Never just repeat the same sentence.
-- The user wants to report a NEXUS error/bug or "save this conversation to report errors" -> `report_issue`."""
+- The user wants to report a NEXUS error/bug or "save this conversation to report errors" -> `report_issue`.
+- The user wants to open, see or change something of NEXUS itself (settings, colours, pointer, shortcuts, voice, menus,
+  conversations, guide) -> call `open_interface` (never just say you opened it)."""
 
 
 def _upcoming(days=7):
@@ -289,6 +291,14 @@ LIVE = [
 ]
 
 
+UI_OPEN_CLAIM = re.compile(r"\b(abri|aberto|aberta|abrindo|abrimos|opened|opening|i've opened|abierto|abierta|abriendo|"
+                           r"te levei|levei voc|took you|te llev|vou (te )?(levar|abrir|mostrar)|vamos (abrir|l[aá])|"
+                           r"let me (open|take|show)|i'?ll (open|take you|show)|i will (open|take|show)|voy a (abrir|llevar)|"
+                           r"te llevo)", re.I)
+UI_WORDS = re.compile(r"\b(configura\w*|ajustes|settings|painel|panel|menu|aro|cursor|atalhos?|shortcuts?|atajos?|"
+                      r"conversas|conversations|notifica\w*|biblioteca|library|guia|guide|tutorial|interface|interfaz)\b", re.I)
+
+
 def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None = None) -> str | None:
     for rx, expected, tool in LIVE:
         if (rx.search(user_text) and not (called or set()) & expected and settings["integrations"]
@@ -300,6 +310,10 @@ def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None
             return (f"The user explicitly asked you to store this, but you did NOT call any tool, so nothing was saved. "
                     f"Call `{tool}` now with the information from the user's message, then confirm briefly in the "
                     f"user's language.")
+    # v0.16.5 eval: "Aberto o painel de configurações" without calling the tool - nothing opened
+    if "open_interface" not in (called or set()) and UI_OPEN_CLAIM.search(reply) and UI_WORDS.search(user_text + " " + reply):
+        return ("You said you opened part of the NEXUS interface but you did NOT call `open_interface`, so nothing "
+                "opened. Call `open_interface` now with the right target (and section for settings), then confirm briefly.")
     if not acted and CLAIMED.search(reply):
         return ("You said you stored/recorded something but you did NOT call any tool, so nothing was saved. "
                 "Call the correct tool now (record_data, remember, learn_knowledge, add_task, add_event, save_note...), "
@@ -491,6 +505,13 @@ class Assistant:
             memory.add_message("assistant", reply)
             self.emit("tool", {"name": "report_issue", "args": {}})
             self.emit("done", {"text": reply, "speak": True, "interrupted": False})
+            return
+        nav = ui_nav.detect(text)
+        if nav and tools.ui_hook:  # v0.16.5: "abre as configurações", "quero mudar a cor do aro" - instant, no model
+            nav, reply = ui_nav.reply(nav)
+            tools.ui_hook({**nav, "say": reply})
+            self.emit("tool", {"name": "open_interface", "args": nav})
+            self.emit("done", {"text": reply, "speak": nav["target"] != "tutorial", "interrupted": False})
             return
         # Context travels inside the current user turn (many chat templates drop extra system messages); the history
         # keeps only the raw text. v0.15.5 measured keeping the context blocks too: the knowledge excerpts fill the

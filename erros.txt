@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 2.9  ·  Data: 2026-10-15  ·  Versão do app: 0.16.1
+ Versão do documento: 3.0  ·  Data: 2026-10-15  ·  Versão do app: 0.16.5
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -85,6 +85,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-035  Leitura do prompt muito lenta em placas AMD (Vulkan + Flash Attention)
       NX-LLM-036  Lembrete marcado para depois de amanhã ("amanhã" virava o dia 17)
       NX-LLM-037  Primeira resposta lenta depois de trocar de idioma
+      NX-LLM-038  A IA disse que abriu (ou ia abrir) um menu e nada abriu
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -131,6 +132,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-UI-013   Vários menus abertos juntos / menus laterais demoravam a sair
       NX-UI-014   Avisos acumulados que demoravam e sumiam todos de uma vez
       NX-UI-015   "IA INDISPONÍVEL" no aro (núcleo vermelho)
+      NX-UI-016   Pedi para abrir um menu e o NEXUS respondeu outra coisa
+      NX-UI-017   Aro girando rápido sem parar depois de "repete" / "pausa"
  WRK  NX-WRK-001  A IA diz que criou/alterou um arquivo, mas nada mudou
       NX-WRK-002  "Fora da área de trabalho": caminho recusado
       NX-WRK-003  Comando não roda, demora ou fica esperando confirmação
@@ -647,6 +650,16 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
   Correção   : O prompt fixo é igual nos três idiomas e o idioma vai junto de
                cada mensagem. Medido: 26,2 s -> 1,3 s.
 
+[NX-LLM-038] A IA disse que abriu (ou ia abrir) um menu e nada abriu
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.16.5) Observado: SIM
+  Sintoma    : Na avaliação, "quero mudar a cor do aro, me leva lá" recebeu
+               "Aberto o painel de configurações" / "Vou te levar até as
+               configurações", sem abrir nada.
+  Correção   : Pedidos de abrir ou mudar algo do próprio NEXUS são
+               reconhecidos sem a IA (nexus/ui_nav.py; instantâneo). Para as
+               outras frases, se a IA disser que abriu ou que vai abrir sem
+               chamar open_interface, ela é obrigada a chamar.
+
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE
 ================================================================================
@@ -1140,6 +1153,23 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                o Ollama e baixe o modelo (ollama pull qwen3:8b). API: confira
                provedor e chave em Configurações > Inteligência. O aro volta ao
                normal sozinho em até 20 s depois de resolvido.
+
+[NX-UI-016] Pedi para abrir um menu e o NEXUS respondeu outra coisa
+  Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
+  Causa      : Pedidos curtos ("abre as configurações de voz", "fecha isso")
+               são reconhecidos na hora (nexus/ui_nav.py); frases longas ou
+               perguntas vão para a IA, que pode não usar a ferramenta
+               open_interface. Funções beta desligadas não abrem.
+  Solução    : Fale curto: "abre" + o nome do menu (configurações, painel,
+               conversas, notificações, biblioteca, área de trabalho,
+               habilidades, guia, tutorial). Ou use o atalho (F1 lista todos).
+
+[NX-UI-017] Aro girando rápido sem parar depois de "repete" / "pausa"
+  Severidade : BAIXA            Status: CORRIGIDO (v0.16.5) Observado: SIM
+  Causa      : A v0.16.1 marcava o NEXUS como "pensando" a cada mensagem e
+               só desmarcava quando a IA respondia; comandos rápidos não passam
+               pela IA.
+  Correção   : Comandos rápidos e pedidos de menu liberam o estado na hora.
 
 ================================================================================
  WRK — ÁREA DE TRABALHO

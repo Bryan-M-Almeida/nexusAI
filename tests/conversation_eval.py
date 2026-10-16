@@ -177,6 +177,14 @@ tool_calls.clear()
 ask("Lê o livro Dom Robo para mim")
 check("biblioteca: 'lê o livro' inicia o podcast", "read_book" in tool_calls and started and started[0][0] == book["id"],
       f"{tool_calls} {started}")
+# 10) v0.16.5: a free-form request about NEXUS itself opens the right place of the interface
+opened = []
+tools.ui_hook = opened.append
+tool_calls.clear()
+ask("Quero mudar a cor do aro do NEXUS, me leva lá")
+check("interface: a IA abre Configurações > Interface", any(o.get("target") == "settings" for o in opened)
+      and "open_interface" in tool_calls, f"{tool_calls} {opened}")
+tools.ui_hook = None
 settings["language"] = "auto"
 
 passed = sum(ok for _, ok in results)

@@ -44,6 +44,7 @@ class Api:
 
         self._brain = assistant.Assistant(self._on_brain_event, control_hook=self._speech_control,
                                           confirm_hook=self._confirm_command)
+        tools.ui_hook = lambda nav: emit("ui_open", nav)  # the model's open_interface tool (v0.16.5)
         self._speaker = Speaker(lambda s: emit("voice", s), lambda payload: emit("speak_env", payload))
         self._listener = Listener(self._on_voice_text, lambda s: emit("voice", s), self._speaker,
                                   on_level=lambda level: emit("mic_level", level))

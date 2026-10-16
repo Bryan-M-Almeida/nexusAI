@@ -253,6 +253,22 @@ def play_music(query, service="youtube"):
     return browser.music_search(query, service)
 
 
+# v0.16.5: the AI opens the interface for the user ("quero mudar a cor do aro" -> Settings > Interface).
+ui_hook = None  # set by the app; receives {"target", "section", "say"}
+UI_BETA = {"library": "library", "workspace": "workspace", "skills": "skills"}
+
+
+def open_interface(target, section=None):
+    from . import features
+
+    if ui_hook is None:
+        return {"error": "no interface"}
+    if UI_BETA.get(target) and not features.enabled(UI_BETA[target]):
+        return {"error": f"'{target}' is a beta feature that is off; the user can enable it in Settings > Beta"}
+    ui_hook({"target": target, "section": section if target == "settings" else None, "say": ""})
+    return {"opened": target, "section": section} if target != "close" else {"closed": True}
+
+
 # ---------------------------------------------------------------- online integrations (v0.6)
 # v0.14: online answers are reused for a while (weather and news change slowly; rates once a day), so asking
 # twice doesn't wait for the network again. Errors are never cached.
@@ -364,6 +380,13 @@ SCHEMAS = [
     _fn("play_music", "Play a song/artist/video: opens the first YouTube result in the browser (or a Spotify / "
         "YouTube Music search when the user names that service).",
         {"query": S, "service": {"type": "string", "enum": ["youtube", "youtube music", "spotify"]}}, ["query"]),
+    _fn("open_interface", "Open (or close) a part of the NEXUS interface for the user when they want to see or change "
+        "something in NEXUS itself: settings (with a section), panel (schedule, tasks, memory), conversations, "
+        "notifications, library, workspace, skills, guide (all shortcuts), tutorial; 'close' closes the open menu.",
+        {"target": {"type": "string", "enum": ["settings", "panel", "conversations", "notifications", "library",
+                                               "workspace", "skills", "guide", "tutorial", "close"]},
+         "section": {"type": "string", "enum": ["general", "ai", "voice", "mic", "perf", "notif", "integ", "ui",
+                                                "data", "beta", "keys"]}}, ["target"]),
     _fn("get_datetime", "Get the current local date and time."),
     _fn("get_weather", "Current weather and forecast (internet). City defaults to the user's city.",
         {"city": S, "days": {"type": "integer", "description": "1-7"}}),

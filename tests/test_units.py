@@ -725,6 +725,50 @@ check("reply language travels in the context", "Reply ONLY in English." in _lang
 check("bars/layout/rest settings have defaults",
       settings["ui_layout"] == "computer" and all(settings[k] == "hover" for k in ("bar_top", "bar_left", "bar_right", "bar_bottom"))
       and int(settings["rest_minutes"]) >= 0)
+# -- v0.16.5: the AI opens the interface ---------------------------------------------------------------------------
+from nexus import ui_nav  # noqa: E402
+
+_nav = {
+    "abre as configurações": ("settings", "general"), "Nexus, abre as configurações de voz": ("settings", "voice"),
+    "abre os atalhos": ("settings", "keys"), "open settings": ("settings", "general"), "abra o painel": ("panel", None),
+    "abre a agenda": ("panel", None), "mostra minhas conversas": ("conversations", None),
+    "muéstrame la biblioteca": ("library", None), "mostra o tutorial": ("tutorial", None), "fecha isso": ("close", None),
+    "close the menu": ("close", None), "abre as configurações de notificações": ("settings", "notif"),
+}
+_bad = [k for k, (tg, sec) in _nav.items() if (ui_nav.detect(k) or {}).get("target") != tg
+        or (sec and ui_nav.detect(k)["section"] != sec)]
+check("ui nav: short 'open X' requests are recognised without the model", not _bad, str(_bad))
+_not = ["abre o youtube", "abre o google e pesquisa gatos", "abre o livro dom casmurro",
+        "para que serve as configurações?", "fecha a porta da cozinha amanhã cedo por favor"]
+check("ui nav: other requests still go to the AI", not [x for x in _not if ui_nav.detect(x)],
+      str([x for x in _not if ui_nav.detect(x)]))
+_chg = {"Quero mudar a cor do aro do NEXUS, me leva lá": "ui", "change the ring colour": "ui", "quero trocar o cursor": "ui",
+        "personalizar os atalhos": "keys", "muda tua voz": "voice", "quero mudar o idioma": "general"}
+_bad = [k for k, sec in _chg.items() if (ui_nav.detect(k) or {}).get("section") != sec]
+check("ui nav: 'change X of NEXUS' opens the right settings section", not _bad, str(_bad))
+check("ui nav: changes that are not about NEXUS stay with the AI",
+      not any(ui_nav.detect(x) for x in ("vou mudar de casa amanhã", "mudei o microfone de lugar", "quero alterar minha senha do banco",
+                                         "muda a cor do texto do meu documento", "como mudo a cor do aro?")))
+check("safety net: 'I opened the settings' without the tool is caught",
+      bool(assistant._needs_tool("Aberto o painel de configurações do NEXUS.", False, "quero mudar a cor do aro", set()))
+      and not assistant._needs_tool("Aberto o painel de configurações.", True, "quero mudar a cor do aro", {"open_interface"}))
+_opened = []
+tools.ui_hook = _opened.append
+settings["app_mode"] = "user"
+_r1 = tools.execute("open_interface", {"target": "settings", "section": "ui"})
+_r2 = tools.execute("open_interface", {"target": "library"})
+settings["app_mode"] = "developer"
+_r3 = tools.execute("open_interface", {"target": "library"})
+settings["app_mode"] = "user"
+tools.ui_hook = None
+check("open_interface: opens a section of the settings", _r1.get("opened") == "settings" and _opened[0]["section"] == "ui")
+check("open_interface: beta parts stay closed while their feature is off", "error" in _r2 and _r3.get("opened") == "library")
+check("open_interface: the tool is offered to the AI", "open_interface" in {x["function"]["name"] for x in assistant.turn_tools()})
+check("ui nav: spoken confirmations exist in the three languages",
+      all(all(k in i18n.STRINGS[lng] for k in ("ui_opening", "ui_closing", "ui_beta_off", "ui_n_settings", "ui_n_tutorial"))
+          for lng in ("pt", "en", "es")))
+check("v0.16.5 settings defaults", settings["show_exchange"] is True and settings["exchange_follow"] is False
+      and settings["cursor_style"] == "ring" and settings["shortcuts"] == {})
 check("colours: default ring/core/background are valid hex colours",
       all(re.fullmatch(r"#[0-9a-f]{6}", str(settings[k])) for k in ("color_ring", "color_core", "color_bg")))
 

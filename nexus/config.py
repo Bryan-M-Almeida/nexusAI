@@ -124,7 +124,15 @@ DEFAULTS = {
     "bar_left": "hover",
     "bar_right": "hover",
     "bar_bottom": "hover",
-    "ring_wander": True,          # the ring drifts around the screen by itself
+    "ring_wander": True,
+    # v0.16.5
+    "show_exchange": True,        # the last exchange under the ring (Ctrl+I shows it for a moment when off)
+    "exchange_follow": False,     # the text moves with the ring (drag and wandering) instead of staying put
+    "exchange_hide_seconds": 45,  # waiting this long, the text under the ring fades (0 = never)
+    "cursor_style": "ring",       # system | ring | dot | arrow (NEXUS cursors take the ring colour)
+    "cursor_size": "medium",      # small | medium | large
+    "shortcuts": {},              # action id -> key combination chosen by the user (Settings > Shortcuts)
+    "tutorial_done": False,       # first run: NEXUS narrates a short tutorial          # the ring drifts around the screen by itself
     "rest_minutes": 3,            # no interaction for this long: texts hide, only the ring plays (0 = never)
     # v0.16 interface colours (ring, core, background)
     "color_ring": "#cfe4ff",
@@ -190,6 +198,9 @@ class Settings(dict):
             except json.JSONDecodeError:
                 pass
         self["llm_api_key"] = unprotect(self["llm_api_key"])
+        if SETTINGS_PATH.exists() and '"tutorial_done"' not in SETTINGS_PATH.read_text("utf-8"):
+            self["tutorial_done"] = True  # existing installs skip the first-run tutorial (it can be opened anytime)
+            self.save()
         if not self.get("v15_auto_net"):  # v0.15: the automatic connection mode becomes the default once
             if self.get("network_mode") == "hybrid":
                 self["network_mode"] = "auto"

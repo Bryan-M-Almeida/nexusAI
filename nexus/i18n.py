@@ -56,6 +56,12 @@ STRINGS = {
         "llm_err_server": "O provedor de IA está com problemas agora (erro do servidor). Tente de novo em instantes ou use a IA local.",
         "llm_err_other": "A IA não conseguiu responder. O detalhe ficou registrado no log (Configurações > Dados > Relatar erro).",
         "reply_lang": "Responda em português do Brasil, a menos que o usuário escreva em outro idioma.",
+        "ui_opening": "Abrindo {name}.",
+        "ui_closing": "Pronto, fechei.",
+        "ui_beta_off": "{name} é uma função beta e está desligada. Você pode ligar em Configurações, Beta.",
+        "ui_n_settings": "as configurações", "ui_n_panel": "o painel", "ui_n_conversations": "as conversas",
+        "ui_n_notifications": "as notificações", "ui_n_library": "a biblioteca", "ui_n_workspace": "a área de trabalho",
+        "ui_n_skills": "as habilidades", "ui_n_guide": "o guia", "ui_n_tutorial": "o tutorial",
     },
     "en": {
         "intro_anon": "Hello, I am NEXUS, your virtual assistant. To get started, import your profile from the NEXUS form.",
@@ -108,6 +114,12 @@ STRINGS = {
         "llm_err_server": "The AI provider is having problems right now (server error). Try again shortly or use the local AI.",
         "llm_err_other": "The AI couldn't answer. The details were saved to the log (Settings > Data > Report an error).",
         "reply_lang": "Always reply in English unless the user writes in another language.",
+        "ui_opening": "Opening {name}.",
+        "ui_closing": "Done, closed.",
+        "ui_beta_off": "{name} is a beta feature and it is off. You can turn it on in Settings, Beta.",
+        "ui_n_settings": "settings", "ui_n_panel": "the panel", "ui_n_conversations": "your conversations",
+        "ui_n_notifications": "notifications", "ui_n_library": "the library", "ui_n_workspace": "the workspace",
+        "ui_n_skills": "skills", "ui_n_guide": "the guide", "ui_n_tutorial": "the tutorial",
     },
     "es": {
         "intro_anon": "Hola, soy NEXUS, tu asistente virtual. Para empezar, importa tu perfil del formulario NEXUS.",
@@ -160,6 +172,12 @@ STRINGS = {
         "llm_err_server": "El proveedor de IA tiene problemas ahora (error del servidor). Inténtalo en unos instantes o usa la IA local.",
         "llm_err_other": "La IA no pudo responder. El detalle quedó en el registro (Configuración > Datos > Reportar error).",
         "reply_lang": "Responde en español, a menos que el usuario escriba en otro idioma.",
+        "ui_opening": "Abriendo {name}.",
+        "ui_closing": "Listo, cerrado.",
+        "ui_beta_off": "{name} es una función beta y está desactivada. Puedes activarla en Configuración, Beta.",
+        "ui_n_settings": "la configuración", "ui_n_panel": "el panel", "ui_n_conversations": "las conversaciones",
+        "ui_n_notifications": "las notificaciones", "ui_n_library": "la biblioteca", "ui_n_workspace": "el área de trabajo",
+        "ui_n_skills": "las habilidades", "ui_n_guide": "la guía", "ui_n_tutorial": "el tutorial",
     },
 }
 LANGS = tuple(STRINGS)

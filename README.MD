@@ -130,6 +130,17 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### A IA abre a interface, atalhos e tutorial (v0.16.5)
+
+- Peça: **"abre as configurações"**, "abre as configurações de voz", "mostra minhas conversas", "fecha isso" — o
+  menu abre e o aro fica pequeno acima dele, esperando ordens. Frases livres ("quero mudar a cor do aro") também
+  funcionam, pela IA.
+- **Configurações → Atalhos**: troque qualquer atalho. **Ctrl+I** mostra o estado e a conversa; **Ctrl+Shift+H**
+  (modo somente atalhos) deixa a tela totalmente limpa, sem nem o cursor.
+- Arraste um menu até o topo para maximizar (com prévia); duplo clique no topo alterna.
+- Configurações → Interface: texto abaixo do aro (mostrar, acompanhar o aro, esconder depois de X s) e o cursor do NEXUS.
+- Na primeira vez, um tutorial narrado; para rever: "mostra o tutorial" ou Configurações → Geral.
+
 ### Modo usuário, modo desenvolvedor e Beta (v0.15.5)
 
 Em **Configurações → Beta**:
@@ -341,4 +352,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.16.1 (protótipo)**.
+Versão atual: **v0.16.5 (protótipo)**.

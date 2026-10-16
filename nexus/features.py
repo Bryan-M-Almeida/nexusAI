@@ -8,7 +8,7 @@ from .config import settings
 BETA = {
     "workspace": set(),            # isolated project area: files + confirmed commands (tools only exist inside it)
     "library": {"list_books", "read_book"},
-    "skills": set(),
+    "skills": set(),  # (open_interface checks library/workspace/skills itself)
     "browser": {"open_url", "web_search", "play_music"},
 }
 TOOL_FEATURE = {tool: feat for feat, tools in BETA.items() for tool in tools}

@@ -8,6 +8,57 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.16.5 — Protótipo · 2026-10-15
+
+**O NEXUS abre os menus para você — e o aro vai junto. Atalhos e cursor personalizáveis, tutorial narrado, tela
+totalmente limpa e menus que maximizam.**
+
+### Novo
+- **A IA abre a interface**: "abre as configurações", "abre as configurações de voz", "mostra minhas conversas",
+  "me leva para as configurações", "quero mudar a cor do aro", "personalizar os atalhos", "fecha isso" (PT/EN/ES).
+  Pedidos assim são reconhecidos na hora, sem passar pela IA; frases mais livres ("Where can I change how NEXUS
+  talks?") chegam à IA, que usa a nova ferramenta `open_interface` — e, se ela disser que abriu (ou que vai abrir)
+  sem chamar a ferramenta, é obrigada a chamar (NX-LLM-038). Ao abrir um menu, **o
+  aro diminui, voa até o topo e fica acima do menu esperando ordens**; ao fechar, volta para o centro. Funções beta
+  desligadas não abrem e o NEXUS explica onde ligar.
+- **Tutorial narrado na primeira vez**: o NEXUS fala e mostra, passo a passo, como falar com ele, onde ficam os menus
+  (ou os atalhos, no modo somente atalhos), o guia F1 e as configurações. "Pular" ou Esc encerra; dá para rever
+  pedindo "mostra o tutorial" ou em Configurações → Geral → Ver o tutorial.
+- **Configurações → Atalhos**: todos os atalhos podem ser trocados (clique e aperte as teclas; Backspace remove;
+  conflitos ficam em amarelo; "Restaurar os atalhos originais"). O guia F1 mostra os atalhos escolhidos.
+- **Tela totalmente limpa** (extra do modo Somente atalhos + IA): **Ctrl+Shift+H** esconde tudo — nem o nome ao mexer o
+  mouse, nem o cursor; só o aro. O mesmo atalho ou Esc traz de volta.
+- **Texto abaixo do aro**: fica parado por padrão (arrastar ou o aro passear não leva o texto), com a opção de
+  **acompanhar o aro**; pode ser **desligado**; some sozinho depois de um tempo aguardando (padrão 45 s); **Ctrl+I**
+  mostra o estado e a conversa por alguns segundos, mesmo desligado ou na tela limpa.
+- **Cursor do NEXUS**: anel, ponto ou seta na cor do aro (ou o do Windows), em 3 tamanhos. Texto que não dá para
+  selecionar nem clicar não muda mais o cursor.
+- **Maximizar menus**: arraste um menu até o topo da tela — aparece uma prévia transparente, como no Windows — e ele
+  ocupa a tela; duplo clique no topo alterna; arrastar de novo restaura.
+- O nome no canto agora é **N.E.X.U.S.**; o aro não mostra mais dica ao passar o mouse (o guia F1 explica).
+
+### Corrigido
+- **Comandos rápidos deixavam o aro "pensando"** (NX-UI-017): "repete", "pausa" e afins por texto ou voz marcavam o
+  NEXUS como ocupado e o aro girava rápido sem parar.
+- Os antigos atalhos extras Ctrl+H e Ctrl+J (conversas e notificações) deram lugar a Ctrl+2 e Ctrl+3 — e agora
+  qualquer um pode ser personalizado.
+
+### Desempenho
+- **Abrir um menu pela voz é instantâneo**: o pedido é reconhecido localmente em **0,016 ms** em vez de esperar a IA —
+  "quero mudar a cor do aro, me leva lá" levava **14,8 s** pela IA (e ela ainda respondia sem abrir); agora abre na
+  hora.
+
+### Testes desta versão
+- 235/235 testes unitários (10 novos: pedidos de abrir/mudar algo do NEXUS em PT/EN/ES, o que continua indo para
+  a IA, a ferramenta `open_interface` e funções beta, a rede de segurança, frases faladas, padrões novos).
+- 32/32 verificações de conversa com qwen3:8b (nova: "quero mudar a cor do aro, me leva lá" abre Configurações >
+  Interface) e 7/7 na área de trabalho. Tempo médio 15,4 s, mediana 12,3 s (v0.16.1: 12,1 s / 9,7 s — o prompt fixo
+  ganhou a ferramenta e a regra de abrir a interface, ~150 tokens, e as rodadas variam ±2 s).
+- Interface conferida no modo de prévia: aro acoplado acima dos menus, maximizar com prévia e restaurar, troca e
+  conflito de atalhos, tela totalmente limpa, Ctrl+I, texto que some, texto fixo × acompanhando, cursor, tutorial.
+
+---
+
 ## v0.16.1 — Protótipo · 2026-10-15
 
 **Ajustes do novo visual: tela totalmente limpa, um menu por vez, dois modos de uso, avisos que não se acumulam e
@@ -752,8 +803,7 @@ Prioridades definidas em 2026-10-14 (desempenho primeiro, para o NEXUS rodar em 
 
 ### Novo visual (prioridade máxima, pedida em 2026-10-15)
 - Entregue na v0.16.0: tela limpa, nome no canto, guia (F1), atalhos e cores personalizáveis.
-- **Próxima parte**: a IA abre menus e opções quando pedido ("abre as configurações") — o aro diminui, vai até o lugar
-  da ação e espera ordens acima do painel.
+- Entregue na v0.16.5: a IA abre menus e opções quando pedido, com o aro acoplado acima do menu.
 
 ### v0.15.x — Protótipo (depois do novo visual)
 - Entregue na v0.15.5: Beta + modo usuário / desenvolvedor. A partir daqui, toda versão traz também melhorias

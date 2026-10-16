@@ -30,7 +30,7 @@
 <main id="app" class="app" hidden data-mode="audio">
   <!-- v0.16: name in the corner, meaning below it -->
   <div class="brand-corner" aria-label="NEXUS">
-    <p class="bc-name">NEXUS</p>
+    <p class="bc-name">N.E.X.U.S.</p>
     <p class="bc-sub">Networked Experiential Intelligence &amp; User System</p>
   </div>
   <button class="guide-hint mono" id="btnGuide" type="button">F1 · <span data-i18n="guideHint">GUIA</span></button>
@@ -176,6 +176,20 @@
     <p class="g-close mono" data-i18n="gClose">F1 ou Esc para fechar</p>
   </div>
 </div>
+
+<!-- ============ TUTORIAL (v0.16.5): first run, narrated by NEXUS ============ -->
+<div class="tutorial" id="tutorial" hidden>
+  <p class="tut-count mono" id="tutCount"></p>
+  <p class="tut-text" id="tutText"></p>
+  <div class="tut-btns">
+    <button class="btn-ghost" type="button" id="tutSkip" data-i18n="tutSkip">Pular</button>
+    <button class="btn-primary" type="button" id="tutNext" data-i18n="tutNext">Próximo</button>
+  </div>
+</div>
+<!-- drag a menu to the top edge: preview of the maximized menu -->
+<div class="snap-preview" id="snapPreview" hidden></div>
+<!-- a menu is open: a small ring waits above it (outside #app so it can sit over the menus) -->
+<div class="dock-ring" id="dockRing" hidden aria-hidden="true"><div class="rings-slot" data-rings="dock"></div></div>
 
 <!-- ============ PANEL DRAWER (schedule, tasks, memory, knowledge, data, log) ============ -->
 <div class="drawer" id="panelDrawer" hidden>
@@ -379,6 +393,7 @@
       <button type="button" data-sec="integ" data-i18n="secInteg">Integrações</button>
       <button type="button" data-sec="ui" data-i18n="secUi">Interface</button>
       <button type="button" data-sec="data" data-i18n="secData">Dados</button>
+      <button type="button" data-sec="keys" data-i18n="secKeys">Atalhos</button>
       <button type="button" data-sec="beta" data-i18n="secBeta">Beta</button>
     </nav>
     <div class="set-body">
@@ -394,7 +409,8 @@
         <label class="check"><input type="checkbox" name="focus_in_workspace"><span data-i18n="focusInWs">Ligar o modo foco na área de trabalho</span></label>
         <label><span data-i18n="historyTurns">Mensagens lembradas na conversa (trocas)</span><input name="history_turns" type="number" min="2" max="40" step="1"></label>
         <p class="hint" data-i18n="historyTurnsHint">Mais trocas = mais contexto, respostas um pouco mais lentas.</p>
-        <div class="row-btns"><button class="btn-ghost" type="button" id="btnReimport" data-i18n="reimport">Reimportar perfil</button></div>
+        <div class="row-btns"><button class="btn-ghost" type="button" id="btnReimport" data-i18n="reimport">Reimportar perfil</button>
+          <button class="btn-ghost" type="button" id="btnTutorial" data-i18n="tutorialAgain">Ver o tutorial</button></div>
       </section>
 
       <!-- AI -->
@@ -531,6 +547,19 @@
           <label><span data-i18n="barRight">Direita: painel, trabalho e conversas</span><select name="bar_right"></select></label>
           <label><span data-i18n="barBottom">Embaixo: controles de voz e texto</span><select name="bar_bottom"></select></label>
         </div>
+        <p class="sub mono" data-i18n="textTitle">TEXTO ABAIXO DO ARO</p>
+        <label class="check"><input type="checkbox" name="show_exchange"><span data-i18n="showExchange">Mostrar a conversa abaixo do aro (Ctrl+I mostra por alguns segundos quando desligado)</span></label>
+        <label class="check"><input type="checkbox" name="exchange_follow"><span data-i18n="exchangeFollow">O texto acompanha o aro (inclusive quando ele se move sozinho)</span></label>
+        <label><span data-i18n="exchangeHide">Esconder o texto depois de quantos segundos aguardando (0 = nunca)</span><input name="exchange_hide_seconds" type="number" min="0" max="3600" step="5"></label>
+        <p class="sub mono" data-i18n="cursorTitle">CURSOR DO MOUSE</p>
+        <div class="two">
+          <label><span data-i18n="cursorStyle">Estilo</span><select name="cursor_style">
+            <option value="ring" data-i18n="cursorRing">Anel do NEXUS</option><option value="dot" data-i18n="cursorDot">Ponto</option>
+            <option value="arrow" data-i18n="cursorArrow">Seta do NEXUS</option><option value="system" data-i18n="cursorSystem">Do Windows</option></select></label>
+          <label><span data-i18n="cursorSize">Tamanho</span><select name="cursor_size">
+            <option value="small" data-i18n="sizeSmall">Pequeno</option><option value="medium" data-i18n="sizeMedium">Médio</option>
+            <option value="large" data-i18n="sizeLarge">Grande</option></select></label>
+        </div>
         <p class="sub mono" data-i18n="ringTitle">ARO</p>
         <label class="check"><input type="checkbox" name="ring_wander"><span data-i18n="ringWander">O aro se move sozinho pela tela</span></label>
         <label><span data-i18n="restMinutes">Repouso depois de quantos minutos sem interação (0 = nunca)</span><input name="rest_minutes" type="number" min="0" max="120" step="1"></label>
@@ -564,6 +593,14 @@
         <ul class="backup-list mono" id="backupList"></ul>
         <label><span data-i18n="bridgePort">Porta da ponte com a landing page</span><input name="bridge_port" type="number" min="1024" max="65535"></label>
         <p class="hint" data-i18n="restartHint">Vale depois de reabrir o NEXUS.</p>
+      </section>
+
+      <!-- SHORTCUTS (v0.16.5) -->
+      <section class="set-sec" data-sec="keys" hidden>
+        <h2 data-i18n="secKeys">Atalhos</h2>
+        <p class="hint" data-i18n="keysHint">Clique em um atalho e aperte as teclas novas. Esc cancela; Backspace deixa a ação sem atalho. Atalhos repetidos ficam marcados.</p>
+        <ul class="keys-list" id="keysList"></ul>
+        <div class="row-btns"><button class="btn-ghost" type="button" id="btnKeysReset" data-i18n="keysReset">Restaurar os atalhos originais</button></div>
       </section>
 
       <!-- BETA & APP MODE (v0.15.5) -->

@@ -127,6 +127,7 @@ window.nexus = {
       case "voice": return setVoiceState(p);
       case "heard": return onHeard(p);
       case "speak_env": ringSpeak(p); return wakeRing();
+      case "ui_open": return onUiOpen(p);
       case "mic_level": ringMicTarget = Math.max(ringMicTarget, p); return wakeRing();
       case "control": return onControl(p);
       case "ai_state": return setAiState(p);
@@ -189,6 +190,12 @@ async function start() {
   caption(hello, 7000);
   if (!profile) openOnboarding();
   setFull(!!st.fullscreen);
+  if (!settings.tutorial_done) {  // first run: narrated tutorial once the profile question is out of the way
+    const go = () => setTimeout(startTutorial, 1800);
+    if ($("#onboarding").hidden) go();
+    else new MutationObserver((m, obs) => { if ($("#onboarding").hidden) { obs.disconnect(); go(); } })
+      .observe($("#onboarding"), { attributes: true, attributeFilter: ["hidden"] });
+  }
   if (!st.llm.online || !st.llm.model_ready) notice(aiHelp(st.llm), T("moreAi"));
   else if (state.ui_mode === "audio" && !state.mic_muted && st.stt === "missing") notice(T("voiceFirstUse"), T("moreVoice"));
 }
@@ -205,6 +212,7 @@ function setAi(llm) {
   aiDown = !(llm.online && llm.model_ready);
   aiHelpText = aiDown ? aiHelp(llm) : "";
   $("#app").classList.toggle("ai-down", aiDown);
+  document.body.classList.toggle("ai-down", aiDown);
   $("#btnAiFix").hidden = !aiDown;
   if (aiDown && !aiPoll) aiPoll = setInterval(() => api().llm_status().then(setAi), 20000);
   if (!aiDown && aiPoll) { clearInterval(aiPoll); aiPoll = null; }
@@ -223,7 +231,10 @@ function setAiState(p) {
 /* ------------------------------------------------------------------ conversation */
 /* v0.16: the last exchange is shown under the ring (audio mode), like a two-line transcript */
 const plain = (t) => String(t || "").replace(/```[\s\S]*?```/g, " ").replace(/[*`#>]/g, "").replace(/\s+/g, " ").trim();
+let exchangeAt = Date.now();
 function setExchange(who, text) {
+  exchangeAt = Date.now();
+  $("#app").classList.remove("ex-faded");
   if (who === "user") { $("#exUser").textContent = plain(text); $("#exNexus").textContent = ""; }
   else $("#exNexus").textContent = plain(text);
 }
@@ -299,7 +310,7 @@ function onError(p) {
 
 function onHeard(p) {
   addMsg("user", p.text, true);
-  if (p.control) setVoiceState("idle");
+  if (p.control && p.control !== "clearer") { aiBusy = false; setVoiceState("idle"); }
 }
 
 function onControl(p) {
@@ -364,7 +375,7 @@ async function send(text) {
   pendingFiles = [];
   renderAttachChips();
   const r = await api().send(text, false);
-  if (r && r.control) setVoiceState("idle");
+  if (r && r.control && r.control !== "clearer") { aiBusy = false; setVoiceState("idle"); }
 }
 
 /* ------------------------------------------------------------------ voice state */
@@ -379,6 +390,7 @@ function setVoiceState(st) {
   if (aiBusy && ["idle", "standby", "muted"].includes(shown)) shown = "thinking";  // v0.16.1: spins fast until it answers
   if (shown !== "idle" && shown !== "standby" && shown !== "muted") activity();
   $("#core").dataset.state = shown;
+  $("#dockRing").dataset.state = shown;
   if (st === "speaking") wakeRing();
   const label = $("#coreLabel");
   label.textContent = aiDown && !aiBusy ? T("aiDown") : T("st_" + shown) || "";
@@ -489,6 +501,11 @@ function applyInterface() {
   setColors(settings);
   applyBars();
   app.classList.toggle("wander", settings.ring_wander !== false);
+  app.classList.toggle("follow", !!settings.exchange_follow);
+  app.classList.toggle("no-exchange", settings.show_exchange === false);
+  if (settings.ui_layout !== "shortcuts") app.classList.remove("zen");
+  setCursor(settings.cursor_style, settings.cursor_size);
+  setRingPos(ringPos[0], ringPos[1], false);
   $("#btnSkillsRail").hidden = !feature("skills");
   // v0.15.5: beta features that are off disappear from the interface (Settings > Beta)
   $("#btnWorkspaces").hidden = !feature("workspace");
@@ -499,38 +516,96 @@ function applyInterface() {
   $('#railRight [data-i18n="convTitle"]').classList.toggle("rail-sep", anyWork);
 }
 
-/* ------------------------------------------------------------------ v0.16 shortcuts and guide HUD */
+/* ------------------------------------------------------------------ shortcuts (v0.16) - configurable (v0.16.5) */
 const openPanel = () => { loadDashboard(); $("#panelDrawer").hidden = false; };
-const SHORTCUTS = [
-  { keys: "F1", label: "kGuide" },
-  { keys: "Ctrl+Espaço", label: "kTalk" },
-  { keys: "Ctrl+1", key: "1", panel: "panelDrawer", label: "kPanel", run: openPanel },
-  { keys: "Ctrl+2", key: "2", panel: "convDrawer", label: "kConvs", run: () => openConversations("threads") },
-  { keys: "Ctrl+3", key: "3", panel: "notifDrawer", label: "kNotif", run: () => openNotifications() },
-  { keys: "Ctrl+4", key: "4", panel: "libDrawer", label: "kLibrary", feature: "library", run: () => openLibrary() },
-  { keys: "Ctrl+5", key: "5", panel: "wsDrawer", label: "kWorkspace", feature: "workspace", run: () => openWorkspaces() },
-  { keys: "Ctrl+6", key: "6", panel: "skillsDrawer", label: "kSkills", feature: "skills", run: () => openSkills() },
-  { keys: "Ctrl+,", key: ",", panel: "settings", label: "kSettings", run: () => openSettings() },
-  { key: "h", panel: "convDrawer", run: () => openConversations("threads") },  // v0.10 aliases (not listed)
-  { key: "j", panel: "notifDrawer", run: () => openNotifications() },
-  { keys: "Ctrl+M", key: "m", label: "kMode", run: () => dock(state.ui_mode === "audio" ? "text" : "audio") },
-  { keys: "Ctrl+Shift+N", label: "kNewConv" },
-  { keys: "Ctrl+T", label: "kTranscript" },
-  { keys: "Ctrl+Shift+X", label: "kToasts" },
-  { keys: "Esc", label: "kStop" },
-  { keys: "F11", label: "kFull" },
-  { keys: "Ctrl+Shift+M", label: "kMin" },
-  { keys: "Ctrl+Shift+Q", label: "kQuit" },
+async function pushToTalk() {
+  const r = await api().push_to_talk();
+  if (!r.ok) notice(T("voiceLoading") + (r.error && r.error !== "loading" ? ` (${r.error})` : ""), T("moreVoice"));
+}
+// id, default keys, label, menu it opens (the same keys close it), beta feature it needs
+const ACTIONS = [
+  { id: "guide", def: "F1", label: "kGuide", panel: "guide", run: () => toggleGuide(true) },
+  { id: "talk", def: "Ctrl+Space", label: "kTalk", run: pushToTalk },
+  { id: "panel", def: "Ctrl+1", label: "kPanel", panel: "panelDrawer", run: openPanel },
+  { id: "convs", def: "Ctrl+2", label: "kConvs", panel: "convDrawer", run: () => openConversations("threads") },
+  { id: "notif", def: "Ctrl+3", label: "kNotif", panel: "notifDrawer", run: () => openNotifications() },
+  { id: "library", def: "Ctrl+4", label: "kLibrary", panel: "libDrawer", feature: "library", run: () => openLibrary() },
+  { id: "workspace", def: "Ctrl+5", label: "kWorkspace", panel: "wsDrawer", feature: "workspace", run: () => openWorkspaces() },
+  { id: "skills", def: "Ctrl+6", label: "kSkills", panel: "skillsDrawer", feature: "skills", run: () => openSkills() },
+  { id: "settings", def: "Ctrl+,", label: "kSettings", panel: "settings", run: () => openSettings() },
+  { id: "mode", def: "Ctrl+M", label: "kMode", run: () => dock(state.ui_mode === "audio" ? "text" : "audio") },
+  { id: "info", def: "Ctrl+I", label: "kInfo", run: () => peekInfo() },
+  { id: "newConv", def: "Ctrl+Shift+N", label: "kNewConv", run: () => newConversation() },
+  { id: "transcript", def: "Ctrl+T", label: "kTranscript", run: () => state.ui_mode === "audio" && toggleTranscript() },
+  { id: "toasts", def: "Ctrl+Shift+X", label: "kToasts", run: () => closeToasts() },
+  { id: "zen", def: "Ctrl+Shift+H", label: "kZen", run: () => toggleZen() },
+  { id: "full", def: "F11", label: "kFull", run: () => toggleFull() },
+  { id: "min", def: "Ctrl+Shift+M", label: "kMin", run: () => api().minimize() },
+  { id: "quit", def: "Ctrl+Shift+Q", label: "kQuit", run: () => api().quit() },
 ];
-const SHORTCUT_KEYS = Object.fromEntries(SHORTCUTS.filter((x) => x.key).map((x) => [x.key, x]));
+const keysOf = (a) => (settings.shortcuts || {})[a.id] ?? a.def;
+const showKeys = (k) => (k || "—").replace("Space", T("kSpace"));
+
+// "Ctrl+Shift+1" from a key event (by physical key, so Shift doesn't turn 1 into ! and layouts don't matter)
+const CODE_KEYS = { Space: "Space", Comma: ",", Period: ".", Slash: "/", Minus: "-", Equal: "=", Semicolon: ";", Quote: "'",
+  BracketLeft: "[", BracketRight: "]", Backslash: "\\", Backquote: "`", Enter: "Enter", Tab: "Tab", Backspace: "Backspace",
+  Delete: "Delete", Insert: "Insert", Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown",
+  ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right", Escape: "Esc" };
+function comboOf(e) {
+  if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return null;
+  const c = e.code || "";
+  const k = c.startsWith("Key") ? c.slice(3) : c.startsWith("Digit") ? c.slice(5) : /^Numpad\d$/.test(c) ? c.slice(6)
+    : CODE_KEYS[c] || (/^F\d{1,2}$/.test(e.key) ? e.key : e.key.length === 1 ? e.key.toUpperCase() : e.key);
+  return [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", k].filter(Boolean).join("+");
+}
+const actionFor = (combo) => ACTIONS.find((a) => keysOf(a) === combo);
 
 function toggleGuide(on) {
   const g = $("#guide"), show = on ?? g.hidden;
   if (show) {
-    $("#guideKeys").innerHTML = SHORTCUTS.filter((x) => x.keys && (!x.feature || feature(x.feature)))
-      .map((x) => `<li><kbd>${esc(x.keys.replace("Espaço", T("kSpace")))}</kbd><span>${esc(T(x.label))}</span></li>`).join("");
+    $("#guideKeys").innerHTML = ACTIONS.filter((a) => keysOf(a) && (!a.feature || feature(a.feature)))
+      .map((a) => `<li><kbd>${esc(showKeys(keysOf(a)))}</kbd><span>${esc(T(a.label))}</span></li>`).join("")
+      + `<li><kbd>Esc</kbd><span>${esc(T("kStop"))}</span></li>`;
   }
   g.hidden = !show;
+}
+
+/* Settings > Shortcuts: click a shortcut, press the new keys (Esc cancels, Backspace removes it) */
+let capturing = null;
+function renderKeys() {
+  const used = {};
+  ACTIONS.forEach((a) => { const k = keysOf(a); if (k) used[k] = (used[k] || 0) + 1; });
+  $("#keysList").innerHTML = ACTIONS.map((a) => {
+    const k = keysOf(a), clash = k && used[k] > 1;
+    return `<li><span>${esc(T(a.label))}${a.feature && !feature(a.feature) ? ` <i class="muted">(beta)</i>` : ""}</span>
+      <button type="button" class="key-btn ${capturing === a.id ? "capturing" : ""} ${clash ? "clash" : ""}" data-action="${a.id}">
+      ${esc(capturing === a.id ? T("keysPress") : showKeys(k))}</button></li>`;
+  }).join("") + `<li><span>${esc(T("kStop"))}</span><button type="button" class="key-btn fixed" disabled>Esc</button></li>`;
+}
+async function saveShortcut(id, combo) {
+  const map = { ...(settings.shortcuts || {}) };
+  const a = ACTIONS.find((x) => x.id === id);
+  if (combo === a.def) delete map[id]; else map[id] = combo;
+  settings = (await api().save_settings({ shortcuts: map })).settings;
+  renderKeys();
+}
+
+/* "Only shortcuts + AI" extra: nothing at all on the screen, not even the mouse pointer */
+function toggleZen(on) {
+  const app = $("#app");
+  const next = on ?? !app.classList.contains("zen");
+  if (next && settings.ui_layout !== "shortcuts") { notice(T("zenOnlyShortcuts"), T("zenMore")); return; }
+  app.classList.toggle("zen", next);
+  if (next) closeToasts();
+}
+
+/* Ctrl+I: show the state and the last exchange for a moment, even if hidden, faded or in zen */
+let peekTimer;
+function peekInfo() {
+  const app = $("#app");
+  app.classList.add("peek");
+  clearTimeout(peekTimer);
+  peekTimer = setTimeout(() => app.classList.remove("peek"), 6000);
 }
 
 /* beta features (v0.15.5): developer mode turns all of them on */
@@ -643,35 +718,170 @@ setInterval(() => {
   if (!min || state.ui_mode === "text" || state.workspace || aiBusy || ["speaking", "listening", "thinking"].includes(voiceState)) return;
   if (Date.now() - lastActivity > min * 60000) $("#app").classList.add("resting");
 }, 5000);
+// waiting a long time: the text under the ring fades too (Settings > Interface, 0 = never)
+setInterval(() => {
+  const sec = +settings.exchange_hide_seconds || 0;
+  if (sec && !aiBusy && voiceState !== "speaking" && Date.now() - exchangeAt > sec * 1000) $("#app").classList.add("ex-faded");
+}, 3000);
 
 /* Only one menu at a time: opening one (click or shortcut) closes the one that was open. */
 const EXCLUSIVE = ["panelDrawer", "convDrawer", "wsDrawer", "skillsDrawer", "libDrawer", "settings", "notifDrawer", "guide"];
 function initExclusivePanels() {
   const obs = new MutationObserver((muts) => {
     for (const m of muts) if (!m.target.hidden) for (const id of EXCLUSIVE) if (id !== m.target.id) $("#" + id).hidden = true;
+    updateDocked();
   });
   for (const id of EXCLUSIVE) obs.observe($("#" + id), { attributes: true, attributeFilter: ["hidden"] });
 }
 const isOpen = (id) => !$("#" + id).hidden;
 
-/* Menus can be dragged by their top area. */
+/* Menus can be dragged by their top area; dragged to the top edge they fill the screen (with a preview, like
+   Windows), dragged again or double-clicked they go back. */
 function initMovable() {
   let drag = null;
-  document.addEventListener("mousedown", (e) => {
+  const handle = (e) => {
     const box = e.target.closest(".drawer-box, .conv-box, .modal-box");
-    if (!box || e.button !== 0 || box.closest("#confirmModal")) return;
-    if (e.target.closest("button, input, select, textarea, a, label, .list, .chat, .conv-body, .set-body *, .reader-text, .file-view, .book-grid")) return;
-    const r = box.getBoundingClientRect();
-    if (e.clientY - r.top > 52) return;
+    if (!box || e.button !== 0 || box.closest("#confirmModal, #onboarding")) return null;
+    if (e.target.closest("button, input, select, textarea, a, label, .list, .chat, .conv-body, .set-body *, .reader-text, .file-view, .book-grid")) return null;
+    return e.clientY - box.getBoundingClientRect().top <= 52 ? box : null;
+  };
+  document.addEventListener("mousedown", (e) => {
+    const box = handle(e);
+    if (!box) return;
+    if (box.classList.contains("maximized")) {  // pulling a maximized menu restores it under the pointer
+      box.classList.remove("maximized");
+      box.style.translate = "0px 0px";
+      const r = box.getBoundingClientRect();
+      box.style.translate = `${e.clientX - (r.left + r.width / 2)}px ${e.clientY - (r.top + 20)}px`;
+    }
     const [x0, y0] = (box.style.translate || "0px 0px").split(" ").map((v) => parseFloat(v) || 0);
     drag = { box, sx: e.clientX, sy: e.clientY, x0, y0 };
     box.classList.add("moving");
     e.preventDefault();
   });
   document.addEventListener("mousemove", (e) => {
-    if (drag) drag.box.style.translate = `${drag.x0 + e.clientX - drag.sx}px ${drag.y0 + e.clientY - drag.sy}px`;
+    if (!drag) return;
+    drag.box.style.translate = `${drag.x0 + e.clientX - drag.sx}px ${drag.y0 + e.clientY - drag.sy}px`;
+    $("#snapPreview").hidden = e.clientY > 6;
   });
-  document.addEventListener("mouseup", () => { if (drag) drag.box.classList.remove("moving"); drag = null; });
+  document.addEventListener("mouseup", () => {
+    if (!drag) return;
+    drag.box.classList.remove("moving");
+    if (!$("#snapPreview").hidden) { drag.box.classList.add("maximized"); drag.box.style.translate = ""; }
+    $("#snapPreview").hidden = true;
+    drag = null;
+  });
+  document.addEventListener("dblclick", (e) => {
+    const box = handle(e);
+    if (!box) return;
+    box.style.translate = "";
+    box.classList.toggle("maximized");
+  });
+}
+
+/* The ring docks above an open menu: it shrinks, flies to the top and waits for orders (v0.16.5) */
+function updateDocked() {
+  const app = $("#app"), twin = $("#dockRing"), core = $("#core");
+  const on = EXCLUSIVE.some((id) => id !== "guide" && isOpen(id));
+  if (on === app.classList.contains("docked")) return;
+  const fly = (el, from, to) => {
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2), dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${from.width / Math.max(to.width, 1)})` },
+      { transform: "translate(0, 0) scale(1)" }], { duration: 650, easing: "cubic-bezier(.22,.8,.26,1)" });
+  };
+  if (on) {
+    const from = core.getBoundingClientRect();
+    twin.hidden = false;
+    app.classList.add("docked");
+    fly(twin, from, twin.getBoundingClientRect());
+  } else {
+    const from = twin.getBoundingClientRect();
+    app.classList.remove("docked");
+    twin.hidden = true;
+    fly(core, from, core.getBoundingClientRect());
+  }
+  wakeRing();
+}
+
+/* The AI opened (or closed) something for the user */
+function onUiOpen(p) {
+  aiBusy = false;
+  if (p.say) setExchange("nexus", p.say);
+  setVoiceState(voiceState === "thinking" ? "idle" : voiceState);
+  const open = { settings: () => openSettings(p.section || "general"), panel: openPanel,
+    conversations: () => openConversations("threads"), notifications: () => openNotifications(),
+    library: () => openLibrary(), workspace: () => openWorkspaces(), skills: () => openSkills(),
+    guide: () => toggleGuide(true), tutorial: () => startTutorial() }[p.target];
+  if (p.target === "close") { EXCLUSIVE.forEach((id) => ($("#" + id).hidden = true)); endTutorial(); }
+  else if (open) { toggleGuide(false); open(); }
+}
+
+/* NEXUS's own mouse pointer (Settings > Interface): ring, dot or arrow in the ring colour, 3 sizes */
+function setCursor(style = "ring", size = "medium") {
+  const root = document.documentElement;
+  if (style === "system") { root.style.setProperty("--cur", "default"); root.style.setProperty("--cur-hover", "pointer"); return; }
+  const px = { small: 20, medium: 26, large: 34 }[size] || 26, c = px / 2;
+  const ring = getComputedStyle(root).getPropertyValue("--c-ring").trim() || "#cfe4ff";
+  const core = getComputedStyle(root).getPropertyValue("--c-core").trim() || "#2f86ff";
+  const svg = (hover) => {
+    const fill = hover ? core : ring;
+    const body = style === "arrow"
+      ? `<path d="M2 2 L${px * .78} ${px * .52} L${px * .46} ${px * .58} L${px * .3} ${px * .92} Z" fill="${fill}" stroke="#020611" stroke-width="1.4" stroke-linejoin="round"/>`
+      : style === "dot"
+        ? `<circle cx="${c}" cy="${c}" r="${px * (hover ? .26 : .2)}" fill="${fill}" stroke="#020611" stroke-width="1.2"/>`
+        : `<circle cx="${c}" cy="${c}" r="${px * .36}" fill="none" stroke="#020611" stroke-width="3"/><circle cx="${c}" cy="${c}" r="${px * .36}" fill="none" stroke="${fill}" stroke-width="1.6"/><circle cx="${c}" cy="${c}" r="${hover ? px * .14 : px * .08}" fill="${fill}" stroke="#020611" stroke-width="1"/>`;
+    const hot = style === "arrow" ? "2 2" : `${Math.round(c)} ${Math.round(c)}`;
+    return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 ${px} ${px}">${body}</svg>`)}") ${hot}, ${hover ? "pointer" : "default"}`;
+  };
+  root.style.setProperty("--cur", svg(false));
+  root.style.setProperty("--cur-hover", svg(true));
+}
+
+/* First run: a short tutorial narrated by NEXUS (it can be replayed from Settings > General or by asking) */
+const TUTORIAL = [
+  { text: "tut1", focus: "center" },
+  { text: "tut2", focus: "center" },
+  { text: "tut3", focus: "edges", computer: true },
+  { text: "tut3s", focus: "keys", shortcuts: true },
+  { text: "tut4", focus: "keys" },
+  { text: "tut5", focus: "none" },
+  { text: "tut6", focus: "none" },
+];
+let tutorialStep = -1, tutorialTimer;
+function tutorialSteps() {
+  const sc = settings.ui_layout === "shortcuts";
+  return TUTORIAL.filter((x) => !(x.computer && sc) && !(x.shortcuts && !sc));
+}
+function startTutorial() {
+  EXCLUSIVE.forEach((id) => ($("#" + id).hidden = true));
+  $("#app").classList.remove("resting", "zen");
+  tutorialGo(0);
+}
+function tutorialGo(i) {
+  const steps = tutorialSteps();
+  clearTimeout(tutorialTimer);
+  if (i >= steps.length) return endTutorial();
+  tutorialStep = i;
+  const st = steps[i], text = T(st.text, { name: profile ? ", " + profile.name.split(" ")[0] : "" });
+  toggleGuide(st.focus !== "none" && st.focus !== "center");
+  $("#guide").dataset.focus = st.focus;
+  $("#tutorial").dataset.focus = st.focus;
+  $("#tutorial").hidden = false;
+  $("#tutText").textContent = text;
+  $("#tutCount").textContent = `${i + 1} / ${steps.length}`;
+  $("#tutNext").textContent = T(i === steps.length - 1 ? "tutDone" : "tutNext");
+  setExchange("nexus", text);
+  api().speak_help(text);
+  tutorialTimer = setTimeout(() => tutorialGo(i + 1), Math.max(4500, text.length * 75));
+}
+async function endTutorial() {
+  if (tutorialStep < 0) return;
+  clearTimeout(tutorialTimer);
+  tutorialStep = -1;
+  $("#tutorial").hidden = true;
+  delete $("#guide").dataset.focus;
+  toggleGuide(false);
+  if (!settings.tutorial_done) settings = (await api().save_settings({ tutorial_done: true })).settings;
 }
 
 /* Window state: no window buttons in full screen */
@@ -920,6 +1130,8 @@ async function pickProfile(name) {
 }
 
 function openSettings(sec) {
+  capturing = null;
+  renderKeys();
   fillSettings();
   renderBeta();
   renderPerf();
@@ -978,39 +1190,33 @@ function wire() {
   $$("[data-ai-mode]").forEach((b) => (b.onclick = () => setAiMode(b.dataset.aiMode)));
   $("#btnTemp").onclick = toggleTemporary;
   document.addEventListener("keydown", async (e) => {
-    if (e.ctrlKey && e.code === "Space") {  // push-to-talk works in both modes
+    if (capturing) {  // Settings > Shortcuts is waiting for keys
       e.preventDefault();
-      const r = await api().push_to_talk();
-      if (!r.ok) notice(T("voiceLoading") + (r.error && r.error !== "loading" ? ` (${r.error})` : ""), T("moreVoice"));
+      e.stopPropagation();
+      const combo = comboOf(e);
+      if (!combo) return;
+      const id = capturing;
+      capturing = null;
+      if (combo === "Esc") return renderKeys();
+      return saveShortcut(id, combo === "Backspace" || combo === "Delete" ? "" : combo);
     }
     if (e.key === "Escape" && confirmId) { answerConfirm(false); return; }
-    if (e.key === "F1" || (e.ctrlKey && e.key === "/")) { e.preventDefault(); toggleGuide(); return; }
+    if (e.key === "Escape" && $("#app").classList.contains("zen")) { toggleZen(false); return; }
+    if (e.key === "Escape" && tutorialStep >= 0) { endTutorial(); return; }
     if (e.key === "Escape" && !$("#guide").hidden) { toggleGuide(false); return; }
-    if (e.ctrlKey && !e.altKey && !e.shiftKey && SHORTCUT_KEYS[e.key]) {
-      const sc = SHORTCUT_KEYS[e.key];
+    const combo = comboOf(e), act = combo && actionFor(combo);
+    const typing = e.target.closest && e.target.closest("input, textarea, select");
+    if (act && !(typing && !e.ctrlKey && !e.altKey && !/^F\d/.test(combo))) {
       e.preventDefault();
-      if (sc.feature && !feature(sc.feature)) return;
-      if (sc.panel && isOpen(sc.panel)) { $("#" + sc.panel).hidden = true; return; }  // same shortcut closes it
-      toggleGuide(false);
-      sc.run();
+      if (act.feature && !feature(act.feature)) return;
+      if (act.panel && isOpen(act.panel)) { $("#" + act.panel).hidden = true; return; }  // the same keys close it
+      if (act.id !== "guide") toggleGuide(false);
+      act.run();
       return;
-    }
-    if (e.ctrlKey && e.shiftKey && !e.altKey) {
-      const k = e.key.toLowerCase();
-      const act = { m: () => api().minimize(), q: () => api().quit(), x: closeToasts }[k];
-      if (act) { e.preventDefault(); act(); return; }
     }
     if (e.key === "Escape") {
       const open = $$(".modal:not([hidden]), .drawer:not([hidden])");
       if (open.length) open.forEach((m) => (m.hidden = true)); else dock("interrupt");
-    }
-    if (e.key === "F11") { e.preventDefault(); toggleFull(); }
-    // v0.10 shortcuts: Ctrl+, settings · Ctrl+Shift+N new conversation · Ctrl+H conversations · Ctrl+J notifications
-    // · Ctrl+T transcript (audio mode)
-    if (e.ctrlKey && !e.altKey) {
-      const k = e.key.toLowerCase();
-      const act = { t: () => state.ui_mode === "audio" && toggleTranscript(), n: e.shiftKey ? newConversation : null }[k];
-      if (act) { e.preventDefault(); act(); }
     }
   });
 
@@ -1038,6 +1244,18 @@ function wire() {
   document.addEventListener("wheel", activity, { passive: true });
   initExclusivePanels();
   initMovable();
+  $("#keysList").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-action]");
+    if (!b) return;
+    capturing = capturing === b.dataset.action ? null : b.dataset.action;
+    renderKeys();
+  });
+  $("#btnKeysReset").onclick = async () => { settings = (await api().save_settings({ shortcuts: {} })).settings; renderKeys(); };
+  $("#btnTutorial").onclick = () => { $("#settings").hidden = true; startTutorial(); };
+  $("#tutNext").onclick = () => tutorialGo(tutorialStep + 1);
+  $("#tutSkip").onclick = () => endTutorial();
+  const cf = $("#settingsForm");
+  ["cursor_style", "cursor_size"].forEach((n) => (cf.elements[n].onchange = () => setCursor(cf.elements.cursor_style.value, cf.elements.cursor_size.value)));
   $("#btnQuit").onclick = () => api().quit();
 
   $("#taskForm").addEventListener("submit", async (e) => {
@@ -1227,18 +1445,22 @@ function catIcon(category) {
 function setRingPos(dx, dy, save = true) {
   const max = (v, lim) => Math.max(-lim, Math.min(lim, v));
   dx = max(dx, innerWidth / 2 - 80); dy = max(dy, innerHeight / 2 - 80);
-  $("#stage").style.setProperty("--dx", dx + "px");
-  $("#stage").style.setProperty("--dy", dy + "px");
+  // v0.16.5: by default only the ring moves and the text under it stays put (Settings > Interface)
+  const follow = !!settings.exchange_follow, onStage = $("#stage"), onCore = $("#core");
+  for (const [el, use] of [[onStage, follow], [onCore, !follow]]) {
+    el.style.setProperty("--dx", (use ? dx : 0) + "px");
+    el.style.setProperty("--dy", (use ? dy : 0) + "px");
+  }
   if (save) try { localStorage.setItem("nexus.ringPos", JSON.stringify([dx, dy])); } catch (e) { /* ignore */ }
   return [dx, dy];
 }
+let ringPos = [0, 0];
 
 function wireRingDrag() {
   let pos = [0, 0];
   try { pos = JSON.parse(localStorage.getItem("nexus.ringPos")) || [0, 0]; } catch (e) { /* ignore */ }
-  pos = setRingPos(pos[0], pos[1], false);
-  const core = $("#core");
-  core.title = T("ringDrag");
+  pos = ringPos = setRingPos(pos[0], pos[1], false);
+  const core = $("#core");  // v0.16.5: no tooltip - the guide (F1) explains it
   let start = null;
   core.addEventListener("pointerdown", (e) => {
     if (state.ui_mode !== "audio" || e.button !== 0) return;
@@ -1251,7 +1473,7 @@ function wireRingDrag() {
     if (!start.moved && Math.hypot(dx, dy) < 4) return;  // a click is not a drag
     start.moved = true;
     core.classList.add("dragging"); $("#stage").classList.add("dragging");
-    pos = setRingPos(start.pos[0] + dx, start.pos[1] + dy, false);
+    pos = ringPos = setRingPos(start.pos[0] + dx, start.pos[1] + dy, false);
   });
   const end = () => {
     if (start && start.moved) setRingPos(pos[0], pos[1]);
@@ -1260,7 +1482,7 @@ function wireRingDrag() {
   };
   core.addEventListener("pointerup", end);
   core.addEventListener("pointercancel", end);
-  core.addEventListener("dblclick", () => (pos = setRingPos(0, 0)));
+  core.addEventListener("dblclick", () => (pos = ringPos = setRingPos(0, 0)));
 }
 
 /* ------------------------------------------------------------------ conversations (v0.9) */
