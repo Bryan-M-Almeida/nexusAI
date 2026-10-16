@@ -1,4 +1,5 @@
 """Offline voice: faster-whisper speech-to-text + Windows SAPI text-to-speech with effects (tts.py)."""
+import pathlib
 import queue
 import re
 import threading
@@ -316,8 +317,10 @@ class Listener:
     accepts control commands (pause/stop/...) from it.
     on_level(0..1): microphone level while the user speaks (for the UI ring)."""
 
-    def __init__(self, on_text, on_state, speaker: Speaker, on_level=lambda level: None):
+    def __init__(self, on_text, on_state, speaker: Speaker, on_level=lambda level: None, on_progress=lambda pct: None):
         self.on_text, self.on_state, self.speaker, self.on_level = on_text, on_state, speaker, on_level
+        self.on_progress = on_progress  # v0.16.8: download progress of the voice model, 0..100 (-1 = failed)
+        self._hold: list = []  # audio captured while the talk key is held (v0.16.8, beta)
         self.model = None
         self.model_error = None
         self.model_state = "loading"  # loading | ready | missing (not downloaded yet) | error
@@ -343,16 +346,45 @@ class Listener:
 
             if download and netprobe.effective() == "offline":
                 raise RuntimeError("offline mode: the voice model can't be downloaded (Settings > Performance)")
-            self.model = WhisperModel(settings["stt_model"], device="cpu", compute_type="int8",
-                                      local_files_only=not download)
+            watch = threading.Event()
+            if download:
+                threading.Thread(target=self._watch_download, args=(watch,), daemon=True, name="stt-dl").start()
+            try:
+                self.model = WhisperModel(settings["stt_model"], device="cpu", compute_type="int8",
+                                          local_files_only=not download)
+            finally:
+                watch.set()
             self.model_state = "ready"
+            if download:
+                self.on_progress(100)
             if self.live:  # audio mode was waiting for the model
                 self.set_live(True)
         except Exception as exc:
             self.model = None
             self.model_state = "error" if download else "missing"
             self.model_error = str(exc) if download else None
+            if download:
+                self.on_progress(-1)
 
+    # approximate download size of each faster-whisper model (bytes)
+    MODEL_BYTES = {"tiny": 75.6e6, "base": 145e6, "small": 484e6, "medium": 1.53e9, "large-v3": 3.1e9}
+
+    def _watch_download(self, done: threading.Event):
+        """Download progress for the ring: the model folder in the Hugging Face cache grows as it downloads."""
+        try:
+            from huggingface_hub.constants import HF_HUB_CACHE
+        except Exception:
+            return
+        name = settings["stt_model"]
+        folder = pathlib.Path(HF_HUB_CACHE) / f"models--Systran--faster-whisper-{name}"
+        total = self.MODEL_BYTES.get(name, 5e8)
+        last = -1
+        while not done.wait(0.4):
+            size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file()) if folder.exists() else 0
+            pct = min(99, int(size * 100 / total))
+            if pct != last:
+                self.on_progress(pct)
+                last = pct
     def release(self):
         """Free Whisper's memory (~0.5 GB for "small") while voice isn't needed; reloaded on demand."""
         if self.model is not None and self.mode == "off":
@@ -384,6 +416,28 @@ class Listener:
         self.mode = "ptt"
         self._open()
         self.on_state("listening")
+
+    # v0.16.8 (beta): hold the talk key - the microphone records until it is released, then the text is sent
+    def hold_start(self):
+        self.speaker.stop()
+        self._hold = []
+        self.mode = "hold"
+        self._open()
+        self.on_state("listening")
+
+    def hold_stop(self):
+        if self.mode != "hold":
+            return
+        buf, self._hold = self._hold, []
+        self.mode = "live" if self.live else "off"
+        if not self.live:
+            self._close()
+        self.on_level(0)
+        audio = np.concatenate(buf) if buf else np.zeros(0, dtype=np.float32)
+        if len(audio) < RATE * 0.3 or not self.ready:
+            self.on_state("standby" if self.mode == "live" else "idle")
+            return
+        threading.Thread(target=self._handle, args=(audio, False, True), daemon=True, name="stt-hold").start()
 
     def set_live(self, enabled: bool):
         """Continuous conversation (audio mode, mic unmuted). Starts as soon as Whisper is ready;
@@ -432,6 +486,12 @@ class Listener:
         det, during, tick = SpeechDetector(), False, 0
         while True:
             frame = self._frames.get()
+            if self.mode == "hold":  # key held: keep everything, no voice detection
+                self._hold.append(frame)
+                tick += 1
+                if tick % 2 == 0:
+                    self.on_level(round(min(1.0, float(np.sqrt(np.mean(frame ** 2))) / 0.12), 2))
+                continue
             if self.mode == "off":
                 if det.active:
                     det.reset_segment()
@@ -458,11 +518,11 @@ class Listener:
         """Whisper guesses the language badly on short phrases: use the chosen one, else the app's."""
         return settings["language"] if settings["language"] in LANGS else lang()
 
-    def _handle(self, audio, during_speech):
+    def _handle(self, audio, during_speech, held=False):
         if not self.ready:
             return
-        was_ptt = self.mode == "ptt"
-        if was_ptt:  # one utterance captured: go back to live listening or release the mic
+        was_ptt = held or self.mode == "ptt"
+        if was_ptt and not held:  # one utterance captured: go back to live listening or release the mic
             self.mode = "live" if self.live else "off"
             if not self.live:
                 self._close()

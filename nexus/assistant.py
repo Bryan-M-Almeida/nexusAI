@@ -511,7 +511,8 @@ class Assistant:
             nav, reply = ui_nav.reply(nav)
             tools.ui_hook({**nav, "say": reply})
             self.emit("tool", {"name": "open_interface", "args": nav})
-            self.emit("done", {"text": reply, "speak": nav["target"] != "tutorial", "interrupted": False})
+            self.emit("done", {"text": reply, "interrupted": False,  # v0.16.8: saying it is a preference
+                               "speak": nav["target"] != "tutorial" and bool(settings.get("speak_menus", True))})
             return
         # Context travels inside the current user turn (many chat templates drop extra system messages); the history
         # keeps only the raw text. v0.15.5 measured keeping the context blocks too: the knowledge excerpts fill the

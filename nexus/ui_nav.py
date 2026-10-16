@@ -8,6 +8,7 @@ import unicodedata
 # target -> words (accents removed, lower case). Order matters: the first match wins.
 TARGETS = [
     ("tutorial", r"tutorial"),
+    ("map", r"mapa( mental| conceitual| de habilidades| de conhecimento)?|mind ?map|concept map|skill tree|arvore de habilidades"),
     ("guide", r"guia|guide|guia de atalhos|lista de atalhos"),
     ("panel", r"painel|panel|dashboard|agenda|tarefas|tasks|tareas|memorias?|memory|memories"),
     ("conversations", r"conversas|conversations|conversaciones|historico|history|historial"),

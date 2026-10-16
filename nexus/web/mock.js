@@ -9,7 +9,7 @@ if (!window.pywebview && location.search.includes("mock")) {
     interests: ["AI", "games", "coffee"], goals: ["Ship NEXUS"], profile: "developer", tone: "técnico e direto",
     modules: ["código", "agenda", "foco/pomodoro"], language: "pt-BR" };
   let mockFull = false;
-  const settings = { ui_layout: "computer", bar_top: "hover", bar_left: "hover", bar_right: "hover", bar_bottom: "hover", ring_wander: true, rest_minutes: 3, show_exchange: true, exchange_follow: false, exchange_hide_seconds: 45, cursor_style: "ring", cursor_size: "medium", shortcuts: {}, tutorial_done: true, app_mode: "user", beta_library: true, color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c", llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
+  const settings = { ui_layout: "computer", bar_top: "hover", bar_left: "hover", bar_right: "hover", bar_bottom: "hover", ring_wander: true, rest_minutes: 3, show_exchange: true, exchange_follow: false, exchange_hide_seconds: 45, cursor_style: "ring", cursor_size: "medium", shortcuts: {}, tutorial_done: true, speak_menus: true, beta_map: true, beta_hold_talk: false, app_mode: "user", beta_library: true, color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c", llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, tts_volume: 100, llm_preset: "ollama", llm_api_key: "ollama",
     llm_temperature: 0.3, llm_context: 8192, history_turns: 12, auto_title: true, greet_on_start: true, start_fullscreen: true,
     mic_device: "", vad_threshold: 0.5, vad_silence: 0.7, reminder_leads: "60,10,0", speak_reminders: true,
@@ -115,6 +115,12 @@ if (!window.pywebview && location.search.includes("mock")) {
     report_issue: async () => ({ ok: true, file: "C:/NEXUS/reports/nexus-report-20261014-120000.md" }),
     toggle_fullscreen: async () => (mockFull = !mockFull), minimize: async () => {}, quit: async () => {},
     llm_status: async () => llm, speak_help: async () => speak(4),
+    hold_start: async () => ({ ok: true }), hold_stop: async () => {},
+    optimize: async (k) => (k === "data" ? { ok: true, backup: "C:/x/nexus-backup-test.zip", rss_mb: 120 } : { ok: true, freed_mb: 312.4, rss_mb: 188.1, freed_disk_mb: 1.2 }),
+    concept_map: async () => ({ skills: ["organization", "finance", "programming", "study", "health", "knowledge", "research", "voice"].map((s, i) => ({ skill: s, rank: "EDCBA"[i % 5], level: 1 + i })),
+      knowledge: [{ name: "Anatomia", items: ["Corpo humano"] }, { name: "Finanças", items: ["Juros compostos", "Reserva de emergência", "Inflação"] },
+        { name: "Primeiros Socorros", items: ["RCP", "Engasgo"] }, { name: "Filosofia", items: ["Estoicismo"] }, { name: "Programação", items: ["Python", "JavaScript"] }],
+      memories: ["Prefere café sem açúcar", "Trabalha melhor à tarde"] }),
     set_temporary: async (on) => { temporary = on; return state(); },
     set_mic: async (muted) => { settings.mic_muted = muted; return state(); },
     set_ai_voice: async (on) => { settings.voice_enabled = on; return state(); },

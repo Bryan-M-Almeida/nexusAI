@@ -47,7 +47,8 @@ class Api:
         tools.ui_hook = lambda nav: emit("ui_open", nav)  # the model's open_interface tool (v0.16.5)
         self._speaker = Speaker(lambda s: emit("voice", s), lambda payload: emit("speak_env", payload))
         self._listener = Listener(self._on_voice_text, lambda s: emit("voice", s), self._speaker,
-                                  on_level=lambda level: emit("mic_level", level))
+                                  on_level=lambda level: emit("mic_level", level),
+                                  on_progress=lambda pct: emit("stt_progress", pct))
         scheduler.start(self._on_alert)
         netprobe.start(lambda st: emit("network", {"effective": netprobe.effective(), "quality": st}))
         bridge.start(settings["bridge_port"], self._on_profile)
@@ -558,6 +559,73 @@ class Api:
         self._speaker.stop()
         self._speaker.say(text, force=True, remember=False)
 
+    def hold_start(self):
+        """Beta (v0.16.8): talk while the key is held."""
+        if not self._listener.ensure_model():
+            return {"ok": False, "error": self._listener.model_error or "loading"}
+        self._listener.hold_start()
+        return {"ok": True}
+
+    def hold_stop(self):
+        self._listener.hold_stop()
+
+    @staticmethod
+    def concept_map():
+        """Concept map (beta, v0.16.8): skills and knowledge areas around the ring."""
+        cats: dict = {}
+        for d in knowledge.documents():
+            cats.setdefault(d.get("category") or "Geral", []).append(d["title"])
+        mems = [m["content"] for m in memory.all_memories()][:8]
+        return {"skills": skills.summary()["skills"],
+                "knowledge": [{"name": k, "items": v} for k, v in sorted(cats.items())],
+                "memories": mems}
+
+    def optimize(self, kind):
+        """Settings > Performance > Optimize (v0.16.8): free RAM, clear caches, temporary files or conversations."""
+        import gc
+
+        from . import backup
+        from .config import LOG_DIR
+
+        before = _rss_mb()
+        freed_disk = 0
+        if kind in ("ram", "cache"):
+            knowledge._cache.clear()
+            tools._online_cache.clear()
+            self._speaker.__dict__.get("_cache", {}).clear()
+            if kind == "ram" and self._listener.mode == "off":
+                self._listener.release()  # Whisper (~0.5 GB) reloads by itself when voice is used again
+            gc.collect()
+            if kind == "cache":
+                size0 = db_path_size()
+                db.execute("VACUUM")
+                freed_disk = max(0, size0 - db_path_size())
+            _trim_working_set()
+        elif kind == "temp":
+            import time as _t
+
+            old = _t.time() - 30 * 86400
+            for f in list(LOG_DIR.glob("nexus.log.*")) + [f for f in tools.REPORTS_DIR.glob("*.md") if f.stat().st_mtime < old]:
+                try:
+                    freed_disk += f.stat().st_size
+                    f.unlink()
+                except OSError:
+                    pass
+        elif kind == "data":
+            saved = backup.create()  # always a backup first: this can't be undone otherwise
+            for table in ("messages", "conversations", "notifications", "actions"):
+                try:
+                    db.execute(f"DELETE FROM {table}")
+                except Exception:
+                    pass
+            memory.new_conversation()
+            emit("refresh")
+            return {"ok": True, "backup": str(saved), "rss_mb": _rss_mb()}
+        else:
+            return {"ok": False, "error": "unknown"}
+        return {"ok": True, "freed_mb": round(max(0, before - _rss_mb()), 1), "rss_mb": _rss_mb(),
+                "freed_disk_mb": round(freed_disk / 1e6, 1)}
+
     def push_to_talk(self):
         if not self._listener.ensure_model():  # first use downloads the Whisper model
             return {"ok": False, "error": self._listener.model_error or "loading"}
@@ -795,6 +863,54 @@ class Api:
         if new_mic:
             self._listener.reopen()
         return self.get_settings()
+
+
+def _rss_mb() -> float:
+    """This process's working set (RAM in use), in MB - Windows API, no extra package."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PMC(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD), ("PeakWorkingSetSize", ctypes.c_size_t),
+                        ("WorkingSetSize", ctypes.c_size_t), ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPagedPoolUsage", ctypes.c_size_t), ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaNonPagedPoolUsage", ctypes.c_size_t), ("PagefileUsage", ctypes.c_size_t),
+                        ("PeakPagefileUsage", ctypes.c_size_t)]
+        pmc = PMC()
+        pmc.cb = ctypes.sizeof(PMC)
+        k = _kernel32()
+        k.K32GetProcessMemoryInfo(k.GetCurrentProcess(), ctypes.byref(pmc), pmc.cb)
+        return round(pmc.WorkingSetSize / 1e6, 1)
+    except Exception:
+        return 0.0
+
+
+def _trim_working_set():
+    """Give unused pages back to Windows (they come back on demand)."""
+    try:
+        k = _kernel32()
+        k.K32EmptyWorkingSet(k.GetCurrentProcess())
+    except Exception:
+        pass
+
+
+def _kernel32():
+    import ctypes
+    from ctypes import wintypes
+
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.GetCurrentProcess.restype = wintypes.HANDLE  # a 64-bit pseudo handle: the default int return type breaks it
+    k.K32GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD]
+    k.K32EmptyWorkingSet.argtypes = [wintypes.HANDLE]
+    return k
+
+
+def db_path_size() -> int:
+    from .config import DATA_DIR
+
+    f = DATA_DIR / "nexus.db"
+    return f.stat().st_size if f.exists() else 0
 
 
 def pathlib_name(path) -> str:

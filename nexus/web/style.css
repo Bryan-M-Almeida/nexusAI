@@ -945,3 +945,78 @@ body.ai-down { --c-core: #e4574c; }
 .key-btn.fixed { opacity: .55; }
 /* the edges step: the card goes to the middle so it doesn't cover the bottom callout */
 .tutorial[data-focus="edges"] { bottom: auto; top: 50%; transform: translate(-50%, -50%); }
+
+/* ================================================================ v0.16.8 */
+/* The Windows pointer showed up inside menus and on disabled controls: everything inherits NEXUS's pointer
+   unless it is clickable (hover pointer) or editable text (I-beam). */
+*, *::before, *::after { cursor: inherit; }
+.drawer-box, .conv-box, .modal-box, .modal-box.settings-box, .modal-box.reader-box { cursor: inherit; }
+button:disabled, .card-opt:disabled, .chip-opt.fixed, .key-btn.fixed, [aria-disabled="true"] { cursor: var(--cur, default); }
+.moving, .moving * { cursor: var(--cur-hover, grabbing) !important; }
+.app.zen, .app.zen * { cursor: none !important; }
+
+/* voice model download: the rings wave and the core shows the percentage */
+@keyframes ringWave { 0%, 100% { transform: scale(1); opacity: .95; } 50% { transform: scale(1.07); opacity: .4; } }
+.app.dl .core .ring-boot { animation: ringWave 1.6s ease-in-out infinite !important; animation-delay: var(--delay) !important; }
+.core-text { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 2;
+  font-family: var(--f-brand); font-weight: 800; font-size: calc(var(--size) * .075); letter-spacing: .06em; color: #fff;
+  text-shadow: 0 0 18px var(--c-core), 0 0 4px rgba(0, 0, 0, .6); }
+.core-text:empty { display: none; }
+.app.docked .core-text { display: none; }
+
+/* the small ring follows the open menu; a full-screen menu has the whole screen */
+.dock-ring { left: calc(50% - 39px); margin-left: 0; transition: left .12s ease, top .12s ease, opacity .25s ease; }
+.dock-ring.gone { opacity: 0; }
+.app.docked ~ .drawer .maximized, .app.docked ~ .modal .maximized { top: 12px; }
+.drawer-box.snap-left, .conv-box.snap-left, .modal-box.snap-left,
+.drawer-box.snap-right, .conv-box.snap-right, .modal-box.snap-right { position: fixed; top: 12px; bottom: 12px; width: calc(50% - 18px) !important;
+  height: auto !important; max-height: none !important; translate: none !important; z-index: 1; }
+.snap-left { left: 12px; } .snap-right { right: 12px; }
+.app.docked ~ .drawer .snap-left, .app.docked ~ .drawer .snap-right,
+.app.docked ~ .modal .snap-left, .app.docked ~ .modal .snap-right { top: 104px; }
+.snap-preview[data-zone="snap-left"] { right: auto; width: calc(50% - 18px); }
+.snap-preview[data-zone="snap-right"] { left: auto; width: calc(50% - 18px); }
+
+/* concept map */
+.map-box { width: min(1180px, 96vw); height: min(88vh, 860px); }
+.map-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.map-head .hint { margin: 0; }
+.map-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: var(--radius-sm);
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--c-core) 12%, transparent), transparent 70%); }
+.map-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.map-links line { stroke: var(--c-ring-faint); stroke-width: 1; }
+.map-links line.hub { stroke: var(--c-ring-soft); stroke-width: 1.4; }
+.map-core { position: absolute; left: 50%; top: 50%; width: 130px; height: 130px; margin: -65px 0 0 -65px; pointer-events: none; }
+.map-core .rings-slot, .map-core .hud-rings { position: absolute; inset: 0; }
+.map-core .hud-rings { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--c-core) 60%, transparent)); }
+.map-nodes { position: absolute; inset: 0; }
+.map-node { position: absolute; left: 0; top: 0; max-width: 180px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--c-ring-faint);
+  background: color-mix(in srgb, var(--bg-2) 90%, transparent); color: var(--text); font-size: 11.5px; line-height: 1.3; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; will-change: translate; }
+.map-node small { display: block; font-family: var(--f-mono); font-size: 9.5px; color: var(--c-ring-soft); }
+.map-node.hub { font-family: var(--f-brand); font-weight: 700; font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  padding: 6px 12px; border-color: var(--c-ring-soft); background: color-mix(in srgb, var(--c-core) 20%, var(--bg-2)); }
+.map-node.skill:not(.hub) { border-color: color-mix(in srgb, var(--c-core) 45%, transparent); }
+.map-node.mem:not(.hub) { font-style: italic; }
+.map-node:hover { border-color: var(--c-ring); z-index: 2; }
+.map-detail { position: absolute; right: 26px; bottom: 26px; max-width: 340px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;
+  border: 1px solid var(--c-ring-soft); border-radius: var(--radius); background: color-mix(in srgb, var(--bg-2) 96%, transparent); font-size: 13px; z-index: 3; }
+.map-detail b { font-weight: 600; }
+.map-detail span { font-size: 12.5px; color: color-mix(in srgb, var(--c-ring) 80%, transparent); }
+
+/* dual AI (not available yet) */
+.locked-card { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 12px; padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px dashed var(--line-strong); color: var(--muted); opacity: .75; }
+.locked-card b { display: block; color: var(--silver); font-weight: 600; font-size: 14px; }
+.locked-card small { font-size: 12.5px; line-height: 1.4; }
+.locked-card svg { flex: none; margin-top: 2px; }
+
+/* optimization */
+.opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 8px; }
+.opt-grid button { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; padding: 10px 12px;
+  font-family: var(--f-body); letter-spacing: 0; font-size: 13px; }
+.opt-grid button b { font-weight: 600; color: var(--text); }
+.opt-grid button small { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+.opt-confirm { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(228, 87, 76, .55); background: rgba(228, 87, 76, .08); }
+.opt-confirm p { margin: 0 0 4px; font-size: 13px; color: #ffd5d1; }
+@media (max-width: 760px) { .opt-grid { grid-template-columns: 1fr; } }

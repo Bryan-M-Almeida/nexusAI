@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 3.0  ·  Data: 2026-10-15  ·  Versão do app: 0.16.5
+ Versão do documento: 3.1  ·  Data: 2026-10-15  ·  Versão do app: 0.16.8
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -134,6 +134,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-UI-015   "IA INDISPONÍVEL" no aro (núcleo vermelho)
       NX-UI-016   Pedi para abrir um menu e o NEXUS respondeu outra coisa
       NX-UI-017   Aro girando rápido sem parar depois de "repete" / "pausa"
+      NX-UI-018   O cursor do Windows aparecia em vez do cursor do NEXUS
  WRK  NX-WRK-001  A IA diz que criou/alterou um arquivo, mas nada mudou
       NX-WRK-002  "Fora da área de trabalho": caminho recusado
       NX-WRK-003  Comando não roda, demora ou fica esperando confirmação
@@ -1170,6 +1171,14 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                só desmarcava quando a IA respondia; comandos rápidos não passam
                pela IA.
   Correção   : Comandos rápidos e pedidos de menu liberam o estado na hora.
+
+[NX-UI-018] O cursor do Windows aparecia em vez do cursor do NEXUS
+  Severidade : BAIXA            Status: CORRIGIDO (v0.16.8) Observado: SIM
+  Causa      : Regras antigas fixavam o cursor padrão dentro dos menus
+               (v0.16.1) e em botões desativados.
+  Correção   : Tudo herda o cursor escolhido em Configurações > Interface;
+               só o que é clicável (cursor de clique) e o texto editável
+               (barra de texto) usam outro. Barras de rolagem usam o do Windows.
 
 ================================================================================
  WRK — ÁREA DE TRABALHO

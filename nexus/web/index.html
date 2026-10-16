@@ -83,6 +83,8 @@
     <p class="rail-title mono" data-i18n="railPanel">PAINEL</p>
     <button class="rail-btn" id="btnPanelRail"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       <span><b data-i18n="panelName">Painel</b><small data-i18n="panelHint">agenda, tarefas, memória e dados</small></span></button>
+    <button class="rail-btn" id="btnMapRail"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.5"/><circle cx="4.5" cy="6" r="1.6"/><circle cx="19.5" cy="6" r="1.6"/><circle cx="5" cy="18.5" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M10 11 6 7M14 11l4-4M10 13.5l-4 3.7M14 13.5l3.8 3.4"/></svg>
+      <span><b data-i18n="mapName">Mapa</b><small data-i18n="mapRailHint">habilidades e conhecimento ligados ao NEXUS</small></span></button>
     <button class="rail-btn" id="btnSkillsRail"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg>
       <span><b data-i18n="skillsName">Habilidades</b><small data-i18n="skillsRailHint">ranks e níveis do NEXUS</small></span></button>
     <p class="rail-title mono rail-sep" data-i18n="wsRail">TRABALHO</p>
@@ -120,6 +122,7 @@
   <section class="stage" id="stage">
     <div class="core" id="core" data-state="idle" title="">
       <div class="ring" id="ring"><div class="rings-slot" data-rings="core"></div></div>
+      <div class="core-text" id="coreText"></div>
       <div class="core-hover" id="coreHover"><span class="wordmark wordmark-xs is-on"></span><span class="mono" id="modelName">NEX-1.0</span></div>
       <!-- Telemetry (v0.9 HUD): four readouts tied to the ring by bracket lines; they move with it -->
       <div class="telemetry mono" aria-hidden="true">
@@ -174,6 +177,21 @@
     <p class="g-kicker mono" data-i18n="gKeys">ATALHOS</p>
     <ul class="g-list mono" id="guideKeys"></ul>
     <p class="g-close mono" data-i18n="gClose">F1 ou Esc para fechar</p>
+  </div>
+</div>
+
+<!-- ============ CONCEPT MAP (v0.16.8, beta) ============ -->
+<div class="drawer" id="mapDrawer" hidden>
+  <div class="conv-box map-box">
+    <button class="icon-btn drawer-close" data-close aria-label="Close">✕</button>
+    <div class="map-head"><p class="mono kicker" data-i18n="mapTitle">MAPA DO NEXUS</p>
+      <span class="hint" data-i18n="mapHint">Habilidades, conhecimento e memórias ligados ao NEXUS. Clique em um ponto para ver mais.</span></div>
+    <div class="map-stage" id="mapStage">
+      <svg class="map-links" id="mapLinks"></svg>
+      <div class="map-core"><div class="rings-slot" data-rings="map"></div></div>
+      <div class="map-nodes" id="mapNodes"></div>
+    </div>
+    <div class="map-detail" id="mapDetail" hidden></div>
   </div>
 </div>
 
@@ -419,6 +437,8 @@
         <div class="ai-status mono" id="aiStatus"></div>
         <div class="seg mono" id="aiSeg"><button type="button" data-target="local" data-i18n="aiLocal">IA LOCAL</button><button type="button" data-target="api" data-i18n="aiApi">API</button></div>
         <p class="hint" data-i18n="aiSegHint">As duas configurações ficam guardadas; troque a qualquer momento pela borda esquerda.</p>
+        <div class="locked-card" aria-disabled="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><div><b data-i18n="dualAi">IA dupla: API + local</b>
+          <small data-i18n="dualAiHint">A IA de API responde e a IA local cuida das ações simples (abrir menus, comandos rápidos) ao mesmo tempo. Em breve.</small></div></div>
         <label><span data-i18n="provider">Provedor</span><select name="llm_preset" id="llmPreset"></select></label>
         <p class="hint warn-cloud" id="cloudWarn" hidden data-i18n="cloudWarn">Provedor na nuvem: suas mensagens, memórias e dados enviados no contexto saem do computador. Os locais (Ollama, LM Studio) não enviam nada.</p>
         <label><span data-i18n="llmUrl">Endereço do servidor</span><input name="llm_base_url" spellcheck="false"></label>
@@ -492,6 +512,19 @@
         <label><span data-i18n="bgRelease">Minimizado por quantos minutos para liberar a memória da voz</span><input name="bg_release_minutes" type="number" min="1" max="240"></label>
         <p class="sub mono" data-i18n="hwTitle">SEU COMPUTADOR</p>
         <div class="hw-box mono" id="hwBox"></div>
+        <p class="sub mono" data-i18n="optTitle">OTIMIZAR</p>
+        <div class="opt-grid">
+          <button class="btn-ghost" type="button" data-opt="ram"><b data-i18n="optRam">Liberar memória (RAM)</b><small data-i18n="optRamHint">voz parada e caches saem da memória; voltam sozinhos quando usados</small></button>
+          <button class="btn-ghost" type="button" data-opt="cache"><b data-i18n="optCache">Limpar cache</b><small data-i18n="optCacheHint">respostas guardadas e compactação do banco de dados</small></button>
+          <button class="btn-ghost" type="button" data-opt="temp"><b data-i18n="optTemp">Limpar dados temporários</b><small data-i18n="optTempHint">logs antigos e relatórios com mais de 30 dias</small></button>
+          <button class="btn-ghost danger" type="button" data-opt="data"><b data-i18n="optData">Limpar dados…</b><small data-i18n="optDataHint">conversas, notificações e registro de ações (com backup antes)</small></button>
+        </div>
+        <div class="opt-confirm" id="optConfirm" hidden>
+          <p data-i18n="optDataConfirm">Apagar TODAS as conversas, notificações e o registro de ações? Um backup é feito antes. Memórias, conhecimento, agenda e tarefas continuam.</p>
+          <div class="row-btns"><button class="btn-ghost" type="button" id="optNo" data-i18n="cancel">Cancelar</button>
+            <button class="btn-ghost danger" type="button" id="optYes" data-i18n="optDataYes">Sim, apagar</button></div>
+        </div>
+        <p class="hint" id="optResult"></p>
       </section>
 
       <!-- NOTIFICATIONS -->
@@ -551,6 +584,7 @@
         <label class="check"><input type="checkbox" name="show_exchange"><span data-i18n="showExchange">Mostrar a conversa abaixo do aro (Ctrl+I mostra por alguns segundos quando desligado)</span></label>
         <label class="check"><input type="checkbox" name="exchange_follow"><span data-i18n="exchangeFollow">O texto acompanha o aro (inclusive quando ele se move sozinho)</span></label>
         <label><span data-i18n="exchangeHide">Esconder o texto depois de quantos segundos aguardando (0 = nunca)</span><input name="exchange_hide_seconds" type="number" min="0" max="3600" step="5"></label>
+        <label class="check"><input type="checkbox" name="speak_menus"><span data-i18n="speakMenus">Falar o nome do menu ao abrir ("Abrindo as configurações")</span></label>
         <p class="sub mono" data-i18n="cursorTitle">CURSOR DO MOUSE</p>
         <div class="two">
           <label><span data-i18n="cursorStyle">Estilo</span><select name="cursor_style">
@@ -619,6 +653,8 @@
           <label class="check"><input type="checkbox" name="beta_library"><span data-i18n="betaLibrary">Biblioteca e modo podcast</span></label>
           <label class="check"><input type="checkbox" name="beta_skills"><span data-i18n="betaSkills">Habilidades e níveis (E → S)</span></label>
           <label class="check"><input type="checkbox" name="beta_browser"><span data-i18n="betaBrowser">Navegador: abrir sites, pesquisar e tocar músicas no YouTube</span></label>
+          <label class="check"><input type="checkbox" name="beta_map"><span data-i18n="betaMap">Mapa conceitual: habilidades e conhecimento ligados ao aro (Ctrl+7)</span></label>
+          <label class="check"><input type="checkbox" name="beta_hold_talk"><span data-i18n="betaHoldTalk">Segurar para falar: o microfone fica ligado enquanto a tecla de falar estiver apertada e envia ao soltar</span></label>
         </div>
         <p class="hint" id="betaDevHint" hidden data-i18n="betaDevOn">No modo desenvolvedor todas ficam ligadas.</p>
       </section>

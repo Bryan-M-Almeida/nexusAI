@@ -61,7 +61,7 @@ STRINGS = {
         "ui_beta_off": "{name} é uma função beta e está desligada. Você pode ligar em Configurações, Beta.",
         "ui_n_settings": "as configurações", "ui_n_panel": "o painel", "ui_n_conversations": "as conversas",
         "ui_n_notifications": "as notificações", "ui_n_library": "a biblioteca", "ui_n_workspace": "a área de trabalho",
-        "ui_n_skills": "as habilidades", "ui_n_guide": "o guia", "ui_n_tutorial": "o tutorial",
+        "ui_n_skills": "as habilidades", "ui_n_guide": "o guia", "ui_n_tutorial": "o tutorial", "ui_n_map": "o mapa",
     },
     "en": {
         "intro_anon": "Hello, I am NEXUS, your virtual assistant. To get started, import your profile from the NEXUS form.",
@@ -119,7 +119,7 @@ STRINGS = {
         "ui_beta_off": "{name} is a beta feature and it is off. You can turn it on in Settings, Beta.",
         "ui_n_settings": "settings", "ui_n_panel": "the panel", "ui_n_conversations": "your conversations",
         "ui_n_notifications": "notifications", "ui_n_library": "the library", "ui_n_workspace": "the workspace",
-        "ui_n_skills": "skills", "ui_n_guide": "the guide", "ui_n_tutorial": "the tutorial",
+        "ui_n_skills": "skills", "ui_n_guide": "the guide", "ui_n_tutorial": "the tutorial", "ui_n_map": "the map",
     },
     "es": {
         "intro_anon": "Hola, soy NEXUS, tu asistente virtual. Para empezar, importa tu perfil del formulario NEXUS.",
@@ -177,7 +177,7 @@ STRINGS = {
         "ui_beta_off": "{name} es una función beta y está desactivada. Puedes activarla en Configuración, Beta.",
         "ui_n_settings": "la configuración", "ui_n_panel": "el panel", "ui_n_conversations": "las conversaciones",
         "ui_n_notifications": "las notificaciones", "ui_n_library": "la biblioteca", "ui_n_workspace": "el área de trabajo",
-        "ui_n_skills": "las habilidades", "ui_n_guide": "la guía", "ui_n_tutorial": "el tutorial",
+        "ui_n_skills": "las habilidades", "ui_n_guide": "la guía", "ui_n_tutorial": "el tutorial", "ui_n_map": "el mapa",
     },
 }
 LANGS = tuple(STRINGS)

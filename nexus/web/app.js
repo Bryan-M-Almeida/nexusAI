@@ -128,6 +128,7 @@ window.nexus = {
       case "heard": return onHeard(p);
       case "speak_env": ringSpeak(p); return wakeRing();
       case "ui_open": return onUiOpen(p);
+      case "stt_progress": return onSttProgress(p);
       case "mic_level": ringMicTarget = Math.max(ringMicTarget, p); return wakeRing();
       case "control": return onControl(p);
       case "ai_state": return setAiState(p);
@@ -393,7 +394,7 @@ function setVoiceState(st) {
   $("#dockRing").dataset.state = shown;
   if (st === "speaking") wakeRing();
   const label = $("#coreLabel");
-  label.textContent = aiDown && !aiBusy ? T("aiDown") : T("st_" + shown) || "";
+  label.textContent = sttDownload >= 0 ? T("sttDownloading") : aiDown && !aiBusy ? T("aiDown") : T("st_" + shown) || "";
   label.className = "core-label " + (["listening", "awake"].includes(shown) ? "red" : ["speaking", "thinking"].includes(shown) ? "blue" : "");
   $("#chipVoice").classList.toggle("on", state.ui_mode === "audio" && !state.mic_muted && state.stt === "ready");
   updateDock();
@@ -507,6 +508,7 @@ function applyInterface() {
   setCursor(settings.cursor_style, settings.cursor_size);
   setRingPos(ringPos[0], ringPos[1], false);
   $("#btnSkillsRail").hidden = !feature("skills");
+  $("#btnMapRail").hidden = !feature("map");
   // v0.15.5: beta features that are off disappear from the interface (Settings > Beta)
   $("#btnWorkspaces").hidden = !feature("workspace");
   $("#btnLibrary").hidden = !feature("library");
@@ -532,6 +534,8 @@ const ACTIONS = [
   { id: "library", def: "Ctrl+4", label: "kLibrary", panel: "libDrawer", feature: "library", run: () => openLibrary() },
   { id: "workspace", def: "Ctrl+5", label: "kWorkspace", panel: "wsDrawer", feature: "workspace", run: () => openWorkspaces() },
   { id: "skills", def: "Ctrl+6", label: "kSkills", panel: "skillsDrawer", feature: "skills", run: () => openSkills() },
+  { id: "map", def: "Ctrl+7", label: "kMap", panel: "mapDrawer", feature: "map", run: () => openMap() },
+  { id: "clearText", def: "Ctrl+L", label: "kClearText", run: () => $("#app").classList.add("ex-faded") },
   { id: "settings", def: "Ctrl+,", label: "kSettings", panel: "settings", run: () => openSettings() },
   { id: "mode", def: "Ctrl+M", label: "kMode", run: () => dock(state.ui_mode === "audio" ? "text" : "audio") },
   { id: "info", def: "Ctrl+I", label: "kInfo", run: () => peekInfo() },
@@ -571,7 +575,7 @@ function toggleGuide(on) {
 }
 
 /* Settings > Shortcuts: click a shortcut, press the new keys (Esc cancels, Backspace removes it) */
-let capturing = null;
+let capturing = null, holdKey = null;
 function renderKeys() {
   const used = {};
   ACTIONS.forEach((a) => { const k = keysOf(a); if (k) used[k] = (used[k] || 0) + 1; });
@@ -725,65 +729,103 @@ setInterval(() => {
 }, 3000);
 
 /* Only one menu at a time: opening one (click or shortcut) closes the one that was open. */
-const EXCLUSIVE = ["panelDrawer", "convDrawer", "wsDrawer", "skillsDrawer", "libDrawer", "settings", "notifDrawer", "guide"];
+const EXCLUSIVE = ["panelDrawer", "convDrawer", "wsDrawer", "skillsDrawer", "libDrawer", "settings", "notifDrawer", "mapDrawer", "guide"];
+const MENU_NAME = { panelDrawer: "panel", convDrawer: "conversations", wsDrawer: "workspace", skillsDrawer: "skills",
+  libDrawer: "library", settings: "settings", notifDrawer: "notifications", mapDrawer: "map" };
+let quietOpen = 0;  // the AI already said what it opened (v0.16.8)
 function initExclusivePanels() {
   const obs = new MutationObserver((muts) => {
-    for (const m of muts) if (!m.target.hidden) for (const id of EXCLUSIVE) if (id !== m.target.id) $("#" + id).hidden = true;
+    for (const m of muts) {
+      if (m.target.hidden) continue;
+      for (const id of EXCLUSIVE) if (id !== m.target.id) $("#" + id).hidden = true;
+      // v0.16.8: NEXUS says which menu opened (Settings > Interface; local voice, no API use)
+      if (MENU_NAME[m.target.id] && settings.speak_menus !== false && Date.now() > quietOpen && tutorialStep < 0)
+        api().speak_help(T("menuOpening", { name: T("menu_" + MENU_NAME[m.target.id]) }));
+    }
     updateDocked();
   });
   for (const id of EXCLUSIVE) obs.observe($("#" + id), { attributes: true, attributeFilter: ["hidden"] });
+  addEventListener("resize", () => placeTwin());
 }
 const isOpen = (id) => !$("#" + id).hidden;
+const openBox = () => {
+  const id = EXCLUSIVE.find((x) => x !== "guide" && isOpen(x));
+  return id ? $("#" + id).querySelector(".drawer-box, .conv-box, .modal-box") : null;
+};
 
-/* Menus can be dragged by their top area; dragged to the top edge they fill the screen (with a preview, like
-   Windows), dragged again or double-clicked they go back. */
+/* Menus can be dragged by their top area. Dragged to the top edge they fill the screen; to the left or right edge
+   they take that half (a transparent preview shows where, like Windows). Dragging again or a double click restores. */
+const SNAPS = ["maximized", "snap-left", "snap-right"];
 function initMovable() {
   let drag = null;
   const handle = (e) => {
     const box = e.target.closest(".drawer-box, .conv-box, .modal-box");
     if (!box || e.button !== 0 || box.closest("#confirmModal, #onboarding")) return null;
-    if (e.target.closest("button, input, select, textarea, a, label, .list, .chat, .conv-body, .set-body *, .reader-text, .file-view, .book-grid")) return null;
+    if (e.target.closest("button, input, select, textarea, a, label, .list, .chat, .conv-body, .set-body *, .reader-text, .file-view, .book-grid, .map-stage")) return null;
     return e.clientY - box.getBoundingClientRect().top <= 52 ? box : null;
   };
+  const zoneAt = (e) => e.clientY < 6 ? "maximized" : e.clientX < 6 ? "snap-left" : e.clientX > innerWidth - 7 ? "snap-right" : null;
   document.addEventListener("mousedown", (e) => {
     const box = handle(e);
     if (!box) return;
-    if (box.classList.contains("maximized")) {  // pulling a maximized menu restores it under the pointer
-      box.classList.remove("maximized");
+    if (SNAPS.some((c) => box.classList.contains(c))) {  // pulling a snapped menu restores it under the pointer
+      box.classList.remove(...SNAPS);
       box.style.translate = "0px 0px";
       const r = box.getBoundingClientRect();
       box.style.translate = `${e.clientX - (r.left + r.width / 2)}px ${e.clientY - (r.top + 20)}px`;
     }
     const [x0, y0] = (box.style.translate || "0px 0px").split(" ").map((v) => parseFloat(v) || 0);
-    drag = { box, sx: e.clientX, sy: e.clientY, x0, y0 };
+    drag = { box, sx: e.clientX, sy: e.clientY, x0, y0, zone: null };
     box.classList.add("moving");
     e.preventDefault();
   });
   document.addEventListener("mousemove", (e) => {
     if (!drag) return;
     drag.box.style.translate = `${drag.x0 + e.clientX - drag.sx}px ${drag.y0 + e.clientY - drag.sy}px`;
-    $("#snapPreview").hidden = e.clientY > 6;
+    drag.zone = zoneAt(e);
+    const pv = $("#snapPreview");
+    pv.hidden = !drag.zone;
+    pv.dataset.zone = drag.zone || "";
+    placeTwin();  // the ring follows the menu being dragged
   });
   document.addEventListener("mouseup", () => {
     if (!drag) return;
     drag.box.classList.remove("moving");
-    if (!$("#snapPreview").hidden) { drag.box.classList.add("maximized"); drag.box.style.translate = ""; }
+    if (drag.zone) { drag.box.classList.add(drag.zone); drag.box.style.translate = ""; }
     $("#snapPreview").hidden = true;
     drag = null;
+    requestAnimationFrame(() => placeTwin());
   });
   document.addEventListener("dblclick", (e) => {
     const box = handle(e);
     if (!box) return;
+    const was = box.classList.contains("maximized");
     box.style.translate = "";
-    box.classList.toggle("maximized");
+    box.classList.remove(...SNAPS);
+    if (!was) box.classList.add("maximized");
+    requestAnimationFrame(() => placeTwin());
   });
+}
+
+/* The small ring waits above the open menu and follows it; a full-screen menu has no room for it, so it steps
+   aside (v0.16.8: it used to sit on top and the menu couldn't fill the screen). */
+function placeTwin(animate = false) {
+  const twin = $("#dockRing"), box = openBox();
+  if (!box || twin.hidden) return;
+  const full = box.classList.contains("maximized");
+  twin.classList.toggle("gone", full);
+  if (full) return;
+  const r = box.getBoundingClientRect();
+  twin.style.left = `${Math.round(r.left + r.width / 2 - 39)}px`;
+  twin.style.top = `${Math.max(8, Math.round(r.top - 90))}px`;
+  if (animate) twin.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
 }
 
 /* The ring docks above an open menu: it shrinks, flies to the top and waits for orders (v0.16.5) */
 function updateDocked() {
   const app = $("#app"), twin = $("#dockRing"), core = $("#core");
   const on = EXCLUSIVE.some((id) => id !== "guide" && isOpen(id));
-  if (on === app.classList.contains("docked")) return;
+  if (on === app.classList.contains("docked")) { if (on) requestAnimationFrame(() => placeTwin()); return; }
   const fly = (el, from, to) => {
     const dx = from.left + from.width / 2 - (to.left + to.width / 2), dy = from.top + from.height / 2 - (to.top + to.height / 2);
     el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${from.width / Math.max(to.width, 1)})` },
@@ -793,6 +835,7 @@ function updateDocked() {
     const from = core.getBoundingClientRect();
     twin.hidden = false;
     app.classList.add("docked");
+    placeTwin();
     fly(twin, from, twin.getBoundingClientRect());
   } else {
     const from = twin.getBoundingClientRect();
@@ -806,14 +849,92 @@ function updateDocked() {
 /* The AI opened (or closed) something for the user */
 function onUiOpen(p) {
   aiBusy = false;
+  quietOpen = Date.now() + 1500;  // NEXUS says it itself
   if (p.say) setExchange("nexus", p.say);
   setVoiceState(voiceState === "thinking" ? "idle" : voiceState);
   const open = { settings: () => openSettings(p.section || "general"), panel: openPanel,
     conversations: () => openConversations("threads"), notifications: () => openNotifications(),
-    library: () => openLibrary(), workspace: () => openWorkspaces(), skills: () => openSkills(),
+    library: () => openLibrary(), workspace: () => openWorkspaces(), skills: () => openSkills(), map: () => openMap(),
     guide: () => toggleGuide(true), tutorial: () => startTutorial() }[p.target];
   if (p.target === "close") { EXCLUSIVE.forEach((id) => ($("#" + id).hidden = true)); endTutorial(); }
   else if (open) { toggleGuide(false); open(); }
+}
+
+/* Voice model download: the ring waves and the core shows the percentage (v0.16.8) */
+let sttDownload = -1;
+function onSttProgress(pct) {
+  const app = $("#app");
+  sttDownload = pct >= 0 && pct < 100 ? pct : -1;
+  app.classList.toggle("dl", sttDownload >= 0);
+  $("#coreText").textContent = sttDownload >= 0 ? `${pct}%` : "";
+  if (pct < 0) notice(T("sttDlFailed"), T("moreVoice"));
+  if (pct >= 100) notice(T("sttDlDone"));
+  setVoiceState(voiceState);
+}
+
+/* Concept map (beta, v0.16.8): skills, knowledge and memories linked to the ring. The ring only spins; the
+   cards float and slowly orbit with it, pulling the lines that connect them. */
+let mapNodes = [], mapRunning = false;
+async function openMap() {
+  const d = await api().concept_map();
+  buildMap(d);
+  $("#mapDrawer").hidden = false;
+  if (!mapRunning) { mapRunning = true; requestAnimationFrame(mapFrame); }
+}
+function buildMap(d) {
+  const groups = [{ label: T("mapSkills"), kind: "skill",
+    items: d.skills.map((x) => ({ t: T("sk_" + x.skill), sub: `${x.rank} · LV ${x.level}` })) }]
+    .concat(d.knowledge.map((k) => ({ label: k.name, kind: "know", items: k.items.map((t) => ({ t })) })))
+    .concat(d.memories.length ? [{ label: T("mapMemories"), kind: "mem", items: d.memories.map((t) => ({ t })) }] : [])
+    .filter((g) => g.items.length);
+  // every group gets a slice of the circle proportional to its size; its points spread evenly inside the slice
+  mapNodes = [];
+  const total = groups.reduce((t, g) => t + g.items.length + 1.5, 0);
+  let start = -Math.PI / 2;
+  groups.forEach((g, i) => {
+    const sector = (Math.PI * 2 * (g.items.length + 1.5)) / total, n = g.items.length;
+    const hub = { label: g.label, kind: g.kind + " hub", r: 0.42, a: start + sector / 2, phase: i * 1.7, parent: null,
+      detail: g.items.map((x) => x.t) };
+    mapNodes.push(hub);
+    g.items.forEach((it, j) => {
+      mapNodes.push({ label: it.t, sub: it.sub, kind: g.kind, r: 0.8 + (n > 3 ? (j % 3) * 0.1 : (j % 2) * 0.08),
+        a: start + sector * (0.06 + 0.88 * (n > 1 ? j / (n - 1) : 0.5)), phase: i * 1.7 + j, parent: hub,
+        detail: [it.t, it.sub].filter(Boolean) });
+    });
+    start += sector;
+  });
+  $("#mapNodes").innerHTML = mapNodes.map((n, k) =>
+    `<button type="button" class="map-node ${n.kind}" data-node="${k}">${esc(n.label.length > 42 ? n.label.slice(0, 40) + "…" : n.label)}${n.sub ? `<small>${esc(n.sub)}</small>` : ""}</button>`).join("");
+  $("#mapLinks").innerHTML = mapNodes.map(() => "<line/>").join("");
+  mapNodes.forEach((n, k) => { n.el = $(`#mapNodes [data-node="${k}"]`); n.line = $("#mapLinks").children[k]; });
+  $("#mapDetail").hidden = true;
+}
+function mapFrame(t) {
+  if ($("#mapDrawer").hidden) { mapRunning = false; return; }
+  const st = $("#mapStage"), w = st.clientWidth, h = st.clientHeight, cx = w / 2, cy = h / 2;
+  const rx = Math.max(80, w / 2 - 100), ry = Math.max(60, h / 2 - 34);  // an ellipse that uses the whole box
+  const spin = t * 0.000035;  // slow orbit together with the ring
+  for (const n of mapNodes) {
+    const a = n.a + spin, fl = Math.sin(t / 1500 + n.phase) * 7;
+    n.x = cx + Math.cos(a) * (n.r * rx + fl);
+    n.y = cy + Math.sin(a) * (n.r * ry + fl);
+    n.el.style.translate = `${(n.x - n.el.offsetWidth / 2).toFixed(1)}px ${(n.y - n.el.offsetHeight / 2).toFixed(1)}px`;
+    const from = n.parent || { x: cx, y: cy };
+    n.line.setAttribute("x1", from.x.toFixed(1)); n.line.setAttribute("y1", from.y.toFixed(1));
+    n.line.setAttribute("x2", n.x.toFixed(1)); n.line.setAttribute("y2", n.y.toFixed(1));
+    n.line.setAttribute("class", n.parent ? "leaf" : "hub");
+  }
+  requestAnimationFrame(mapFrame);
+}
+
+/* Settings > Performance > Optimize (v0.16.8) */
+async function runOptimize(kind) {
+  $("#optResult").textContent = T("optWorking");
+  const r = await api().optimize(kind);
+  if (!r.ok) { $("#optResult").textContent = T("optFailed"); return; }
+  $("#optResult").textContent = kind === "data" ? T("optDataDone", { file: r.backup.split(/[\\/]/).pop() })
+    : T("optDone", { mb: r.freed_mb, rss: r.rss_mb, disk: r.freed_disk_mb });
+  if (kind === "data") { $("#chat").innerHTML = ""; setExchange("user", ""); loadDashboard(); }
 }
 
 /* NEXUS's own mouse pointer (Settings > Interface): ring, dot or arrow in the ring colour, 3 sizes */
@@ -1210,6 +1331,13 @@ function wire() {
       e.preventDefault();
       if (act.feature && !feature(act.feature)) return;
       if (act.panel && isOpen(act.panel)) { $("#" + act.panel).hidden = true; return; }  // the same keys close it
+      if (act.id === "talk" && feature("hold_talk")) {
+        if (!e.repeat && !holdKey) {
+          holdKey = e.code;
+          api().hold_start().then((r) => { if (!r.ok) { holdKey = null; notice(T("voiceLoading"), T("moreVoice")); } });
+        }
+        return;
+      }
       if (act.id !== "guide") toggleGuide(false);
       act.run();
       return;
@@ -1238,6 +1366,28 @@ function wire() {
     $$("#layoutCards [data-layout]").forEach((x) => x.classList.toggle("on", x === b));
   }));
   $("#btnSkillsRail").onclick = () => openSkills();
+  $("#btnMapRail").onclick = () => openMap();
+  $("#mapNodes").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-node]");
+    if (!b) return;
+    const n = mapNodes[+b.dataset.node];
+    $("#mapDetail").innerHTML = `<b>${esc(n.label)}</b>` + (n.detail || []).filter((x) => x !== n.label).slice(0, 12).map((x) => `<span>${esc(x)}</span>`).join("");
+    $("#mapDetail").hidden = false;
+  });
+  // hold-to-talk: releasing the key (or the Ctrl key) stops recording and sends
+  const holdEnd = (e) => {
+    if (!holdKey || (e && e.code !== holdKey && !["Control", "Shift", "Alt"].includes(e.key))) return;
+    holdKey = null;
+    api().hold_stop();
+  };
+  document.addEventListener("keyup", holdEnd);
+  addEventListener("blur", () => holdEnd());
+  $$("[data-opt]").forEach((b) => (b.onclick = () => {
+    if (b.dataset.opt === "data") { $("#optConfirm").hidden = false; return; }  // second confirmation below
+    runOptimize(b.dataset.opt);
+  }));
+  $("#optNo").onclick = () => ($("#optConfirm").hidden = true);
+  $("#optYes").onclick = () => { $("#optConfirm").hidden = true; runOptimize("data"); };
   $("#btnAiFix").onclick = () => { api().speak_help(aiHelpText); notice(aiHelpText, T("moreAi")); };
   document.addEventListener("keydown", activity);
   document.addEventListener("mousedown", activity);

@@ -130,6 +130,14 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Mapa conceitual, otimização e segurar para falar (v0.16.8)
+
+- **Mapa** (beta, `Ctrl+7`): habilidades, conhecimento e memórias ligados ao aro, flutuando enquanto ele gira.
+- Arraste um menu até a **borda esquerda/direita** (metade da tela) ou até o **topo** (tela toda); o aro acompanha o menu.
+- **Configurações → Desempenho → Otimizar**: liberar RAM, limpar cache, limpar temporários e limpar dados (com backup).
+- **Segurar para falar** (beta): segure `Ctrl+Espaço` enquanto fala; ao soltar, envia. `Ctrl+L` limpa o texto do aro.
+- Na primeira vez que a voz é usada, o download aparece no aro (anéis ondulando e a porcentagem no núcleo).
+
 ### A IA abre a interface, atalhos e tutorial (v0.16.5)
 
 - Peça: **"abre as configurações"**, "abre as configurações de voz", "mostra minhas conversas", "fecha isso" — o
@@ -352,4 +360,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.16.5 (protótipo)**.
+Versão atual: **v0.16.8 (protótipo)**.

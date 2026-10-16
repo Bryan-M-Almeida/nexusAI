@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 3.0  ·  Date: 2026-10-15  ·  App version: 0.16.5
+ Document version: 3.1  ·  Date: 2026-10-15  ·  App version: 0.16.8
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -136,6 +136,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-UI-015   "AI UNAVAILABLE" on the ring (red core)
       NX-UI-016   I asked to open a menu and NEXUS answered something else
       NX-UI-017   Ring spinning fast forever after "repeat" / "pause"
+      NX-UI-018   The Windows pointer showed instead of the NEXUS pointer
  WRK  NX-WRK-001  The AI says it created/changed a file, but nothing changed
       NX-WRK-002  "Outside the workspace": path refused
       NX-WRK-003  Command doesn't run, takes long or waits for confirmation
@@ -1168,6 +1169,14 @@ QUICK DIAGNOSTICS (run these before investigating)
   Cause      : v0.16.1 marked NEXUS as "thinking" on every message and only
                cleared it when the AI answered; quick commands skip the AI.
   Fix        : Quick commands and menu requests clear the state right away.
+
+[NX-UI-018] The Windows pointer showed instead of the NEXUS pointer
+  Severity   : LOW              Status: FIXED (v0.16.8)    Observed: YES
+  Cause      : Old rules forced the default pointer inside menus (v0.16.1) and
+               on disabled buttons.
+  Fix        : Everything inherits the pointer chosen in Settings > Interface;
+               only clickable things (click pointer) and editable text (I-beam)
+               use another one. Scrollbars keep the Windows pointer.
 
 ================================================================================
  WRK — WORKSPACE

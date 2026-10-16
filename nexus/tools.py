@@ -255,7 +255,7 @@ def play_music(query, service="youtube"):
 
 # v0.16.5: the AI opens the interface for the user ("quero mudar a cor do aro" -> Settings > Interface).
 ui_hook = None  # set by the app; receives {"target", "section", "say"}
-UI_BETA = {"library": "library", "workspace": "workspace", "skills": "skills"}
+UI_BETA = {"library": "library", "workspace": "workspace", "skills": "skills", "map": "map"}
 
 
 def open_interface(target, section=None):
@@ -384,7 +384,7 @@ SCHEMAS = [
         "something in NEXUS itself: settings (with a section), panel (schedule, tasks, memory), conversations, "
         "notifications, library, workspace, skills, guide (all shortcuts), tutorial; 'close' closes the open menu.",
         {"target": {"type": "string", "enum": ["settings", "panel", "conversations", "notifications", "library",
-                                               "workspace", "skills", "guide", "tutorial", "close"]},
+                                               "workspace", "skills", "map", "guide", "tutorial", "close"]},
          "section": {"type": "string", "enum": ["general", "ai", "voice", "mic", "perf", "notif", "integ", "ui",
                                                 "data", "beta", "keys"]}}, ["target"]),
     _fn("get_datetime", "Get the current local date and time."),

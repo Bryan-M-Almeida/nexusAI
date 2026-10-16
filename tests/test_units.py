@@ -769,6 +769,21 @@ check("ui nav: spoken confirmations exist in the three languages",
           for lng in ("pt", "en", "es")))
 check("v0.16.5 settings defaults", settings["show_exchange"] is True and settings["exchange_follow"] is False
       and settings["cursor_style"] == "ring" and settings["shortcuts"] == {})
+# -- v0.16.8 -----------------------------------------------------------------------------------------------------
+from nexus import app as _app  # noqa: E402
+
+check("optimize: this process's RAM is measured (Windows API)", _app._rss_mb() > 1)
+_app._trim_working_set()
+check("optimize: giving pages back to Windows doesn't break anything", _app._rss_mb() > 0)
+_cm = _app.Api.concept_map()
+check("concept map: skills, knowledge areas and memories", len(_cm["skills"]) >= 8 and isinstance(_cm["knowledge"], list)
+      and isinstance(_cm["memories"], list))
+check("concept map: the AI can open it", (ui_nav.detect("abre o mapa mental") or {}).get("target") == "map"
+      and (ui_nav.detect("show me the skill tree") or {}).get("target") == "map")
+settings["app_mode"] = "user"
+check("beta: concept map and hold-to-talk start off for users",
+      not features.enabled("map") and not features.enabled("hold_talk") and settings["speak_menus"] is True)
+check("i18n: map name spoken in the three languages", all("ui_n_map" in i18n.STRINGS[x] for x in ("pt", "en", "es")))
 check("colours: default ring/core/background are valid hex colours",
       all(re.fullmatch(r"#[0-9a-f]{6}", str(settings[k])) for k in ("color_ring", "color_core", "color_bg")))
 

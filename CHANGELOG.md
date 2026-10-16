@@ -8,6 +8,48 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.16.8 — Protótipo · 2026-10-15
+
+**Mapa conceitual em volta do aro, download da voz no próprio aro, menus que encaixam nas metades da tela,
+otimização de memória e "segurar para falar".**
+
+### Novo
+- **Mapa conceitual** (beta, Ctrl+7, borda direita ou "abre o mapa"): o aro do NEXUS no centro, girando, com as
+  habilidades (rank e nível), as áreas de conhecimento e as memórias ligadas a ele por linhas; os cartões flutuam e
+  orbitam devagar com o aro, puxando as linhas. Clique em um ponto para ver o que ele contém.
+- **Download do reconhecimento de voz no aro**: na primeira vez que a voz é usada, os anéis ondulam e o núcleo mostra
+  a porcentagem ("BAIXANDO A VOZ"); avisa quando termina ou se falhar.
+- **Menus que encaixam**: arraste até a borda esquerda ou direita para ocupar aquela metade (com prévia), ou até o
+  topo para a tela toda. **O aro acompanha o menu** enquanto ele é arrastado e fica acima dele; em tela cheia ele sai
+  da frente e o menu ocupa tudo.
+- **O NEXUS diz qual menu abriu** ("Abrindo as configurações") — opção em Configurações → Interface. A fala é a voz
+  local do Windows: não usa a IA nem a API e não tem custo.
+- **Ctrl+L** limpa o texto abaixo do aro na hora (configurável em Atalhos).
+- **Segurar para falar** (beta): com a opção ligada, o microfone fica aberto enquanto a tecla de falar (Ctrl+Espaço)
+  estiver apertada; ao soltar, ele para e envia.
+- **Otimizar** (Configurações → Desempenho): liberar memória (RAM), limpar cache (e compactar o banco), limpar dados
+  temporários (logs antigos e relatórios com mais de 30 dias) e limpar dados (conversas, notificações e registro de
+  ações — com confirmação dupla e backup automático antes; memórias, conhecimento, agenda e tarefas ficam).
+- **IA dupla (API + local)** aparece em Configurações → Inteligência como bloqueada ("em breve").
+
+### Corrigido
+- **O cursor do Windows ainda aparecia** (NX-UI-018): dentro dos menus e em botões desativados havia regras antigas com
+  o cursor padrão. Agora tudo herda o cursor do NEXUS, exceto o que é clicável (cursor de clique) e o que é texto
+  editável (barra de texto).
+
+### Desempenho
+- **Liberar memória** medido com o reconhecimento de voz carregado: o NEXUS usava **372 MB** e, depois de liberar,
+  **3 MB em uso ativo** (368 MB devolvidos ao Windows; o modelo de voz volta sozinho, em ~1 s, quando a voz é usada).
+
+### Testes desta versão
+- 241/241 testes unitários (6 novos: medição de RAM do Windows, devolver memória, dados do mapa, abrir o mapa por
+  voz, funções beta novas desligadas, nomes falados).
+- 32/32 verificações de conversa com qwen3:8b (média 14,0 s, mediana 10,4 s) e 7/7 na área de trabalho.
+- Interface conferida no modo de prévia: mapa conceitual, encaixe à esquerda/direita/tela toda com o aro seguindo o
+  menu, download da voz no aro, Ctrl+L, fala do menu, otimização com confirmação dupla.
+
+---
+
 ## v0.16.5 — Protótipo · 2026-10-15
 
 **O NEXUS abre os menus para você — e o aro vai junto. Atalhos e cursor personalizáveis, tutorial narrado, tela

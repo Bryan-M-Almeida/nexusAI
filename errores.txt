@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 3.0  ·  Fecha: 2026-10-15  ·  Versión de la app: 0.16.5
+ Versión del documento: 3.1  ·  Fecha: 2026-10-15  ·  Versión de la app: 0.16.8
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -137,6 +137,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-UI-015   "IA NO DISPONIBLE" en el anillo (núcleo rojo)
       NX-UI-016   Pedí abrir un menú y NEXUS respondió otra cosa
       NX-UI-017   Anillo girando rápido sin parar tras "repite" / "pausa"
+      NX-UI-018   Aparecía el puntero de Windows en lugar del de NEXUS
  WRK  NX-WRK-001  La IA dice que creó/cambió un archivo, pero nada cambió
       NX-WRK-002  "Fuera del área de trabajo": ruta rechazada
       NX-WRK-003  El comando no se ejecuta, tarda o espera confirmación
@@ -1206,6 +1207,15 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                pasan por la IA.
   Corrección : Los comandos rápidos y los pedidos de menú liberan el estado al
                instante.
+
+[NX-UI-018] Aparecía el puntero de Windows en lugar del de NEXUS
+  Gravedad   : BAJA             Estado: CORREGIDO (v0.16.8) Observado: SÍ
+  Causa      : Reglas antiguas fijaban el puntero por defecto dentro de los
+               menús (v0.16.1) y en botones desactivados.
+  Corrección : Todo hereda el puntero elegido en Configuración > Interfaz;
+               solo lo que se puede pulsar (puntero de clic) y el texto
+               editable (cursor de texto) usan otro. Las barras de desplazamiento
+               mantienen el de Windows.
 
 ================================================================================
  WRK — ÁREA DE TRABAJO

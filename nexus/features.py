@@ -10,6 +10,8 @@ BETA = {
     "library": {"list_books", "read_book"},
     "skills": set(),  # (open_interface checks library/workspace/skills itself)
     "browser": {"open_url", "web_search", "play_music"},
+    "map": set(),        # v0.16.8: concept map of skills and knowledge
+    "hold_talk": set(),  # v0.16.8: hold the talk key to speak
 }
 TOOL_FEATURE = {tool: feat for feat, tools in BETA.items() for tool in tools}
 
