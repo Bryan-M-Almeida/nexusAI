@@ -130,6 +130,20 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Configurações em grupos, Personalização e painel AMD (v0.18.5)
+
+- **Configurações** em grupos (Sistema, Inteligência, Voz, Aparência, Conexões, Hardware, Dados e privacidade) e
+  seções novas: Memória e conversas, Ativação e escuta, **Personalização** e **AMD**. **Interface** liga e desliga;
+  **Personalização** muda: 7 temas (NEXUS, AMD, Esmeralda, Violeta, Âmbar, Grafite, Gelo), cores, tamanho do aro,
+  velocidade do giro, tamanho do texto, fundo (brilho, liso, grade), letra dos títulos e cursor.
+- **O NEXUS muda as próprias configurações quando você pede**: "muda o aro para vermelho", "tema AMD", "voz
+  feminina", "fala mais rápido", "aro maior", "desliga as animações", "desfaz" — na hora, sem a IA.
+- **Abas exatas**: "abre a aba AMD", "abre a personalização", "abre minhas memórias", "abre os aprendizados".
+- **Painel AMD** (Configurações → AMD): a placa, o driver e a versão do Adrenalin; uso da placa e da memória de vídeo
+  ao vivo (com gráfico), quanto a IA usa, tokens/s, tempo até a primeira palavra e quanto do modelo está na VRAM;
+  liberar a placa ou recarregar a IA; a otimização do Ollama para placas AMD; referências da AMD (Adrenalin, ROCm,
+  GPUOpen, Developer Central, Ryzen AI, Ollama em placas AMD, o hackathon).
+
 ### Integrações, mídia e aplicativos (v0.18.0)
 
 - **Central de integrações** (Configurações → Integrações): clima, câmbio, criptomoedas, relógio mundial, tradutor,
@@ -386,6 +400,8 @@ nexus/
   connectors.py central de integrações: rota sem IA, cache em disco, respostas na hora, integrações do usuário
   media.py      controle de mídia (teclas de mídia, volume do sistema, o que está tocando)
   apps.py       abrir aplicativos pelo nome, jogos x trabalho, detectar jogos em primeiro plano
+  prefs.py      o NEXUS muda a própria aparência e voz quando pedem (temas, cores, tamanhos, desfazer)
+  amd.py        painel AMD: placa e driver (registro), uso e memória ao vivo (contadores do Windows)
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -419,4 +435,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.18.1 (protótipo)**.
+Versão atual: **v0.18.5 (protótipo)**.

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import webview
 
 from . import (MODEL_NAME, __version__, assistant, bridge, control, features, gpu_tune, i18n, knowledge, legal, llm, memory,
-               memory_import, notify, profile, training, apps, connectors, media,
+               memory_import, notify, profile, training, apps, connectors, media, amd, prefs,
                library, netprobe, performance, scheduler, skills, tools, workspace)
 from . import files as filereader
 from .logs import log, setup as setup_logs
@@ -60,6 +60,7 @@ class Api:
                                           confirm_hook=self._confirm_command)
         tools.ui_hook = lambda nav: emit("ui_open", nav)  # the model's open_interface tool (v0.16.5)
         tools.app_hook = lambda app: self.suspend("game", app["name"])  # v0.18.0: a game opened -> free the GPU
+        tools.prefs_hook = lambda changed: emit("prefs", changed)  # v0.18.5: NEXUS changed its own look/voice
         self._last_activity = time.time()
         self._suspended = None  # v0.18.0: {"reason", "app", "since", "vram_freed_mb"} while suspended
         self._speaker = Speaker(lambda s: emit("voice", s), lambda payload: emit("speak_env", payload))
@@ -142,6 +143,36 @@ class Api:
             elif game != woke_for or time.time() - self._last_activity > 120:
                 woke_for = game
                 self.suspend("game_watch", game)
+
+    # -- AMD panel and preferences (v0.18.5) --------------------------------------------------------------------------
+    def amd_status(self):
+        return {**amd.info(), "tune": gpu_tune.status(), "model": llm.loaded(), "ai": llm.perf_summary(),
+                "keep_alive": settings.get("llm_keep_alive", "2h"), "model_name": settings.get("llm_model", ""),
+                "refs": [r for r, _ in amd.REFERENCES]}
+
+    def amd_live(self):
+        return {**amd.live(), "ai": llm.perf_summary(), "model": llm.loaded()}
+
+    def amd_open_ref(self, ref_id):
+        return {"ok": amd.open_reference(ref_id)}
+
+    def amd_free(self):
+        """Take the model out of the graphics card now (it comes back on the next question)."""
+        before = sum(m["vram_mb"] for m in llm.loaded())
+        llm.unload()
+        time.sleep(0.6)
+        return {"freed_mb": max(0, before - sum(m["vram_mb"] for m in llm.loaded()))}
+
+    def amd_warm(self):
+        threading.Thread(target=self._warm_up, daemon=True, name="warm").start()
+        return {"ok": True}
+
+    def set_preferences(self, changes):
+        """Personalisation chips (theme) from the interface: same validation as when the AI changes them."""
+        try:
+            return {"ok": True, "applied": prefs.apply(dict(changes or {})), "settings": dict(settings)}
+        except (ValueError, TypeError) as exc:
+            return {"ok": False, "error": str(exc)}
 
     # -- integrations, apps and media (v0.18.0) -----------------------------------------------------------------------
     def integrations_status(self):

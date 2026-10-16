@@ -8,6 +8,59 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.18.5 — Protótipo · 2026-10-16
+
+**Configurações reorganizadas em grupos, aba Personalização separada da Interface, painel AMD ao vivo e o NEXUS
+mudando as próprias configurações quando você pede.**
+
+### Novo
+- **Configurações em grupos**: Sistema · Inteligência · Voz · Aparência · Conexões · Hardware · Dados e privacidade,
+  com seções novas — **Memória e conversas** (memorizar, títulos, trocas lembradas), **Ativação e escuta** ("Nexus",
+  segundo plano, proteção contra eco e ruído), **Personalização** e **AMD**.
+- **Interface x Personalização**: Interface só liga e desliga (marcações, legendas, animações, menus, texto abaixo do
+  aro, aro se movendo). Personalização reúne o que muda o visual:
+  - **7 temas** com prévia (NEXUS, **AMD**, Esmeralda, Violeta, Âmbar, Grafite, Gelo) e as cores do aro, núcleo e fundo;
+  - **tamanho do aro** (60–140%), **velocidade do giro**, **tamanho do texto** abaixo do aro, **fundo** (brilho, liso
+    ou grade de HUD), **letra dos títulos** (futurista ou limpa), cursor, repouso e tempo do texto. Tudo com prévia
+    ao vivo.
+- **O NEXUS muda as próprias configurações** (`nexus/prefs.py`): "muda o aro para vermelho", "aro vermelho e núcleo
+  branco", "deixa o fundo preto", "tema AMD", "voz feminina", "fala mais rápido", "aro maior", "letra maior",
+  "desliga as animações" e **"desfaz"** — reconhecidos sem a IA, aplicados na hora e a tela muda junto. Em outras
+  frases a IA usa a nova ferramenta `set_preference` (só as opções permitidas, cada valor validado). Sem dizer o
+  valor ("quero mudar a cor do aro"), ele abre Personalização.
+- **Abas exatas**: "abre a aba AMD", "abre a personalização", "abre as configurações de ativação", "abre minhas
+  memórias", "abre os aprendizados", "abre o conhecimento" — seções das configurações e abas do painel.
+- **Painel AMD** (Configurações → AMD), no espírito da sobreposição de desempenho do AMD Software: Adrenalin Edition e
+  com o visual do N.E.X.U.S.:
+  - a placa, a versão do **Adrenalin** e do driver e o backend do Ollama (Vulkan/ROCm), lidos do registro do driver;
+  - **ao vivo** (a cada 1,5 s, ~2 ms por leitura): uso da placa por motor, memória de vídeo, quanto **a IA** usa da
+    placa e da VRAM, com gráfico dos últimos 60 s — pelos contadores do Windows (os mesmos do Gerenciador de Tarefas);
+  - **IA na placa**: tokens/s médios, tempo até a primeira palavra, a última resposta, quanto do modelo está na VRAM e
+    o histórico de tokens/s;
+  - **Liberar a placa agora** / **Carregar a IA de novo**, a otimização do Ollama para placas AMD (movida de
+    Desempenho) e **referências da AMD**: Adrenalin, ROCm, GPUOpen, Developer Central, Ryzen AI, Ollama em placas
+    AMD e o AMD Developer Hackathon.
+
+### Desempenho
+- **Mudar a aparência por voz**: **0 s** (antes o NEXUS só abria o menu; pela IA, 3–6 s).
+- **Descrições das ferramentas mais curtas**: o prompt fixo caiu de 3.377 para 3.090 tokens **mesmo com a ferramenta
+  nova** — partida a frio 14,6 s → 14,0 s (toda releitura do prompt fica ~0,6 s mais rápida).
+- Avaliação de conversa nas mesmas 27 perguntas: média **5,3 s → 5,1 s**.
+
+### Corrigido
+- NX-LLM-042: a IA dizia "Pronto: tema AMD." sem chamar a ferramenta (nada mudava). Teste: 0/4 → 4/4.
+
+### Testes desta versão
+- 297/297 testes unitários (13 novos: frases de preferência sem a IA, tema com as três cores e desfazer, validação,
+  mudança instantânea avisando a interface, rede de segurança do set_preference, seções e abas exatas, open_interface
+  com abas, informações da placa pelo registro, contadores ao vivo, referências só da AMD, tokens/s e primeira palavra,
+  lista de ferramentas enxuta).
+- Avaliação de conversa **37/37** (2 novos: "muda o aro para vermelho" muda de verdade; "abre minhas memórias" abre a
+  aba certa) e da área de trabalho 7/7 com o modelo real.
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.18.1 — Protótipo · 2026-10-16
 
 **Correção: o NEXUS não fala mais sozinho (eco da própria voz, emojis lidos em voz alta e frases inventadas com o

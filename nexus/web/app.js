@@ -133,6 +133,7 @@ window.nexus = {
       case "stt_progress": return onSttProgress(p);
       case "training": return onTrainingState(p);
       case "suspended": return onSuspended(p);
+      case "prefs": return onPrefs(p);
       case "training_progress": return onTrainingProgress(p);
       case "training_done": return showTrainingResult(p);
       case "mic_level": ringMicTarget = Math.max(ringMicTarget, p); return wakeRing();
@@ -517,6 +518,7 @@ function applyInterface() {
   app.classList.toggle("no-exchange", settings.show_exchange === false);
   if (settings.ui_layout !== "shortcuts") app.classList.remove("zen");
   setCursor(settings.cursor_style, settings.cursor_size);
+  applyLook(settings);
   setRingPos(ringPos[0], ringPos[1], false);
   $("#btnSkillsRail").hidden = !feature("skills");
   $("#btnMapRail").hidden = !feature("map");
@@ -870,7 +872,8 @@ function onUiOpen(p) {
   quietOpen = Date.now() + 1500;  // NEXUS says it itself
   if (p.say) setExchange("nexus", p.say);
   setVoiceState(voiceState === "thinking" ? "idle" : voiceState);
-  const open = { settings: () => openSettings(p.section || "general"), panel: openPanel,
+  const open = { settings: () => openSettings(p.section || "general"),
+    panel: () => { openPanel(); if (p.section) $(`#panelDrawer [data-tab="${p.section}"]`)?.click(); },
     conversations: () => openConversations("threads"), notifications: () => openNotifications(),
     library: () => openLibrary(), workspace: () => openWorkspaces(), skills: () => openSkills(), map: () => openMap(),
     guide: () => toggleGuide(true), tutorial: () => startTutorial() }[p.target];
@@ -1308,12 +1311,15 @@ function fillSettings() {
   $("#quietOn").checked = !!settings.quiet_hours; $("#quietFrom").value = qf || "22:00"; $("#quietTo").value = qt || "07:00";
   $("#briefingOn").checked = !!settings.daily_briefing; $("#briefingAt").value = settings.daily_briefing || "08:00";
   $$("output[data-for]", f).forEach(syncOutput);
+  renderThemes();
+  $$("#bgCards [data-bg]").forEach((b) => b.classList.toggle("on", b.dataset.bg === (settings.bg_style || "glow")));
   renderVoiceInfo();
 }
 
 function syncOutput(out) {
   const v = $("#settingsForm").elements[out.dataset.for].value;
-  out.textContent = { tts_volume: v + "%", vad_silence: v + " s", tts_speed: (v > 0 ? "+" : "") + v }[out.dataset.for] ?? v;
+  out.textContent = { tts_volume: v + "%", vad_silence: v + " s", tts_speed: (v > 0 ? "+" : "") + v, ring_scale: v + "%",
+    exchange_size: v + " px" }[out.dataset.for] ?? v;
 }
 
 function collectSettings() {
@@ -1333,6 +1339,83 @@ function showSection(sec) {
   clearInterval(integTimer);
   if (sec === "integ") { renderIntegrations(); integTimer = setInterval(() => { if (!$("#settings").hidden) renderIntegrations(); }, 6000); }
   if (sec === "apps") { if (feature("media")) renderMedia(); if (feature("apps")) renderApps(false); }
+  clearInterval(amdTimer);
+  if (sec === "amd") { renderAmd(); amdTimer = setInterval(() => { if (!$("#settings").hidden && amdVisible()) amdTick(); else clearInterval(amdTimer); }, 1500); }
+}
+
+/* ------------------------------------------------------------------ personalisation (v0.18.5) */
+const THEMES = { nexus: ["#cfe4ff", "#2f86ff", "#0b1f5c"], amd: ["#ffd6d3", "#ed1c24", "#2a0507"], emerald: ["#d5ffea", "#16c47a", "#05271b"],
+  violet: ["#ebdcff", "#8b5cf6", "#1a0b3b"], amber: ["#ffe9c4", "#f59e0b", "#2a1904"], graphite: ["#e6e8ec", "#9aa3b2", "#101318"],
+  ice: ["#e8fbff", "#38bdf8", "#04233a"] };
+function applyLook(src) {
+  const root = document.documentElement.style;
+  root.setProperty("--ring-scale", Math.max(0.6, Math.min(1.4, (+src.ring_scale || 100) / 100)));
+  root.setProperty("--spin", { slow: 1.8, normal: 1, fast: 0.55 }[src.ring_speed] || 1);
+  root.setProperty("--ex-size", Math.max(12, Math.min(24, +src.exchange_size || 14)) + "px");
+  document.body.classList.toggle("bg-solid", src.bg_style === "solid");
+  document.body.classList.toggle("bg-grid", src.bg_style === "grid");
+  document.body.classList.toggle("font-clean", src.font_brand === "clean");
+}
+function renderThemes() {
+  const f = $("#settingsForm"), cur = f.elements.theme.value || settings.theme || "nexus";
+  $("#themeGrid").innerHTML = Object.entries(THEMES).map(([id, [r, c, b]]) => `<button type="button" class="theme-chip ${id === cur ? "on" : ""}" data-theme="${id}"
+      style="--t-ring:${r};--t-core:${c};--t-bg:${b}"><i></i><span>${esc(T("theme_" + id))}</span></button>`).join("");
+}
+function pickTheme(id) {
+  const f = $("#settingsForm"), [r, c, b] = THEMES[id];
+  f.elements.theme.value = id;
+  f.elements.color_ring.value = r; f.elements.color_core.value = c; f.elements.color_bg.value = b;
+  setColors({ color_ring: r, color_core: c, color_bg: b });
+  renderThemes();
+}
+function previewLook() {
+  const f = $("#settingsForm");
+  applyLook({ ring_scale: f.elements.ring_scale.value, ring_speed: f.elements.ring_speed.value, exchange_size: f.elements.exchange_size.value,
+    bg_style: f.elements.bg_style.value, font_brand: f.elements.font_brand.value });
+}
+function onPrefs(changed) {  // NEXUS changed its own look or voice ("muda o aro para vermelho")
+  Object.assign(settings, changed);
+  applyInterface();
+  if (!$("#settings").hidden) fillSettings();
+}
+
+/* ------------------------------------------------------------------ AMD panel (v0.18.5) */
+let amdTimer, amdHistory = [];
+const amdVisible = () => !$('.set-sec[data-sec="amd"]').hidden;
+const gb = (mb) => (mb / 1024).toFixed(1);
+function amdTile(label, value, sub = "", pct = null) {
+  return `<div class="amd-tile"><small class="mono">${esc(label)}</small><b>${value}</b>${pct === null ? "" : `<i class="meter"><em style="width:${Math.max(0, Math.min(100, pct))}%"></em></i>`}<small>${esc(sub)}</small></div>`;
+}
+async function renderAmd() {
+  const r = await api().amd_status(), card = (r.cards || [])[0];
+  $("#amdName").textContent = card ? card.name : T("amdNoCard");
+  $("#amdDriver").textContent = card ? [card.adrenalin && `Adrenalin ${card.adrenalin}`, card.driver && `${T("amdDriver")} ${card.driver}`,
+    r.tune && (r.tune.vulkan ? "Vulkan" : "ROCm / Vulkan")].filter(Boolean).join(" · ") : T("amdNoCardHint");
+  $("#amdRefs").innerHTML = (r.refs || []).map((id) => `<button type="button" class="amd-ref" data-ref="${id}"><b>${esc(T("ref_" + id))}</b><small>${esc(T("refd_" + id))}</small></button>`).join("");
+  amdCard = card;
+  amdTick();
+}
+let amdCard = null;
+async function amdTick() {
+  const r = await api().amd_live();
+  if (r.error) { $("#amdTiles").innerHTML = `<p class="muted small">${esc(r.error)}</p>`; return; }
+  const total = amdCard ? amdCard.vram_gb * 1024 : 0, model = (r.model || [])[0];
+  amdHistory.push(r.gpu_pct); amdHistory = amdHistory.slice(-40);
+  const engines = Object.entries(r.engines || {}).filter(([, v]) => v > 0.5).map(([k, v]) => `${k} ${Math.round(v)}%`).join(" · ");
+  $("#amdTiles").innerHTML = amdTile(T("amdGpu"), Math.round(r.gpu_pct) + "<u>%</u>", engines || T("amdIdle"), r.gpu_pct)
+    + amdTile(T("amdVram"), gb(r.vram_used_mb) + "<u>GB</u>", total ? `${T("amdOf")} ${gb(total)} GB` : "", total ? 100 * r.vram_used_mb / total : null)
+    + amdTile(T("amdAiGpu"), Math.round(r.ai_gpu_pct) + "<u>%</u>", T("amdAiGpuSub"), r.ai_gpu_pct)
+    + amdTile(T("amdAiVram"), gb(r.ai_vram_mb) + "<u>GB</u>", model ? model.name : T("amdNotLoaded"), total ? 100 * r.ai_vram_mb / total : null);
+  const ai = r.ai || {}, last = ai.last || {};
+  $("#amdAiTiles").innerHTML = amdTile(T("amdTokS"), ai.tok_s ?? "—", T("amdTokSSub"))
+    + amdTile(T("amdFirst"), ai.first_s != null ? ai.first_s + "<u>s</u>" : "—", T("amdFirstSub"))
+    + amdTile(T("amdLast"), last.total_s != null ? last.total_s + "<u>s</u>" : "—", last.gen_tokens ? `${last.gen_tokens} tokens` : T("amdNoAnswers"))
+    + amdTile(T("amdModel"), model ? Math.round(100 * model.vram_mb / Math.max(1, model.size_mb)) + "<u>%</u>" : "—", T("amdModelSub"), model ? 100 * model.vram_mb / Math.max(1, model.size_mb) : null);
+  const hist = ai.history || [], max = Math.max(30, ...hist);
+  $("#amdSpeed").innerHTML = hist.length ? `<small class="mono">${esc(T("amdSpeedHist"))}</small><div>${hist.map((v) => `<i style="height:${Math.round(100 * v / max)}%" title="${v} tok/s"></i>`).join("")}</div>` : "";
+  const off = 40 - amdHistory.length;  // newest sample on the right edge, like a live overlay
+  const pts = amdHistory.map((v, i) => `${(300 * (i + off) / 39).toFixed(1)},${(58 - 56 * v / 100).toFixed(1)}`).join(" ");
+  $("#amdGraph polyline").setAttribute("points", pts);
 }
 
 /* ------------------------------------------------------------------ integrations hub, apps, media (v0.18.0) */
@@ -1783,10 +1866,19 @@ function wire() {
   ["color_ring", "color_core", "color_bg"].forEach((n) => (colorForm.elements[n].oninput = () =>
     setColors({ color_ring: colorForm.elements.color_ring.value, color_core: colorForm.elements.color_core.value,
       color_bg: colorForm.elements.color_bg.value })));
-  $("#btnColorsReset").onclick = () => {
-    for (const [k, v] of Object.entries(COLOR_DEFAULTS)) colorForm.elements[k].value = v;
-    setColors(COLOR_DEFAULTS);
-  };
+  $("#btnColorsReset").onclick = () => pickTheme("nexus");
+  ["color_ring", "color_core", "color_bg"].forEach((n) => colorForm.elements[n].addEventListener("input", () => {
+    colorForm.elements.theme.value = "custom"; renderThemes(); }));
+  $("#themeGrid").addEventListener("click", (e) => { const b = e.target.closest("[data-theme]"); if (b) pickTheme(b.dataset.theme); });
+  $$("#bgCards [data-bg]").forEach((b) => (b.onclick = () => {
+    colorForm.elements.bg_style.value = b.dataset.bg;
+    $$("#bgCards [data-bg]").forEach((x) => x.classList.toggle("on", x === b));
+    previewLook();
+  }));
+  ["ring_scale", "exchange_size", "ring_speed", "font_brand"].forEach((n) => colorForm.elements[n].addEventListener("input", previewLook));
+  $("#amdRefs").addEventListener("click", (e) => { const b = e.target.closest("[data-ref]"); if (b) api().amd_open_ref(b.dataset.ref); });
+  $("#btnAmdFree").onclick = async () => { const r = await api().amd_free(); notice(T("amdFreed", { gb: gb(r.freed_mb || 0) })); amdTick(); };
+  $("#btnAmdWarm").onclick = async () => { await api().amd_warm(); notice(T("amdWarming")); };
   $("#btnTestVoice").onclick = testVoice;
   $("#settingsForm").elements.voice_gender.onchange = renderVoiceInfo;
   $("#settingsForm").addEventListener("submit", async (e) => {

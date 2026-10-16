@@ -145,6 +145,13 @@ DEFAULTS = {
     "game_watch": False,          # also suspend when a game started elsewhere comes to the foreground
     "apps_games": [],             # app names the user marked as games
     "apps_work": [],              # app names the user marked as work apps
+    # v0.18.5: Settings > Personalisation (the AI can change these when asked: nexus/prefs.py)
+    "theme": "nexus",             # nexus | amd | emerald | violet | amber | graphite | ice (sets the three colours)
+    "ring_scale": 100,            # ring size, % (60-140)
+    "ring_speed": "normal",       # slow | normal | fast
+    "exchange_size": 14,          # px of the text under the ring
+    "bg_style": "glow",           # glow | solid | grid
+    "font_brand": "orbitron",     # orbitron (futuristic) | clean
     # v0.16.8
     "speak_menus": True,          # NEXUS says which menu it opened ("Abrindo as configurações")
     "beta_map": False,            # concept map (skills and knowledge around the ring) - beta

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 3.5  ·  Data: 2026-10-16  ·  Versão do app: 0.18.1
+ Versão do documento: 3.6  ·  Data: 2026-10-16  ·  Versão do app: 0.18.5
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -89,6 +89,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-039  Treinamento: fatos gerais sumiam ou eram julgados sem evidência
       NX-LLM-040  Treinamento: a IA perguntava "quer que eu armazene?" a cada lição
       NX-LLM-041  Perguntas ao vivo: a IA chamava a ferramenta de novo (resposta em duas rodadas)
+      NX-LLM-042  "Pronto: tema AMD." sem mudar nada (a IA não chamava set_preference)
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -713,6 +714,19 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                hora quando é um fato simples; nas perguntas maiores o dado vai
                no contexto e conta como ferramenta já usada. Dólar 7,4 s -> 0,4 s
                (0 s do cache), clima 8,1 s -> 0,2-2,4 s, notícias 29,9 s -> 0,3 s.
+
+[NX-LLM-042] "Pronto: tema AMD." sem mudar nada (a IA não chamava set_preference)
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.18.5) Observado: SIM
+  Sintoma    : No teste, com frases fora dos atalhos, a IA respondia "Pronto,
+               voz trocada." / "Pronto: tema AMD." copiando as respostas
+               anteriores da conversa, sem chamar a ferramenta.
+  Correção   : Os pedidos comuns ("muda o aro para vermelho", "tema AMD",
+               "voz feminina", "aro maior", "desfaz") são aplicados sem a IA
+               (0 s). Para os outros, se o pedido traz o novo valor (uma cor,
+               um tema, uma voz) e a IA não chamou set_preference, ela é
+               obrigada a chamar. Sem valor ("quero mudar a cor do aro"), o
+               NEXUS abre Configurações > Personalização. Teste: 4/4 frases
+               pela IA mudaram de verdade (antes 0/4).
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE

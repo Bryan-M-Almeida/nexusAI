@@ -190,6 +190,18 @@ tool_calls.clear()
 ask("Quero mudar a cor do aro do NEXUS, me leva lá")
 check("interface: a IA abre Configurações > Interface", any(o.get("target") == "settings" for o in opened)
       and "open_interface" in tool_calls, f"{tool_calls} {opened}")
+# 11) v0.18.5: NEXUS changes its own look when asked (instant) and opens an exact tab of the panel
+changed = []
+tools.prefs_hook = changed.append
+tool_calls.clear()
+ask("Muda o aro do NEXUS para vermelho")
+check("preferência: 'muda o aro para vermelho' troca a cor de verdade", settings["color_ring"] == "#ff3030" and bool(changed),
+      f"{settings['color_ring']} {changed}")
+opened.clear()
+ask("abre minhas memórias")
+check("interface: abre a aba Memória do painel", any(o.get("target") == "panel" and o.get("section") == "memory" for o in opened),
+      str(opened))
+tools.prefs_hook = None
 tools.ui_hook = None
 settings["language"] = "auto"
 

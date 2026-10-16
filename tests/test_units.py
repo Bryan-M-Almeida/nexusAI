@@ -710,9 +710,14 @@ WEB = Path(__file__).resolve().parent.parent / "nexus" / "web"
 _i18n = (WEB / "i18n.js").read_text("utf-8")
 _blocks = dict(zip(("pt", "en", "es"), re.split(r"\n  (?:pt|en|es): \{", _i18n)[1:]))
 _keys = {lang: set(re.findall(r"(?:^|[\s,{])([A-Za-z_]\w*): ", body)) for lang, body in _blocks.items()}
-for _extra in re.findall(r"Object\.entries\((\{.*?\})\)\) Object\.assign\(window\.I18N\[l\], extra\)", _i18n, re.S):
-    for lang, more in json.loads(_extra).items():  # v0.18.0+: keys added as JSON blocks after the main object
-        _keys[lang] |= set(more)
+for _m in re.finditer(r"Object\.entries\(", _i18n):  # v0.18.0+: keys added as JSON blocks after the main object
+    try:
+        _extra, _end = json.JSONDecoder().raw_decode(_i18n, _m.end())
+    except ValueError:
+        continue
+    if _i18n.startswith(")) Object.assign(window.I18N[l], extra)", _end):
+        for lang, more in _extra.items():
+            _keys[lang] |= set(more)
 _html = (WEB / "index.html").read_text("utf-8")
 _used = set(re.findall(r'data-i18n(?:-ph|-title)?="(\w+)"', _html))
 for lang in ("pt", "en", "es"):
@@ -748,7 +753,7 @@ _not = ["abre o youtube", "abre o google e pesquisa gatos", "abre o livro dom ca
         "para que serve as configurações?", "fecha a porta da cozinha amanhã cedo por favor"]
 check("ui nav: other requests still go to the AI", not [x for x in _not if ui_nav.detect(x)],
       str([x for x in _not if ui_nav.detect(x)]))
-_chg = {"Quero mudar a cor do aro do NEXUS, me leva lá": "ui", "change the ring colour": "ui", "quero trocar o cursor": "ui",
+_chg = {"Quero mudar a cor do aro do NEXUS, me leva lá": "custom", "change the ring colour": "custom", "quero trocar o cursor": "custom",
         "personalizar os atalhos": "keys", "muda tua voz": "voice", "quero mudar o idioma": "general"}
 _bad = [k for k, sec in _chg.items() if (ui_nav.detect(k) or {}).get("section") != sec]
 check("ui nav: 'change X of NEXUS' opens the right settings section", not _bad, str(_bad))
@@ -1023,6 +1028,70 @@ for _segs in ([_Seg(" Que tipo de brincadeira você quer?")], [_Seg(" Você tem 
     _lst._handle(np.zeros(16000, dtype=np.float32), False)
 check("listening: echo, loops and noise never reach the AI; the real reply does",
       _heard == ["Conta uma piada."] and [r for r, _ in _lst.dropped] == ["echo", "noise"], f"{_heard} {_lst.dropped}")
+
+# -- v0.18.5: NEXUS changes its own settings, exact tabs, AMD panel ------------------------------------------------
+from nexus import amd as _amd  # noqa: E402
+from nexus import prefs as _prefs  # noqa: E402
+from nexus import ui_nav as _nav  # noqa: E402
+
+_d = {q: (_prefs.detect(q) or {}).get("changes") for q in (
+    "muda o aro para vermelho", "aro vermelho e núcleo branco", "make the ring red", "pon el fondo negro", "tema AMD",
+    "voz feminina", "aro maior", "quero mudar a cor do aro", "qual a cor do aro?", "o aro vermelho estava lindo ontem quando eu abri")}
+check("prefs: requests recognised without the AI (and not questions or chat)", _d == {
+    "muda o aro para vermelho": {"color_ring": "#ff3030"}, "aro vermelho e núcleo branco": {"color_ring": "#ff3030", "color_core": "#f5f7fa"},
+    "make the ring red": {"color_ring": "#ff3030"}, "pon el fondo negro": {"color_bg": "#05060a"}, "tema AMD": {"theme": "amd"},
+    "voz feminina": {"voice_gender": "female"}, "aro maior": {"ring_scale": 115}, "quero mudar a cor do aro": None,
+    "qual a cor do aro?": None, "o aro vermelho estava lindo ontem quando eu abri": None}, str(_d))
+_ring0 = settings["color_ring"]
+_applied = _prefs.apply({"theme": "amd"})
+check("prefs: a theme sets the three colours; undo brings them back",
+      _applied["color_core"] == "#ed1c24" and settings["theme"] == "amd" and _prefs.undo() and settings["color_ring"] == _ring0)
+check("prefs: values are validated (ranges, colour names, unknown settings refused)",
+      _prefs.validate("ring_scale", 500) == 140 and _prefs.validate("color_ring", "azul") == "#2f86ff"
+      and "error" in _prefs.set_preference("llm_api_key", "x") and "error" in _prefs.set_preference("color_core", "banana"))
+_seen = []
+tools.prefs_hook = _seen.append
+_ev = []
+_bot = assistant.Assistant(lambda e, p: _ev.append((e, p)))
+_bot.ask("muda o fundo para preto")
+check("prefs: instant change, the interface is told, and the reply confirms it",
+      settings["color_bg"] == "#05060a" and _seen == [{"color_bg": "#05060a"}]
+      and [p["text"] for e, p in _ev if e == "done"][-1] == "Pronto: fundo na nova cor.")
+_bot.ask("desfaz")
+check("prefs: 'desfaz' undoes the last change", settings["color_bg"] != "#05060a")
+tools.prefs_hook = None
+check("prefs: the model is made to call set_preference when it only claims the change",
+      assistant._needs_tool("Pronto: tema AMD.", False, "tema AMD", set()) is not None
+      and assistant._needs_tool("Pronto.", False, "tema AMD", {"set_preference"}) is None
+      and assistant._needs_tool("O aro é azul.", False, "qual a cor do aro?", set()) is None)
+check("navigation: exact settings sections and panel tabs",
+      [_nav.detect(q) for q in ("abre a aba AMD", "abre a personalização", "quero mudar a cor do aro", "abre minhas memórias",
+                                "abre os aprendizados", "abre as configurações de ativação")]
+      == [{"target": "settings", "section": "amd"}, {"target": "settings", "section": "custom"},
+          {"target": "settings", "section": "custom"}, {"target": "panel", "section": "memory"},
+          {"target": "panel", "section": "learned"}, {"target": "settings", "section": "listen"}])
+_opened = []
+tools.ui_hook = _opened.append
+tools.open_interface("panel", "learned"); tools.open_interface("panel", "nonsense")
+check("open_interface: panel tabs pass, unknown tabs are dropped", [o["section"] for o in _opened] == ["learned", None])
+tools.ui_hook = None
+_info = _amd.info()
+check("AMD panel: card info read from the driver's registry keys (no extra software)",
+      isinstance(_info.get("cards"), list) and all({"name", "vram_gb", "driver", "adrenalin"} <= set(c) for c in _info["cards"]))
+_live = _amd.live()
+check("AMD panel: live load and memory from Windows counters",
+      "error" in _live or {"gpu_pct", "vram_used_mb", "ai_vram_mb", "ai_gpu_pct"} <= set(_live))
+check("AMD panel: references only open known AMD addresses", not _amd.open_reference("https://evil.example")
+      and all(u.startswith("https://") for _, u in _amd.REFERENCES))
+_llm.STATS.clear()
+_llm._record({"eval_count": 80, "eval_duration": 4e9, "prompt_eval_count": 3000, "prompt_eval_duration": 3e8}, 0.0, 1.5)
+_ps = _llm.perf_summary()
+check("AI speed: tokens/s and time to the first word kept for the AMD panel", _ps["tok_s"] == 20.0 and _ps["first_s"] == 1.5
+      and _ps["history"] == [20.0])
+settings["app_mode"] = "user"
+check("prompt: tool list kept short (descriptions trimmed for the new set_preference)",
+      len(json.dumps(assistant.turn_tools(), ensure_ascii=False)) < 10500
+      and "set_preference" in {x["function"]["name"] for x in assistant.turn_tools()})
 
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

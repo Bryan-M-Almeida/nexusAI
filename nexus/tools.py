@@ -273,6 +273,9 @@ ui_hook = None  # set by the app; receives {"target", "section", "say"}
 UI_BETA = {"library": "library", "workspace": "workspace", "skills": "skills", "map": "map"}
 
 
+PANEL_TABS = ("memory", "knowledge", "data", "learned", "log")
+
+
 def open_interface(target, section=None):
     from . import features
 
@@ -280,7 +283,9 @@ def open_interface(target, section=None):
         return {"error": "no interface"}
     if UI_BETA.get(target) and not features.enabled(UI_BETA[target]):
         return {"error": f"'{target}' is a beta feature that is off; the user can enable it in Settings > Beta"}
-    ui_hook({"target": target, "section": section if target == "settings" else None, "say": ""})
+    if target == "panel" and section not in PANEL_TABS:
+        section = None
+    ui_hook({"target": target, "section": section if target in ("settings", "panel") else None, "say": ""})
     return {"opened": target, "section": section} if target != "close" else {"closed": True}
 
 
@@ -326,6 +331,13 @@ def lookup(service, query):
 
 # ---------------------------------------------------------------- apps and media (v0.18.0, beta)
 app_hook = None  # set by the app: app_hook(app) after a game opens -> NEXUS suspends itself
+prefs_hook = None  # set by the app: prefs_hook(changed settings) -> the interface applies them (v0.18.5)
+
+
+def set_preference(name, value):
+    from . import prefs
+
+    return prefs.set_preference(name, value)
 
 
 def open_app_reply(app: dict, code: str) -> tuple[str, str, dict]:
@@ -376,7 +388,7 @@ def _fn(name, desc, props=None, required=()):
 
 
 S, I, O = {"type": "string"}, {"type": "integer"}, {"type": "object"}
-ISO = {"type": "string", "description": "ISO datetime YYYY-MM-DDTHH:MM (local time)"}
+ISO = {"type": "string", "description": "local YYYY-MM-DDTHH:MM"}
 
 SCHEMAS = [
     _fn("add_task", "Create a to-do task for the user.",
@@ -384,61 +396,59 @@ SCHEMAS = [
     _fn("list_tasks", "List tasks.", {"status": {"type": "string", "enum": ["pending", "done", "all"]}}),
     _fn("complete_task", "Mark a task as done.", {"task_id": I}, ["task_id"]),
     _fn("delete_task", "Delete a task.", {"task_id": I}, ["task_id"]),
-    _fn("add_event", "Add an appointment/event to the user's schedule (calendar).",
-        {"title": S, "start": ISO, "end": ISO, "remind_minutes": {"type": "integer", "description": "minutes before start to alert"}, "notes": S},
+    _fn("add_event", "Add an appointment/event to the schedule.",
+        {"title": S, "start": ISO, "end": ISO, "remind_minutes": I, "notes": S},
         ["title", "start"]),
-    _fn("set_reminder", "Set a reminder that alerts the user at a specific time.", {"text": S, "at": ISO}, ["text", "at"]),
-    _fn("list_events", "List schedule events between two datetimes (default: next 7 days).", {"start": ISO, "end": ISO}),
+    _fn("set_reminder", "Alert the user at a specific time.", {"text": S, "at": ISO}, ["text", "at"]),
+    _fn("list_events", "List schedule events (default: next 7 days).", {"start": ISO, "end": ISO}),
     _fn("delete_event", "Cancel/delete an event.", {"event_id": I}, ["event_id"]),
     _fn("save_note", "Save or update a note (same title updates it).", {"title": S, "content": S, "tags": S}, ["title", "content"]),
     _fn("search_notes", "Search the user's notes.", {"query": S}),
-    _fn("record_data", "Store a structured record in a named collection (e.g. expenses, workouts, readings, contacts).",
-        {"collection": S, "data": {"type": "object", "description": "fields of the record, e.g. {\"amount\": 32.5, \"item\": \"lunch\"}"}},
+    _fn("record_data", "Store a record in a named collection (expenses, workouts, readings...). data e.g. {\"amount\": 32.5, \"item\": \"lunch\"}.",
+        {"collection": S, "data": O},
         ["collection", "data"]),
     _fn("query_data", "Read records of a collection to answer questions or compute totals.", {"collection": S, "limit": I}, ["collection"]),
     _fn("list_collections", "List data collections the user has."),
     _fn("delete_record", "Delete a record by id.", {"record_id": I}, ["record_id"]),
-    _fn("remember", "Save a durable fact about the user (preference, person, habit, decision).",
-        {"content": S, "category": {"type": "string", "description": "e.g. preferencia, pessoa, saude, trabalho, rotina"}}, ["content"]),
+    _fn("remember", "Save a durable fact about the user (preference, person, habit, decision). category e.g. preferencia, "
+        "pessoa, saude, trabalho, rotina.", {"content": S, "category": S}, ["content"]),
     _fn("recall", "Search long-term memories about the user.", {"query": S}, ["query"]),
     _fn("forget", "Delete a memory by id when the user asks to forget it.", {"memory_id": I}, ["memory_id"]),
-    _fn("search_knowledge", "Search the local knowledge base (first aid, philosophy, finance, programming, health, productivity and anything learned). Content exists in Portuguese, English and Spanish: use keywords in the user's language.",
+    _fn("search_knowledge", "Search the local knowledge base (first aid, philosophy, finance, programming, health, "
+        "productivity, anything learned). Keywords in the user's language.",
         {"query": S, "category": S}, ["query"]),
     _fn("learn_knowledge", "Store new knowledge the user teaches or asks to learn. Same title updates it.",
         {"title": S, "content": S, "category": S}, ["title", "content"]),
-    _fn("remind_next_session",
-        "ONLY when the user explicitly asks to be reminded of something the next time they open/start NEXUS "
-        "(e.g. 'next time I open, remind me to continue the app project'). NEXUS will greet them with it.",
-        {"topic": {"type": "string", "description": "short noun phrase with article, in the user's language, "
-                                                     "e.g. 'o projeto do app de finanças' / 'the finance app project'"}},
-        ["topic"]),
-    _fn("conversation_control",
-        "Control your own speech when the user asks about the conversation itself: 'repeat' (say the last answer "
-        "again), 'clearer' (user didn't understand -> explain again more clearly), 'pause', 'resume' (continue "
-        "speaking), 'stop' (be quiet).",
+    _fn("remind_next_session", "ONLY when the user asks to be reminded of something the next time they open NEXUS. "
+        "topic: short noun phrase with article in the user's language ('o projeto do app').", {"topic": S}, ["topic"]),
+    _fn("conversation_control", "Your own speech: repeat the last answer, clearer (explain it again more simply), "
+        "pause, resume, stop.",
         {"action": {"type": "string", "enum": ["repeat", "clearer", "pause", "resume", "stop"]}}, ["action"]),
     _fn("update_profile", "Update a field of the user's profile (name, profession, routine, interests, goals, language).",
         {"field": S, "value": S}, ["field", "value"]),
-    _fn("report_issue",
-        "Save this whole conversation to a report file when the user wants to report an error/bug/problem of "
-        "NEXUS to the developers (e.g. 'salve essa conversa para relatar erros', 'report this bug').",
-        {"description": {"type": "string", "description": "what went wrong, in the user's words"}}),
+    _fn("report_issue", "Save this conversation to a report file when the user wants to report a NEXUS bug.",
+        {"description": S}),
     _fn("list_books", "List the books in the user's library with their reading progress."),
     _fn("read_book", "Read a library book aloud (podcast mode), continuing where the user stopped.",
         {"title": S, "from_start": {"type": "boolean"}}, ["title"]),
     _fn("open_url", "Open a web page in the user's default browser.", {"url": S}, ["url"]),
     _fn("web_search", "Open a Google search in the user's browser (when they want to see results themselves).",
         {"query": S}, ["query"]),
-    _fn("play_music", "Play a song/artist/video: opens the first YouTube result in the browser (or a Spotify / "
-        "YouTube Music search when the user names that service).",
+    _fn("play_music", "Play a song/artist/video: opens the first YouTube result. service only when the user names "
+        "another one.",
         {"query": S, "service": {"type": "string", "enum": ["youtube", "youtube music", "spotify", "limusic"]}}, ["query"]),
-    _fn("open_interface", "Open (or close) a part of the NEXUS interface for the user when they want to see or change "
-        "something in NEXUS itself: settings (with a section), panel (schedule, tasks, memory), conversations, "
-        "notifications, library, workspace, skills, guide (all shortcuts), tutorial; 'close' closes the open menu.",
+    _fn("open_interface", "Open (or close) part of the NEXUS interface for the user to SEE: settings with a section, "
+        "panel with a tab, menus. To CHANGE colour, theme, size or voice use set_preference.",
         {"target": {"type": "string", "enum": ["settings", "panel", "conversations", "notifications", "library",
                                                "workspace", "skills", "map", "guide", "tutorial", "close"]},
-         "section": {"type": "string", "enum": ["general", "ai", "voice", "mic", "perf", "notif", "integ", "ui",
-                                                "data", "beta", "keys"]}}, ["target"]),
+         "section": {"type": "string", "enum": ["general", "ai", "memory", "voice", "mic", "listen", "ui", "custom", "keys",
+                                                "integ", "apps", "notif", "amd", "perf", "data", "legal", "beta",
+                                                "knowledge", "learned", "log"]}}, ["target"]),
+    _fn("set_preference", "Change NEXUS's own look or voice now. name: theme (nexus|amd|emerald|violet|amber|graphite|"
+        "ice), color_ring|color_core|color_bg (#rrggbb or colour name), ring_scale 60-140, ring_speed slow|normal|fast, "
+        "exchange_size 12-24, bg_style glow|solid|grid, cursor_style, voice_gender male|female, voice_effect, tts_speed "
+        "-5..10, tts_volume 0-100, show_hud/reduce_motion/ring_wander/show_exchange on|off.",
+        {"name": S, "value": S}, ["name", "value"]),
     _fn("get_datetime", "Get the current local date and time."),
     _fn("get_weather", "Current weather and forecast (internet). City defaults to the user's city.",
         {"city": S, "days": {"type": "integer", "description": "1-7"}}),
@@ -448,17 +458,16 @@ SCHEMAS = [
     _fn("wikipedia", "Look up a person, place or concept on Wikipedia (internet) when the local base has nothing.",
         {"query": S}, ["query"]),
     _fn("sync_calendar", "Import the user's calendar (ICS link from Settings) into the schedule now."),
-    _fn("lookup", "Live data from an online service: crypto prices, the time in another city (clock), translations, "
-        "public holidays, air quality / UV. query = the request in natural language, e.g. 'bitcoin in BRL', "
-        "'Tokyo', 'translate good night to Spanish', 'air quality in Lisbon'.",
+    _fn("lookup", "Live online data: crypto prices, time in another city (clock), translation, holidays, air "
+        "quality/UV. query in natural language ('bitcoin in BRL', 'Tokyo', 'translate good night to Spanish').",
         {"service": {"type": "string", "enum": ["crypto", "clock", "translate", "holidays", "air"]}, "query": S},
         ["service", "query"]),
     _fn("open_app", "Open an app installed on the user's PC by name (Discord, VS Code, Spotify, a game...).",
         {"name": S}, ["name"]),
-    _fn("media_control", "Control the music/video playing on the PC (Spotify, LiMusic, YouTube...) or the system volume.",
+    _fn("media_control", "Control the music/video playing on the PC, or the system volume.",
         {"action": {"type": "string", "enum": ["play", "pause", "next", "previous", "volume", "volume_up", "volume_down",
                                                "mute", "unmute", "now_playing"]},
-         "level": {"type": "integer", "description": "0-100 for 'volume'"}}, ["action"]),
+         "level": I}, ["action"]),
 ]
 
 REGISTRY = {s["function"]["name"]: globals()[s["function"]["name"]] for s in SCHEMAS}

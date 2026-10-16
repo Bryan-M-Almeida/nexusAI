@@ -2,6 +2,8 @@
 and to any other OpenAI-compatible server (LM Studio, llama.cpp server) through /chat/completions."""
 import json
 import re
+import time
+from collections import deque
 
 import httpx
 
@@ -10,6 +12,33 @@ from .config import settings
 TIMEOUT = httpx.Timeout(300, connect=5)
 last_stats: dict = {}  # token counts/timing of the last call, for diagnostics
 calls_log: list = []   # every call's stats (benchmarks read and clear it)
+STATS: deque = deque(maxlen=40)  # v0.18.5: speed of the last answers, for the AMD panel
+
+
+def _record(chunk: dict, t0: float, first: float | None):
+    """Ollama's own timings of one call (nanoseconds) -> last_stats, calls_log and the AMD panel's history."""
+    last_stats.clear()
+    last_stats.update({k: chunk.get(k) for k in ("prompt_eval_count", "prompt_eval_duration", "eval_count",
+                                                  "eval_duration", "load_duration", "total_duration")})
+    calls_log.append(dict(last_stats))
+    del calls_log[:-500]  # benchmarks read it; a long session doesn't grow forever
+    ev, evd = chunk.get("eval_count") or 0, chunk.get("eval_duration") or 0
+    pc, pcd = chunk.get("prompt_eval_count") or 0, chunk.get("prompt_eval_duration") or 0
+    STATS.append({"ts": time.time(), "gen_tokens": ev, "tok_s": round(ev / (evd / 1e9), 1) if evd else 0,
+                  "prompt_tokens": pc, "prompt_tok_s": round(pc / (pcd / 1e9)) if pcd and pc > 8 else None,
+                  "load_s": round((chunk.get("load_duration") or 0) / 1e9, 2),
+                  "first_s": round(first - t0, 2) if first else None, "total_s": round(time.time() - t0, 2)})
+
+
+def perf_summary() -> dict:
+    """Averages of the recent answers (AMD panel)."""
+    rows = list(STATS)
+    gen = [r["tok_s"] for r in rows if r["tok_s"] and r["gen_tokens"] >= 8]
+    read = [r["prompt_tok_s"] for r in rows if r["prompt_tok_s"]]
+    first = [r["first_s"] for r in rows if r["first_s"] is not None]
+    avg = lambda xs: round(sum(xs) / len(xs), 1) if xs else None  # noqa: E731
+    return {"count": len(rows), "tok_s": avg(gen), "prompt_tok_s": avg(read), "first_s": avg(first),
+            "last": rows[-1] if rows else None, "history": [r["tok_s"] for r in rows][-24:]}
 
 
 class LLMOffline(Exception):
@@ -215,6 +244,7 @@ def unload():
 def _stream_ollama(messages, tools, temperature, max_tokens=None):
     body = _native_body(messages, tools, temperature, **({"num_predict": max_tokens} if max_tokens else {}))
     calls = []
+    t0, first = time.time(), None
     with httpx.stream("POST", f"{_ollama_root()}/api/chat", json=body, timeout=TIMEOUT) as r:
         if r.status_code >= 400:
             r.read()
@@ -227,6 +257,7 @@ def _stream_ollama(messages, tools, temperature, max_tokens=None):
                 raise LLMOffline(chunk["error"])
             msg = chunk.get("message") or {}
             if msg.get("content"):
+                first = first or time.time()
                 yield "token", msg["content"]
             for tc in msg.get("tool_calls") or []:
                 fn = tc.get("function") or {}
@@ -234,10 +265,7 @@ def _stream_ollama(messages, tools, temperature, max_tokens=None):
                 calls.append({"id": tc.get("id", ""), "name": fn.get("name", ""),
                               "arguments": args if isinstance(args, str) else json.dumps(args, ensure_ascii=False)})
             if chunk.get("done"):
-                last_stats.clear()
-                last_stats.update({k: chunk.get(k) for k in ("prompt_eval_count", "prompt_eval_duration", "eval_count",
-                                                              "eval_duration", "load_duration", "total_duration")})
-                calls_log.append(dict(last_stats))
+                _record(chunk, t0, first)
     yield ("tool_calls", calls) if calls else ("done", None)
 
 
@@ -335,6 +363,7 @@ def _raw_body(messages, tools, temperature, stream=True, **options):
 def _stream_raw(messages, tools, temperature, max_tokens=None):
     body = _raw_body(messages, tools, temperature, **({"num_predict": max_tokens} if max_tokens else {}))
     text, sent = "", 0
+    t0, first = time.time(), None
     with httpx.stream("POST", f"{_ollama_root()}/api/generate", json=body, timeout=TIMEOUT) as r:
         if r.status_code >= 400:
             r.read()
@@ -349,13 +378,11 @@ def _stream_raw(messages, tools, temperature, max_tokens=None):
                 text += chunk["response"]
                 shown = _visible(text)
                 if len(shown) > sent:
+                    first = first or time.time()
                     yield "token", shown[sent:]
                     sent = len(shown)
             if chunk.get("done"):
-                last_stats.clear()
-                last_stats.update({k: chunk.get(k) for k in ("prompt_eval_count", "prompt_eval_duration", "eval_count",
-                                                              "eval_duration", "load_duration", "total_duration")})
-                calls_log.append(dict(last_stats))
+                _record(chunk, t0, first)
     calls = parse_tool_calls(text)
     rest = _visible(text, final=True)
     if not calls and len(rest) > sent:

@@ -459,19 +459,30 @@
     <button class="icon-btn drawer-close" type="button" data-close aria-label="Close">✕</button>
     <nav class="set-nav mono" id="setNav">
       <p class="kicker">NEXUS://config</p>
+      <p class="set-group" data-i18n="grpSystem">SISTEMA</p>
       <button type="button" data-sec="general" class="on" data-i18n="secGeneral">Geral</button>
+      <p class="set-group" data-i18n="grpAi">INTELIGÊNCIA</p>
       <button type="button" data-sec="ai" data-i18n="secAi">Inteligência</button>
+      <button type="button" data-sec="memory" data-i18n="secMemory">Memória e conversas</button>
+      <p class="set-group" data-i18n="grpVoice">VOZ</p>
       <button type="button" data-sec="voice" data-i18n="secVoice">Voz do NEXUS</button>
       <button type="button" data-sec="mic" data-i18n="secMic">Microfone</button>
-      <button type="button" data-sec="perf" data-i18n="secPerf">Desempenho</button>
-      <button type="button" data-sec="notif" data-i18n="secNotif">Notificações</button>
+      <button type="button" data-sec="listen" data-i18n="secListen">Ativação e escuta</button>
+      <p class="set-group" data-i18n="grpLook">APARÊNCIA</p>
+      <button type="button" data-sec="ui" data-i18n="secUi">Interface</button>
+      <button type="button" data-sec="custom" data-i18n="secCustom">Personalização</button>
+      <button type="button" data-sec="keys" data-i18n="secKeys">Atalhos</button>
+      <p class="set-group" data-i18n="grpConnect">CONEXÕES</p>
       <button type="button" data-sec="integ" data-i18n="secInteg">Integrações</button>
       <button type="button" data-sec="apps" data-i18n="secApps" data-feature-any="apps,media">Apps e mídia</button>
-      <button type="button" data-sec="ui" data-i18n="secUi">Interface</button>
+      <button type="button" data-sec="notif" data-i18n="secNotif">Notificações</button>
+      <p class="set-group" data-i18n="grpHardware">HARDWARE</p>
+      <button type="button" data-sec="amd" class="nav-amd" data-i18n="secAmd">AMD</button>
+      <button type="button" data-sec="perf" data-i18n="secPerf">Desempenho</button>
+      <p class="set-group" data-i18n="grpData">DADOS E PRIVACIDADE</p>
       <button type="button" data-sec="data" data-i18n="secData">Dados</button>
-      <button type="button" data-sec="keys" data-i18n="secKeys">Atalhos</button>
-      <button type="button" data-sec="beta" data-i18n="secBeta">Beta</button>
       <button type="button" data-sec="legal" data-i18n="secLegal">Privacidade e termos</button>
+      <button type="button" data-sec="beta" data-i18n="secBeta">Beta</button>
     </nav>
     <div class="set-body">
       <!-- GENERAL -->
@@ -481,11 +492,7 @@
           <select name="language"><option value="auto">Auto</option><option value="pt">Português</option><option value="en">English</option><option value="es">Español</option></select></label>
         <label class="check"><input type="checkbox" name="greet_on_start"><span data-i18n="greetOnStart">Falar a saudação ao abrir</span></label>
         <label class="check"><input type="checkbox" name="start_fullscreen"><span data-i18n="startFullscreen">Abrir em tela cheia</span></label>
-        <label class="check"><input type="checkbox" name="auto_memory"><span data-i18n="autoMemory">Memorizar fatos automaticamente</span></label>
-        <label class="check"><input type="checkbox" name="auto_title"><span data-i18n="autoTitle">A IA dá título e descrição às conversas</span></label>
         <label class="check"><input type="checkbox" name="focus_in_workspace"><span data-i18n="focusInWs">Ligar o modo foco na área de trabalho</span></label>
-        <label><span data-i18n="historyTurns">Mensagens lembradas na conversa (trocas)</span><input name="history_turns" type="number" min="2" max="40" step="1"></label>
-        <p class="hint" data-i18n="historyTurnsHint">Mais trocas = mais contexto, respostas um pouco mais lentas.</p>
         <div class="row-btns"><button class="btn-ghost" type="button" id="btnReimport" data-i18n="reimport">Reimportar perfil</button>
           <button class="btn-ghost" type="button" id="btnTutorial" data-i18n="tutorialAgain">Ver o tutorial</button></div>
       </section>
@@ -545,9 +552,6 @@
           <label><span data-i18n="vadSilence">Pausa que encerra a fala</span><input name="vad_silence" type="range" min="0.3" max="2" step="0.1"><output class="mono" data-for="vad_silence"></output></label>
         </div>
         <p class="hint" data-i18n="vadHint">Valor menor de sensibilidade capta vozes mais baixas (e mais ruído). Aumente a pausa se o NEXUS corta você no meio da frase.</p>
-        <label class="check"><input type="checkbox" name="require_wake_word"><span data-i18n="requireWake">Só responder quando eu disser "Nexus"</span></label>
-        <label class="check"><input type="checkbox" name="bg_wake_only"><span data-i18n="bgWakeOnly">Com o NEXUS minimizado ou fora de foco, só responder a "Nexus…"</span></label>
-        <p class="hint" data-i18n="wakeHint">Com "Nexus" exigido, só os 2 primeiros segundos de cada fala são checados; a transcrição completa só roda depois de ouvir "Nexus" (bem menos processador com TV ou conversas por perto).</p>
       </section>
 
       <!-- PERFORMANCE & CONNECTION (v0.12) -->
@@ -571,16 +575,6 @@
         <label><span data-i18n="bgRelease">Minimizado por quantos minutos para liberar a memória da voz</span><input name="bg_release_minutes" type="number" min="1" max="240"></label>
         <p class="sub mono" data-i18n="hwTitle">SEU COMPUTADOR</p>
         <div class="hw-box mono" id="hwBox"></div>
-        <div class="gpu-tune" id="gpuTune" hidden>
-          <p class="sub mono" data-i18n="gpuTitle">PLACA DE VÍDEO</p>
-          <p class="hint" id="gpuTuneText"></p>
-          <div class="row-btns"><button class="btn-ghost" type="button" id="btnGpuTune"></button></div>
-          <div class="opt-confirm" id="gpuConfirm" hidden>
-            <p id="gpuConfirmText"></p>
-            <div class="row-btns"><button class="btn-ghost" type="button" id="gpuNo" data-i18n="cancel">Cancelar</button>
-              <button class="btn-primary" type="button" id="gpuYes" data-i18n="gpuYes">Aplicar e reiniciar o Ollama</button></div>
-          </div>
-        </div>
         <p class="sub mono" data-i18n="optTitle">OTIMIZAR</p>
         <div class="opt-grid">
           <button class="btn-ghost" type="button" data-opt="ram"><b data-i18n="optRam">Liberar memória (RAM)</b><small data-i18n="optRamHint">voz parada e caches saem da memória; voltam sozinhos quando usados</small></button>
@@ -618,6 +612,102 @@
           <button class="btn-ghost" type="button" id="btnTestNotif" data-i18n="testNotif">Testar notificação</button>
           <button class="btn-ghost" type="button" id="btnBriefing" data-i18n="briefingNow">Ouvir o resumo agora</button>
         </div>
+      </section>
+
+      <!-- MEMORY AND CONVERSATIONS (v0.18.5) -->
+      <section class="set-sec" data-sec="memory" hidden>
+        <h2 data-i18n="secMemory">Memória e conversas</h2>
+        <label class="check"><input type="checkbox" name="auto_memory"><span data-i18n="autoMemory">Memorizar fatos automaticamente</span></label>
+        <label class="check"><input type="checkbox" name="auto_title"><span data-i18n="autoTitle">A IA dá título e descrição às conversas</span></label>
+        <label><span data-i18n="historyTurns">Mensagens lembradas na conversa (trocas)</span><input name="history_turns" type="number" min="2" max="40" step="1"></label>
+        <p class="hint" data-i18n="historyTurnsHint">Mais trocas = mais contexto, respostas um pouco mais lentas.</p>
+        <p class="hint" data-i18n="memoryHint">As memórias ficam no seu computador. Para ver, apagar ou importar de outras IAs: painel → Memória.</p>
+      </section>
+
+      <!-- ACTIVATION AND LISTENING (v0.18.5) -->
+      <section class="set-sec" data-sec="listen" hidden>
+        <h2 data-i18n="secListen">Ativação e escuta</h2>
+        <label class="check"><input type="checkbox" name="require_wake_word"><span data-i18n="requireWake">Só responder quando eu disser "Nexus"</span></label>
+        <label class="check"><input type="checkbox" name="bg_wake_only"><span data-i18n="bgWakeOnly">Com o NEXUS minimizado ou fora de foco, só responder a "Nexus…"</span></label>
+        <p class="hint" data-i18n="wakeHint">Com "Nexus" exigido, só os 2 primeiros segundos de cada fala são checados; a transcrição completa só roda depois de ouvir "Nexus" (bem menos processador com TV ou conversas por perto).</p>
+        <p class="sub mono" data-i18n="echoTitle">PROTEÇÃO CONTRA ECO E RUÍDO</p>
+        <p class="hint" data-i18n="echoHint">Sempre ligada: enquanto o NEXUS fala, só comandos curtos ("pausa", "para") contam; logo depois, o que repetir a fala dele é ignorado (caixas de som, microfone com atraso como o DroidCam); frases que o reconhecimento inventa com ruído são descartadas. Um fone de ouvido ajuda ainda mais.</p>
+      </section>
+
+      <!-- PERSONALISATION (v0.18.5): what can be customised; Interface keeps the on/off switches -->
+      <section class="set-sec" data-sec="custom" hidden>
+        <h2 data-i18n="secCustom">Personalização</h2>
+        <p class="hint" data-i18n="customHint">Também por voz: "muda o aro para vermelho", "tema AMD", "aro maior", "letra maior", "desfaz".</p>
+        <p class="sub mono" data-i18n="themesTitle">TEMA</p>
+        <div class="theme-grid" id="themeGrid"></div>
+        <input type="hidden" name="theme">
+        <p class="sub mono" data-i18n="colorsTitle">CORES</p>
+        <div class="colors">
+          <label><span data-i18n="colorRing">Aro</span><input type="color" name="color_ring"></label>
+          <label><span data-i18n="colorCore">Núcleo</span><input type="color" name="color_core"></label>
+          <label><span data-i18n="colorBg">Fundo</span><input type="color" name="color_bg"></label>
+        </div>
+        <div class="row-btns"><button class="btn-ghost" type="button" id="btnColorsReset" data-i18n="colorsReset">Cores originais</button></div>
+        <p class="sub mono" data-i18n="ringLookTitle">ARO E TEXTO</p>
+        <div class="two">
+          <label><span data-i18n="ringScale">Tamanho do aro</span><input name="ring_scale" type="range" min="60" max="140" step="5"><output class="mono" data-for="ring_scale"></output></label>
+          <label><span data-i18n="exchangeSize">Tamanho do texto abaixo do aro</span><input name="exchange_size" type="range" min="12" max="24" step="1"><output class="mono" data-for="exchange_size"></output></label>
+        </div>
+        <div class="two">
+          <label><span data-i18n="ringSpeed">Velocidade do giro</span><select name="ring_speed"><option value="slow" data-i18n="speedSlow">Lenta</option><option value="normal" data-i18n="speedNormal">Normal</option><option value="fast" data-i18n="speedFast">Rápida</option></select></label>
+          <label><span data-i18n="fontBrand">Letra dos títulos</span><select name="font_brand"><option value="orbitron" data-i18n="fontOrbitron">Futurista</option><option value="clean" data-i18n="fontClean">Limpa</option></select></label>
+        </div>
+        <p class="sub mono" data-i18n="bgTitle">FUNDO</p>
+        <div class="cards three-cards" id="bgCards">
+          <button type="button" class="card-opt" data-bg="glow"><b data-i18n="bgGlow">Brilho</b><small data-i18n="bgGlowHint">Luz suave atrás do aro.</small></button>
+          <button type="button" class="card-opt" data-bg="solid"><b data-i18n="bgSolid">Liso</b><small data-i18n="bgSolidHint">Uma cor só, sem brilho.</small></button>
+          <button type="button" class="card-opt" data-bg="grid"><b data-i18n="bgGrid">Grade</b><small data-i18n="bgGridHint">Linhas finas de HUD.</small></button>
+        </div>
+        <input type="hidden" name="bg_style">
+        <p class="sub mono" data-i18n="cursorTitle">CURSOR DO MOUSE</p>
+        <div class="two">
+          <label><span data-i18n="cursorStyle">Estilo</span><select name="cursor_style">
+            <option value="ring" data-i18n="cursorRing">Anel do NEXUS</option><option value="dot" data-i18n="cursorDot">Ponto</option>
+            <option value="arrow" data-i18n="cursorArrow">Seta do NEXUS</option><option value="system" data-i18n="cursorSystem">Do Windows</option></select></label>
+          <label><span data-i18n="cursorSize">Tamanho</span><select name="cursor_size">
+            <option value="small" data-i18n="sizeSmall">Pequeno</option><option value="medium" data-i18n="sizeMedium">Médio</option>
+            <option value="large" data-i18n="sizeLarge">Grande</option></select></label>
+        </div>
+        <label><span data-i18n="exchangeHide">Esconder o texto depois de quantos segundos aguardando (0 = nunca)</span><input name="exchange_hide_seconds" type="number" min="0" max="3600" step="5"></label>
+        <label><span data-i18n="restMinutes">Repouso depois de quantos minutos sem interação (0 = nunca)</span><input name="rest_minutes" type="number" min="0" max="120" step="1"></label>
+        <p class="hint" data-i18n="restHint">No repouso os textos somem e só o aro fica, se mexendo; qualquer tecla, movimento do mouse ou fala acorda o NEXUS.</p>
+        <div class="row-btns"><button class="btn-ghost" type="button" id="btnCenterRing" data-i18n="centerRing">Centralizar o aro</button></div>
+      </section>
+
+      <!-- AMD (v0.18.5) -->
+      <section class="set-sec amd-sec" data-sec="amd" hidden>
+        <div class="amd-head">
+          <div class="amd-logo mono">AMD<span>▲</span></div>
+          <div class="amd-card"><b id="amdName">—</b><small id="amdDriver"></small></div>
+          <span class="amd-live mono" id="amdLive" data-i18n="amdLive">AO VIVO</span>
+        </div>
+        <p class="hint" data-i18n="amdIntro">O NEXUS roda a IA no seu computador, na placa de vídeo. Este painel mostra o que ela está fazendo, no espírito da sobreposição de desempenho do AMD Software: Adrenalin Edition.</p>
+        <p class="sub mono" data-i18n="amdNow">AGORA</p>
+        <div class="amd-tiles" id="amdTiles"></div>
+        <div class="amd-graph"><svg id="amdGraph" viewBox="0 0 300 60" preserveAspectRatio="none"><polyline points="" /></svg><small class="mono" data-i18n="amdGraphHint">uso da placa · últimos 60 s</small></div>
+        <p class="sub mono" data-i18n="amdAi">IA NA PLACA</p>
+        <div class="amd-tiles" id="amdAiTiles"></div>
+        <div class="amd-bars" id="amdSpeed"></div>
+        <div class="row-btns"><button class="btn-ghost" type="button" id="btnAmdFree" data-i18n="amdFree">Liberar a placa agora</button>
+          <button class="btn-ghost" type="button" id="btnAmdWarm" data-i18n="amdWarm">Carregar a IA de novo</button></div>
+        <div class="gpu-tune" id="gpuTune" hidden>
+          <p class="sub mono" data-i18n="amdTuneTitle">OTIMIZAÇÃO PARA ESTA PLACA</p>
+          <p class="hint" id="gpuTuneText"></p>
+          <div class="row-btns"><button class="btn-ghost" type="button" id="btnGpuTune"></button></div>
+          <div class="opt-confirm" id="gpuConfirm" hidden>
+            <p id="gpuConfirmText"></p>
+            <div class="row-btns"><button class="btn-ghost" type="button" id="gpuNo" data-i18n="cancel">Cancelar</button>
+              <button class="btn-primary" type="button" id="gpuYes" data-i18n="gpuYes">Aplicar e reiniciar o Ollama</button></div>
+          </div>
+        </div>
+        <p class="sub mono" data-i18n="amdRefTitle">REFERÊNCIAS AMD</p>
+        <div class="amd-refs" id="amdRefs"></div>
+        <p class="hint" data-i18n="amdTempHint">Temperatura, clocks e ventoinha: abra o AMD Software: Adrenalin Edition (Alt+R) e ative a sobreposição de métricas (Ctrl+Shift+O).</p>
       </section>
 
       <!-- INTEGRATIONS (v0.18.0: hub) -->
@@ -681,6 +771,7 @@
       <!-- INTERFACE -->
       <section class="set-sec" data-sec="ui" hidden>
         <h2 data-i18n="secUi">Interface</h2>
+        <p class="hint" data-i18n="uiHint">O que aparece e o que fica ligado. Cores, tamanhos, tema e cursor ficam em Personalização.</p>
         <label class="check"><input type="checkbox" name="show_hud"><span data-i18n="showHud">Marcações e brilho em volta do aro</span></label>
         <label class="check"><input type="checkbox" name="show_captions"><span data-i18n="showCaptions">Legenda da resposta no modo áudio</span></label>
         <label class="check"><input type="checkbox" name="reduce_motion"><span data-i18n="reduceMotion">Reduzir animações (PCs mais fracos)</span></label>
@@ -701,29 +792,9 @@
         <p class="sub mono" data-i18n="textTitle">TEXTO ABAIXO DO ARO</p>
         <label class="check"><input type="checkbox" name="show_exchange"><span data-i18n="showExchange">Mostrar a conversa abaixo do aro (Ctrl+I mostra por alguns segundos quando desligado)</span></label>
         <label class="check"><input type="checkbox" name="exchange_follow"><span data-i18n="exchangeFollow">O texto acompanha o aro (inclusive quando ele se move sozinho)</span></label>
-        <label><span data-i18n="exchangeHide">Esconder o texto depois de quantos segundos aguardando (0 = nunca)</span><input name="exchange_hide_seconds" type="number" min="0" max="3600" step="5"></label>
         <label class="check"><input type="checkbox" name="speak_menus"><span data-i18n="speakMenus">Falar o nome do menu ao abrir ("Abrindo as configurações")</span></label>
-        <p class="sub mono" data-i18n="cursorTitle">CURSOR DO MOUSE</p>
-        <div class="two">
-          <label><span data-i18n="cursorStyle">Estilo</span><select name="cursor_style">
-            <option value="ring" data-i18n="cursorRing">Anel do NEXUS</option><option value="dot" data-i18n="cursorDot">Ponto</option>
-            <option value="arrow" data-i18n="cursorArrow">Seta do NEXUS</option><option value="system" data-i18n="cursorSystem">Do Windows</option></select></label>
-          <label><span data-i18n="cursorSize">Tamanho</span><select name="cursor_size">
-            <option value="small" data-i18n="sizeSmall">Pequeno</option><option value="medium" data-i18n="sizeMedium">Médio</option>
-            <option value="large" data-i18n="sizeLarge">Grande</option></select></label>
-        </div>
         <p class="sub mono" data-i18n="ringTitle">ARO</p>
         <label class="check"><input type="checkbox" name="ring_wander"><span data-i18n="ringWander">O aro se move sozinho pela tela</span></label>
-        <label><span data-i18n="restMinutes">Repouso depois de quantos minutos sem interação (0 = nunca)</span><input name="rest_minutes" type="number" min="0" max="120" step="1"></label>
-        <p class="hint" data-i18n="restHint">No repouso os textos somem e só o aro fica, se mexendo; qualquer tecla, movimento do mouse ou fala acorda o NEXUS.</p>
-        <p class="sub mono" data-i18n="colorsTitle">CORES</p>
-        <div class="colors">
-          <label><span data-i18n="colorRing">Aro</span><input type="color" name="color_ring"></label>
-          <label><span data-i18n="colorCore">Núcleo</span><input type="color" name="color_core"></label>
-          <label><span data-i18n="colorBg">Fundo</span><input type="color" name="color_bg"></label>
-        </div>
-        <div class="row-btns"><button class="btn-ghost" type="button" id="btnColorsReset" data-i18n="colorsReset">Cores originais</button></div>
-        <div class="row-btns"><button class="btn-ghost" type="button" id="btnCenterRing" data-i18n="centerRing">Centralizar o aro</button></div>
       </section>
 
       <!-- DATA -->

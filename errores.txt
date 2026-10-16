@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 3.5  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.18.1
+ Versión del documento: 3.6  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.18.5
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -92,6 +92,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-LLM-039  Entrenamiento: los datos generales desaparecían o se juzgaban sin evidencia
       NX-LLM-040  Entrenamiento: la IA preguntaba "¿quieres que lo guarde?" en cada lección
       NX-LLM-041  Preguntas en vivo: la IA llamaba a la herramienta otra vez (respuesta en dos rondas)
+      NX-LLM-042  "Listo: tema AMD." sin cambiar nada (la IA no llamaba a set_preference)
  VOZ  NX-VOZ-001  El micrófono no responde en el primer uso (descarga Whisper)
       NX-VOZ-002  Micrófono equivocado seleccionado (p. ej. DroidCam)
       NX-VOZ-003  Palabra de activación "Nexus" no reconocida / falsos disparos
@@ -740,6 +741,19 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                dato va en el contexto y cuenta como herramienta ya usada. Dólar
                7,4 s -> 0,4 s (0 s de la caché), clima 8,1 s -> 0,2-2,4 s,
                noticias 29,9 s -> 0,3 s.
+
+[NX-LLM-042] "Listo: tema AMD." sin cambiar nada (la IA no llamaba a set_preference)
+  Severidad  : MEDIA            Estado: CORREGIDO (v0.18.5) Observado: SÍ
+  Síntoma    : En las pruebas, con frases fuera de los atajos, la IA respondía
+               "Listo, voz cambiada." / "Listo: tema AMD." copiando respuestas
+               anteriores de la conversación, sin llamar a la herramienta.
+  Corrección : Los pedidos comunes ("pon el anillo rojo", "tema AMD", "voz
+               femenina", "anillo más grande", "deshaz") se aplican sin la IA
+               (0 s). Para los demás, si el pedido trae el nuevo valor (un color,
+               un tema, una voz) y la IA no llamó a set_preference, se la obliga a
+               llamarla. Sin valor ("quiero cambiar el color del anillo"), NEXUS
+               abre Configuración > Personalización. Prueba: 4/4 frases por la IA
+               cambiaron de verdad (antes 0/4).
 
 ================================================================================
  VOZ — RECONOCIMIENTO Y SÍNTESIS

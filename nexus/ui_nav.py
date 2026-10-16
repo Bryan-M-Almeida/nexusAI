@@ -10,7 +10,8 @@ TARGETS = [
     ("tutorial", r"tutorial"),
     ("map", r"mapa( mental| conceitual| de habilidades| de conhecimento)?|mind ?map|concept map|skill tree|arvore de habilidades"),
     ("guide", r"guia|guide|guia de atalhos|lista de atalhos"),
-    ("panel", r"painel|panel|dashboard|agenda|tarefas|tasks|tareas|memorias?|memory|memories"),
+    ("panel", r"painel|panel|dashboard|agenda|tarefas|tasks|tareas|memorias?|memory|memories|aprendizados?|learned|"
+              r"conhecimento|knowledge|conocimiento"),
     ("conversations", r"conversas|conversations|conversaciones|historico|history|historial"),
     ("notifications", r"notificac\w*|notifications?|notificaciones|avisos|alertas?|alerts?"),
     ("library", r"biblioteca|library|livros|books|libros"),
@@ -20,18 +21,27 @@ TARGETS = [
 ]
 # settings section -> words (only used together with a "settings" word, or alone for the very specific ones)
 SECTIONS = [
+    ("amd", r"amd|radeon|placa de video|graphics card|tarjeta grafica|gpu"),
+    ("custom", r"personaliza\w*|customi[sz]\w*|temas?|themes?|cores|colors|colours|colores|cursor|ponteiro|puntero"),
+    ("listen", r"ativacao|activation|activacion|escuta|listening|escucha|palavra de ativacao|wake word|eco|echo"),
+    ("memory", r"memoria e conversas|memory and conversations|memoria y conversaciones"),
+    ("apps", r"apps|aplicativos|aplicaciones|midia|media|multimedia|musica|music"),
+    ("legal", r"privacidade|privacy|privacidad|termos|terms|terminos"),
     ("keys", r"atalhos|shortcuts|atajos|teclas|keys"),
     ("voice", r"voz|voice"),
     ("mic", r"microfone|microphone|microfono|mic"),
     ("perf", r"desempenho|performance|rendimiento|conexao|connection|conexion"),
     ("notif", r"notificac\w*|notifications?|notificaciones"),
     ("integ", r"integrac\w*|integrations?|integraciones"),
-    ("ui", r"interface|interfaz|aparencia|appearance|apariencia|cores|colors|colours|colores|cursor|mouse|menus?"),
+    ("ui", r"interface|interfaz|aparencia|appearance|apariencia|mouse|menus?"),
     ("data", r"dados|data|datos|backup"),
     ("beta", r"beta|modo desenvolvedor|developer mode|modo desarrollador"),
     ("ai", r"inteligencia|intelligence|provedor|provider|proveedor|modelo|model|api"),
     ("general", r"geral|general|idioma|language"),
 ]
+PANEL_TABS = [("learned", r"aprendizados?|learned|lessons|aprendizajes"), ("memory", r"memorias?|memory|memories|recuerdos"),
+              ("knowledge", r"saber|conhecimento|knowledge|conocimiento"), ("data", r"dados|data|datos|colecoes|collections"),
+              ("log", r"log|historico de acoes|action log|registro")]
 OPEN = (r"(abr[aei]r?|abre|abra|mostr[aeo]r?|mostra|me mostra|open|show( me)?|bring up|go to|muestra(me)?|ve a|ir para|"
         r"vai para|entra(r)? (em|no|na)|acessa(r)?|me leva( para| pra| ate| ao| a| onde)?|leva me|take me( to)?|llevame)")
 CLOSE = r"(fech[aeo]r?|fecha|close|cierra|cerrar|sai(a|r)? d[aoe]s?|exit|sal de)"
@@ -59,9 +69,10 @@ CHANGE = (r"(mud(a|ar|e|o)|troc(a|ar|e|o)|alter(a|ar|e)|personaliz(a|ar|e)|ajust
           r"change|customi[sz]e|set up|edit|cambi(a|ar|e)|modific(a|ar|e))")
 SUBJECTS = [
     ("keys", r"atalhos?|shortcuts?|atajos?|teclas de atalho"),
-    ("ui", r"(cor|cores|color|colors|colour|colours|colores)\s+(\w+\s+){0,3}(aro|anel|ring|anillo|nucleo|core|fundo|background|"
-           r"nexus|tela|screen|pantalla)|aro|anel do nexus|nucleo do nexus|cursor|ponteiro|pointer|puntero|menus?|layout|"
-           r"modo de uso|tema|theme|(aro|ring|anillo|nucleo|core|background|fundo)\s+(colou?rs?|color|cor)"),
+    ("custom", r"(cor|cores|color|colors|colour|colours|colores)\s+(\w+\s+){0,3}(aro|anel|ring|anillo|nucleo|core|fundo|"
+               r"background|nexus|tela|screen|pantalla)|aro|anel do nexus|nucleo do nexus|cursor|ponteiro|pointer|puntero|"
+               r"tema|theme|(aro|ring|anillo|nucleo|core|background|fundo)\s+(colou?rs?|color|cor)"),
+    ("ui", r"menus?|layout|modo de uso"),
     ("voice", r"(sua |tua |a |your |tu )?voz( do nexus)?|(your |the )?voice|velocidade da fala|speech speed"),
     ("mic", r"microfone|microphone|microfono"),
     ("general", r"idioma|language"),
@@ -96,8 +107,11 @@ def detect(text: str) -> dict | None:
     rest = re.sub(rf"^{OPEN}\s*", "", norm)
     target = _find(TARGETS, rest)
     section = _find(SECTIONS, rest)
-    if target == "settings" or (target is None and section in ("keys", "beta")):
+    if target == "settings" or (target is None and section in ("keys", "beta", "amd", "custom")):
         return {"target": "settings", "section": section or "general"}
+    if target == "panel":  # v0.18.5: the exact tab ("abre minhas memórias", "abre os aprendizados")
+        tab = _find(PANEL_TABS, rest)
+        return {"target": "panel", "section": tab}
     if target in ("notifications",) and re.search(r"configurac|settings|ajustes", rest):
         return {"target": "settings", "section": "notif"}
     if target:

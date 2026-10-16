@@ -22,13 +22,17 @@ if (!window.pywebview && location.search.includes("mock")) {
   const mockApps = [["RetroArch", "game"], ["PCSX2", "game"], ["Steam", "launcher"], ["XBOX", "launcher"], ["Visual Studio Code", "work"],
     ["Discord", "work"], ["Google Chrome", "work"], ["LiMusic", "work"], ["Notion", "work"], ["WhatsApp", "work"], ["Spotify", "work"]]
     .map(([name, kind]) => ({ name, kind, id: name }));
+  let mockT = 0;
+  const mockModel = () => [{ name: "qwen3:8b", size_mb: 6782, vram_mb: 6242 }];
+  const mockAi = () => ({ count: 9, tok_s: 22.7, prompt_tok_s: 7604, first_s: 2.4, last: { gen_tokens: 72, tok_s: 22.4, total_s: 5.9 },
+    history: [22.7, 23.1, 21.8, 22.4, 24.0, 22.9, 23.3, 22.1, 22.4] });
   let mockFull = false; let mockTrain = false; let mockTerms = /terms=1/.test(location.search), mockGpu = false;
   const settings = { ui_layout: "computer", bar_top: "hover", bar_left: "hover", bar_right: "hover", bar_bottom: "hover", ring_wander: true, rest_minutes: 3, show_exchange: true, exchange_follow: false, exchange_hide_seconds: 45, cursor_style: "ring", cursor_size: "medium", shortcuts: {}, tutorial_done: true, speak_menus: true, beta_map: true, beta_hold_talk: false, beta_training: true, beta_memory_import: true, app_mode: "user", beta_library: true, color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c", llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, tts_volume: 100, llm_preset: "ollama", llm_api_key: "ollama",
     llm_temperature: 0.3, llm_context: 8192, history_turns: 12, auto_title: true, greet_on_start: true, start_fullscreen: true,
     mic_device: "", vad_threshold: 0.5, vad_silence: 0.7, reminder_leads: "60,10,0", speak_reminders: true,
     ai_target: "local", bg_wake_only: true, bg_release_minutes: 10, pause_when_unfocused: true, network_mode: "hybrid", performance: "balanced", stt_beam: 5, llm_keep_alive: "2h", llm_num_gpu: -1, desktop_notifications: true, notify_sound: true, quiet_hours: "", daily_briefing: "", show_hud: true, show_captions: true, reduce_motion: false, auto_memory: true, voice_enabled: true, bridge_port: 47800,
-    integrations: true, home_city: "São Paulo", beta_media: true, beta_apps: true, music_player: "limusic", apps_suspend: "games", game_watch: false, home_currency: "", home_country: "", calendar_ics_url: "", ai_mode: "assistant",
+    integrations: true, home_city: "São Paulo", beta_media: true, beta_apps: true, theme: "nexus", ring_scale: 100, ring_speed: "normal", exchange_size: 14, bg_style: "glow", font_brand: "orbitron", music_player: "limusic", apps_suspend: "games", game_watch: false, home_currency: "", home_country: "", calendar_ics_url: "", ai_mode: "assistant",
     ui_mode: "audio", mic_muted: false, require_wake_word: false };
   const llm = { online: true, model_ready: true, model: "qwen3:8b", models: ["qwen3:8b"] };
   const VOICES = [{ name: "Microsoft Maria", gender: "female", lang: "pt" }, { name: "Microsoft Zira", gender: "female", lang: "en" },
@@ -158,6 +162,15 @@ if (!window.pywebview && location.search.includes("mock")) {
       return { ok: true, items: mockCx }; },
     integration_remove: async (id) => { mockCx = mockCx.filter((c) => c.id !== id); return { ok: true, items: mockCx }; },
     apps_list: async () => ({ items: mockApps }),
+    // v0.18.5: AMD panel
+    amd_status: async () => ({ cards: [{ name: "AMD Radeon RX 6600 XT", vram_gb: 8, driver: "32.0.21045.5002", adrenalin: "26.8.1" }],
+      tune: { amd: true, vulkan: true, applied: true, suggest: true, installed: true }, model: mockModel(),
+      ai: mockAi(), refs: ["adrenalin", "rocm", "gpuopen", "developer", "ryzen_ai", "ollama_amd", "hackathon"] }),
+    amd_live: async () => { mockT += 1; const busy = mockT % 6 < 3; return { gpu_pct: busy ? 70 + Math.random() * 15 : 3 + Math.random() * 4,
+      engines: busy ? { Copy: 78, "3D": 4 } : { "3D": 4 }, ai_gpu_pct: busy ? 69 : 0, nexus_gpu_pct: 0, vram_used_mb: 7681, shared_used_mb: 1161,
+      ai_vram_mb: 6213, ai: mockAi(), model: mockModel() }; },
+    amd_open_ref: async () => ({ ok: true }), amd_free: async () => ({ freed_mb: 6213 }), amd_warm: async () => ({ ok: true }),
+    set_preferences: async (c) => { Object.assign(settings, c); return { ok: true, applied: c, settings }; },
     app_mark: async (name, kind) => { const a = mockApps.find((x) => x.name === name); if (a) a.kind = kind; return { items: mockApps }; },
     app_open: async (name) => ({ ok: true, said: `Abrindo ${name}.` }),
     media_state: async () => ({ sessions: [], current: { app: "LiMusic", title: "Midnight City", artist: "M83", status: "playing" }, volume: 38, muted: false }),

@@ -5,8 +5,8 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import (apps, connectors, emergency, features, knowledge, llm, media, memory, netprobe, profile, skills, tools,
-               training, ui_nav, workspace)
+from . import (apps, connectors, emergency, features, knowledge, llm, media, memory, netprobe, prefs, profile, skills,
+               tools, training, ui_nav, workspace)
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
@@ -309,6 +309,14 @@ LIVE = [
 ]
 
 
+_COLOR_WORDS = (r"(vermelh|azul|verde|rox[oa]|rosa|laranja|amarel|branc|pret|cinza|dourad|prat|ciano|violeta|"
+                r"red|blue|green|purple|pink|orange|yellow|white|black|gr[ae]y|gold|silver|cyan|violet|"
+                r"roj|negr|blanc|morad|amarill|naranj|gris)")
+PREF_REQUEST = re.compile(  # v0.18.5: a request to change NEXUS's look or voice WITH the new value (else: open settings)
+    rf"\b(aro|anel|n[uú]cleo|fundo|ring|core|background|anillo|fondo)\b.{{0,40}}\b{_COLOR_WORDS}|"
+    rf"\b{_COLOR_WORDS}\w*\b.{{0,15}}\b(ring|core|background)\b|"
+    r"\b(tema|theme)\s+(d[oa]\s+|the\s+)?(nexus|amd|radeon|esmeralda|emerald|violeta|violet|[aâá]mbar|amber|grafit[eo]|"
+    r"graphite|gelo|ice|hielo)\b|\b(voz|voice)\s+(feminin|masculin|female|male|femenin|de mulher|de homem)", re.I)
 UI_OPEN_CLAIM = re.compile(r"\b(abri|aberto|aberta|abrindo|abrimos|opened|opening|i've opened|abierto|abierta|abriendo|"
                            r"te levei|levei voc|took you|te llev|vou (te )?(levar|abrir|mostrar)|vamos (abrir|l[aá])|"
                            r"let me (open|take|show)|i'?ll (open|take you|show)|i will (open|take|show)|voy a (abrir|llevar)|"
@@ -330,6 +338,10 @@ def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None
             return (f"The user explicitly asked you to store this, but you did NOT call any tool, so nothing was saved. "
                     f"Call `{tool}` now with the information from the user's message, then confirm briefly in the "
                     f"user's language.")
+    # v0.18.5: "Pronto: tema AMD." without calling set_preference (copied from earlier turns) - nothing changed
+    if "set_preference" not in (called or set()) and PREF_REQUEST.search(user_text) and not user_text.strip().endswith("?"):
+        return ("The user asked to change NEXUS's look or voice, but you did NOT call `set_preference`, so nothing "
+                "changed. Call `set_preference` now (one call per setting), then confirm briefly in the user's language.")
     # v0.16.5 eval: "Aberto o painel de configurações" without calling the tool - nothing opened
     if "open_interface" not in (called or set()) and UI_OPEN_CLAIM.search(reply) and UI_WORDS.search(user_text + " " + reply):
         return ("You said you opened part of the NEXUS interface but you did NOT call `open_interface`, so nothing "
@@ -522,6 +534,13 @@ class Assistant:
         if workspace.active or any(rx.search(text) for rx, _, _ in INTENTS):
             return False
         code = detect(text) or lang()
+        hit = prefs.handle(text, code)  # v0.18.5: "muda o aro para vermelho", "tema AMD", "voz feminina", "desfaz"
+        if hit:
+            changed, reply = hit
+            if changed and tools.prefs_hook:
+                tools.prefs_hook(changed)
+            self._instant(text, reply, "set_preference", changed)
+            return True
         if features.enabled("media"):
             hit = media.handle(text, code)
             if hit:
