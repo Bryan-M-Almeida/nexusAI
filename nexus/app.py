@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import webview
 
 from . import (MODEL_NAME, __version__, assistant, bridge, control, features, gpu_tune, i18n, knowledge, legal, llm, memory,
-               memory_import, notify, profile, training,
+               memory_import, notify, profile, training, apps, connectors, media,
                library, netprobe, performance, scheduler, skills, tools, workspace)
 from . import files as filereader
 from .logs import log, setup as setup_logs
@@ -37,6 +37,19 @@ def emit(event: str, payload=None):
         pass
 
 
+def _set_priority(low: bool):
+    """BELOW_NORMAL while suspended for a game, NORMAL again when NEXUS wakes (v0.18.0)."""
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+        kernel32.SetPriorityClass.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
+        kernel32.SetPriorityClass(kernel32.GetCurrentProcess(), 0x4000 if low else 0x20)
+    except Exception:
+        pass
+
+
 class Api:
     """Every public method is callable from JS as window.pywebview.api.<name>()."""
 
@@ -46,6 +59,9 @@ class Api:
         self._brain = assistant.Assistant(self._on_brain_event, control_hook=self._speech_control,
                                           confirm_hook=self._confirm_command)
         tools.ui_hook = lambda nav: emit("ui_open", nav)  # the model's open_interface tool (v0.16.5)
+        tools.app_hook = lambda app: self.suspend("game", app["name"])  # v0.18.0: a game opened -> free the GPU
+        self._last_activity = time.time()
+        self._suspended = None  # v0.18.0: {"reason", "app", "since", "vram_freed_mb"} while suspended
         self._speaker = Speaker(lambda s: emit("voice", s), lambda payload: emit("speak_env", payload))
         self._listener = Listener(self._on_voice_text, lambda s: emit("voice", s), self._speaker,
                                   on_level=lambda level: emit("mic_level", level),
@@ -60,6 +76,119 @@ class Api:
         self._attachments: list[dict] = []  # v0.15: files attached to the next message
         library.player = self.podcast_start
         threading.Thread(target=self._background_watch, daemon=True, name="background").start()
+        threading.Thread(target=self._game_watch, daemon=True, name="game-watch").start()
+
+    # -- suspended for games (v0.18.0) -------------------------------------------------------------------------------
+    def suspend(self, reason="manual", app=""):
+        """Free the graphics card for a game: the model leaves the VRAM, the window minimizes, NEXUS runs below normal
+        priority and only "Nexus" by voice (or going back to the window) wakes it. Reminders keep working."""
+        if self._suspended:
+            return {"ok": True, "already": True}
+        self._suspended = {"reason": reason, "app": app, "since": time.time(), "vram_freed_mb": 0}
+        threading.Thread(target=self._do_suspend, daemon=True, name="suspend").start()
+        return {"ok": True}
+
+    def _do_suspend(self):
+        for _ in range(80):  # let NEXUS finish saying "opening the game..." (8 s at most)
+            if not self._speaker.speaking.is_set():
+                break
+            time.sleep(0.1)
+        before = sum(m["vram_mb"] for m in llm.loaded())
+        llm.unload()
+        time.sleep(0.6)
+        after = sum(m["vram_mb"] for m in llm.loaded())
+        if self._suspended is None:
+            return
+        self._suspended["vram_freed_mb"] = max(0, before - after)
+        _set_priority(low=True)
+        log.info(f"suspended ({self._suspended['reason']}: {self._suspended['app']}): {before - after} MB of VRAM freed")
+        emit("suspended", {"on": True, **self._suspended})
+        try:
+            _window.minimize()
+        except Exception:
+            pass
+
+    def resume(self, source="manual"):
+        if not self._suspended:
+            return {"ok": True, "already": True}
+        info, self._suspended = self._suspended, None
+        _set_priority(low=False)
+        self._last_activity = time.time()
+        try:
+            _window.restore()
+        except Exception:
+            pass
+        emit("suspended", {"on": False, "source": source, "minutes": round((time.time() - info["since"]) / 60, 1)})
+        threading.Thread(target=self._warm_up, daemon=True, name="warm").start()  # the model is back before the question
+        return {"ok": True}
+
+    def suspend_state(self):
+        return {"suspended": bool(self._suspended), **(self._suspended or {})}
+
+    def _game_watch(self):
+        """Optional (Settings > Apps): a game started outside NEXUS comes to the foreground -> suspend. After the user
+        wakes NEXUS during the same game it suspends again only when idle for 2 minutes with the game in front."""
+        woke_for = ""
+        while True:
+            time.sleep(10)
+            if not (settings.get("game_watch") and features.enabled("apps")) or self._suspended:
+                continue
+            try:
+                game = apps.foreground_game()
+            except Exception:
+                continue
+            if not game:
+                woke_for = ""
+            elif game != woke_for or time.time() - self._last_activity > 120:
+                woke_for = game
+                self.suspend("game_watch", game)
+
+    # -- integrations, apps and media (v0.18.0) -----------------------------------------------------------------------
+    def integrations_status(self):
+        return {"items": connectors.status(), "online": connectors.online_allowed(),
+                "home_city": settings.get("home_city", ""), "home_currency": connectors.home_currency(),
+                "home_country": connectors.home_country()}
+
+    def integration_toggle(self, cid, on):
+        return connectors.toggle(cid, bool(on))
+
+    def integration_test(self, cid):
+        return connectors.test(cid)
+
+    def integration_add(self, name, keywords, url, ttl_min=30):
+        result = connectors.add_custom(name, keywords, url, ttl_min)
+        return {**result, "items": connectors.status()}
+
+    def integration_remove(self, cid):
+        connectors.remove_custom(cid)
+        return {"ok": True, "items": connectors.status()}
+
+    def apps_list(self, refresh=False):
+        items = apps.list_apps(refresh=bool(refresh))
+        return {"items": sorted(items, key=lambda a: (a["kind"] != "game", a["kind"] != "launcher", a["name"].lower()))}
+
+    def app_mark(self, name, kind):
+        games = [n for n in settings.get("apps_games", []) if n != name]
+        work = [n for n in settings.get("apps_work", []) if n != name]
+        if kind == "game":
+            games.append(name)
+        elif kind == "work":
+            work.append(name)
+        settings.apply({"apps_games": games, "apps_work": work})
+        return self.apps_list()
+
+    def app_open(self, name):
+        app = apps.find(name)
+        if not app:
+            return {"ok": False}
+        reply, _, result = tools.open_app_reply(app, lang())
+        return {**result, "said": reply}
+
+    def media_state(self):
+        return {**media.now_playing(), **media.get_volume()}
+
+    def media_action(self, action, level=None):
+        return media.control(action, level)
 
     def _confirm_command(self, command: str) -> bool:
         """The AI wants to run a command in the workspace: ask the user (dialog + voice) and wait up to 3 min."""
@@ -304,6 +433,7 @@ class Api:
             threading.Thread(target=self._brain.ask, args=(request,), daemon=True).start()
 
     def send(self, text, spoken=False):
+        self._last_activity = time.time()
         action = control.detect(text)
         if action:
             self._handle_control(action, text)
@@ -438,6 +568,8 @@ class Api:
     def set_background(self, state):
         """The interface reports "visible" | "blurred" (not in focus) | "hidden" (minimized)."""
         self._listener.set_background(state != "visible")
+        if state == "visible" and self._suspended and time.time() - self._suspended["since"] > 4:
+            self.resume("window")  # v0.18.0: the user went back to NEXUS
         if state == "hidden":
             self._hidden_since = self._hidden_since or time.time()
         else:
@@ -657,7 +789,8 @@ class Api:
         freed_disk = 0
         if kind in ("ram", "cache"):
             knowledge._cache.clear()
-            tools._online_cache.clear()
+            if kind == "cache":
+                connectors.clear_cache()  # v0.18.0: the integrations' answers (kept on disk)
             self._speaker.__dict__.get("_cache", {}).clear()
             if kind == "ram" and self._listener.mode == "off":
                 self._listener.release()  # Whisper (~0.5 GB) reloads by itself when voice is used again
@@ -701,6 +834,9 @@ class Api:
         return {"ok": True}
 
     def _on_voice_text(self, text, during_speech=False):
+        self._last_activity = time.time()
+        if self._suspended:  # v0.18.0: "Nexus, ..." while a game runs wakes NEXUS and the request goes on
+            self.resume("voice")
         action = control.detect(text)
         if action:
             emit("heard", {"text": text, "control": action})

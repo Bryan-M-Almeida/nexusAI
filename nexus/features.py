@@ -14,6 +14,8 @@ BETA = {
     "hold_talk": set(),  # v0.16.8: hold the talk key to speak
     "training": set(),       # v0.17.5: training mode + "Aprendizados" tab
     "memory_import": set(),  # v0.17.5: import memories from other AIs
+    "media": {"media_control"},  # v0.18.0: play/pause, next, volume, what's playing (Spotify, LiMusic, browser...)
+    "apps": {"open_app"},        # v0.18.0: open installed apps; games suspend NEXUS
 }
 TOOL_FEATURE = {tool: feat for feat, tools in BETA.items() for tool in tools}
 

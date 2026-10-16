@@ -18,8 +18,17 @@ TIMEOUT = httpx.Timeout(10, connect=5)
 HEADERS = {"User-Agent": "NEXUS-assistant/0.6 (hackathon prototype)"}
 
 
+_client: httpx.Client | None = None
+
+
 def _get(url, **params):
-    r = httpx.get(url, params=params or None, headers=HEADERS, timeout=TIMEOUT, follow_redirects=True)
+    # v0.18.0: one client keeps the connections open - each new TLS handshake cost ~0.6 s, and a weather answer
+    # needs two requests to the same service
+    global _client
+    if _client is None:
+        _client = httpx.Client(headers=HEADERS, timeout=TIMEOUT, follow_redirects=True,
+                               limits=httpx.Limits(max_keepalive_connections=8, keepalive_expiry=120))
+    r = _client.get(url, params=params or None)
     r.raise_for_status()
     return r
 

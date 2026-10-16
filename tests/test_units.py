@@ -417,12 +417,15 @@ def fake_weather(city="", days=3):
     return {"city": city or "SP", "now": 22}
 
 
-tools._online_cache.clear()
+from nexus import connectors as _cx  # noqa: E402
+
+_cx.clear_cache()
 cfg["integrations"] = True
-fake_weather.__name__ = "get_weather"
-wrapped = tools._online(fake_weather)
-wrapped(city="Rio"); wrapped(city="Rio"); wrapped(city="Recife")
+_real_fetch, _real_allowed = _cx.CONNECTORS["weather"].fetch, _cx.online_allowed
+_cx.CONNECTORS["weather"].fetch, _cx.online_allowed = fake_weather, lambda: True
+tools.get_weather(city="Rio"); tools.get_weather(city="Rio"); tools.get_weather(city="Recife")
 check("online cache: same question within the TTL doesn't hit the network", calls == ["Rio", "Recife"], str(calls))
+_cx.CONNECTORS["weather"].fetch, _cx.online_allowed = _real_fetch, _real_allowed
 knowledge._cache.clear()
 first = knowledge.search("estoicismo")
 check("knowledge cache: repeated search served from cache", knowledge.search("estoicismo") == first and len(knowledge._cache) >= 1)
@@ -645,14 +648,14 @@ def capture_stream(messages, *a, **k):
 memory.new_conversation()
 _llm.stream_chat = capture_stream
 bot = assistant.Assistant(lambda e, p: None)
-bot.ask("Quanto é 2 mais 2?")
-bot.ask("E 3 mais 3?")
+bot.ask("Quem escreveu Dom Casmurro?")
+bot.ask("E Memórias Póstumas?")
 _llm.stream_chat = real_stream
 first, second = seen_prompts[0], seen_prompts[1]
 check("prompt cache: the next turn starts with the same history (system + earlier turns)",
-      second[0] == first[0] and second[len(first) - 1]["content"] == "Quanto é 2 mais 2?", str(second[-3:])[:300])
+      second[0] == first[0] and second[len(first) - 1]["content"] == "Quem escreveu Dom Casmurro?", str(second[-3:])[:300])
 check("prompt cache: the database keeps only the raw text",
-      memory.history(5)[0]["content"] == "Quanto é 2 mais 2?")
+      memory.history(5)[0]["content"] == "Quem escreveu Dom Casmurro?")
 
 from datetime import date as _date, timedelta as _td  # noqa: E402
 
@@ -707,6 +710,9 @@ WEB = Path(__file__).resolve().parent.parent / "nexus" / "web"
 _i18n = (WEB / "i18n.js").read_text("utf-8")
 _blocks = dict(zip(("pt", "en", "es"), re.split(r"\n  (?:pt|en|es): \{", _i18n)[1:]))
 _keys = {lang: set(re.findall(r"(?:^|[\s,{])([A-Za-z_]\w*): ", body)) for lang, body in _blocks.items()}
+for _extra in re.findall(r"Object\.entries\((\{.*?\})\)\) Object\.assign\(window\.I18N\[l\], extra\)", _i18n, re.S):
+    for lang, more in json.loads(_extra).items():  # v0.18.0+: keys added as JSON blocks after the main object
+        _keys[lang] |= set(more)
 _html = (WEB / "index.html").read_text("utf-8")
 _used = set(re.findall(r'data-i18n(?:-ph|-title)?="(\w+)"', _html))
 for lang in ("pt", "en", "es"):
@@ -854,6 +860,118 @@ _gs = gpu_tune.status()
 check("gpu tuning: status reports card, backend and setting", set(_gs) >= {"amd", "vulkan", "applied", "suggest", "installed"})
 check("colours: default ring/core/background are valid hex colours",
       all(re.fullmatch(r"#[0-9a-f]{6}", str(settings[k])) for k in ("color_ring", "color_core", "color_bg")))
+
+# -- v0.18.0: integrations hub, media, apps ------------------------------------------------------------------------
+from nexus import apps as _apps  # noqa: E402
+from nexus import connectors as cx  # noqa: E402
+from nexus import legal as _legal  # noqa: E402
+from nexus import media as _media  # noqa: E402
+
+settings["home_city"], settings["language"] = "São Paulo", "pt"
+_routes = {q: [c for c, _ in cx.route(q)] for q in (
+    "Quanto está o dólar hoje?", "quanto é 100 dólares em reais", "gastei 42 reais no mercado", "quantos reais eu tenho?",
+    "Vai chover amanhã em São Paulo?", "o tempo em geral é curto", "quanto tempo falta pro natal?", "quanto está o bitcoin?",
+    "que horas são em Tóquio?", "que horas são?", "traduza bom dia para inglês", "qual o próximo feriado?",
+    "quanto é 15% de 230?", "10 milhas em km", "notícias sobre tecnologia", "me conta uma piada")}
+check("hub: each question reaches only the integration it needs (none for chat, expenses or 'what time is it?')", _routes == {
+    "Quanto está o dólar hoje?": ["currency"], "quanto é 100 dólares em reais": ["currency"], "gastei 42 reais no mercado": [],
+    "quantos reais eu tenho?": [], "Vai chover amanhã em São Paulo?": ["weather"], "o tempo em geral é curto": [],
+    "quanto tempo falta pro natal?": [], "quanto está o bitcoin?": ["crypto"], "que horas são em Tóquio?": ["clock"],
+    "que horas são?": [], "traduza bom dia para inglês": ["translate"], "qual o próximo feriado?": ["holidays"],
+    "quanto é 15% de 230?": ["calc"], "10 milhas em km": ["units"], "notícias sobre tecnologia": ["news"],
+    "me conta uma piada": []}, str(_routes))
+check("hub: arguments come from the message (amount, currencies, city, days, language)",
+      cx.route("quanto é 100 dólares em reais")[0][1] == {"amount": 100.0, "from_currency": "USD", "to_currency": "BRL"}
+      and cx.route("Vai chover amanhã em Curitiba?")[0][1] == {"city": "Curitiba", "days": 2}
+      and cx.route("how much is 50 euros in dollars?")[0][1]["to_currency"] == "USD"
+      and cx.route("como se diz obrigado em japonês?")[0][1]["target"] == "ja")
+check("calculator: exact answers without the AI (percent, words, roots, division)",
+      [cx.prepare(q)["instant"] for q in ("quanto é 15% de 230?", "quanto é 12 x 7 + 3", "raiz quadrada de 144",
+                                          "quanto é 10 dividido por 4")]
+      == ["15% de 230 = 34,5.", "12 x 7 + 3 = 87.", "raiz quadrada de 144 = 12.", "10 dividido por 4 = 2,5."])
+check("units: length, temperature and mass", [cx.prepare(q)["instant"] for q in ("10 milhas em km", "30 graus celsius em fahrenheit",
+                                                                                   "converte 5 kg em libras")]
+      == ["10 milhas = 16,09 quilômetros.", "30 graus Celsius = 86 graus Fahrenheit.", "5 quilos = 11,02 libras."])
+check("calculator: code never runs (only arithmetic is evaluated)", cx.route("quanto é __import__('os')") == []
+      and cx.route("quanto é 2**10000000") == [])
+_cx_calls = []
+
+
+def _fake_currency(amount=1, from_currency="USD", to_currency="BRL"):
+    _cx_calls.append((amount, from_currency, to_currency))
+    return {"amount": amount, "from": from_currency, "to": to_currency, "result": round(5.0828 * amount, 4),
+            "rate_date": "2026-10-16", "source": "test"}
+
+
+_real = cx.CONNECTORS["currency"].fetch, cx.online_allowed
+cx.CONNECTORS["currency"].fetch, cx.online_allowed = _fake_currency, lambda: True
+cx.clear_cache()
+_a = cx.prepare("Quanto está o dólar hoje?")
+_b = cx.prepare("Quanto está o dólar hoje?")
+check("currency: instant answer with names and symbol", _a["instant"] == "1 dólar = R$ 5,08 (cotação de referência do BCE de 16/10).",
+      str(_a["instant"]))
+check("hub cache: the second question doesn't use the internet", len(_cx_calls) == 1 and _b["instant"] == _a["instant"])
+_long = cx.prepare("Quanto está o dólar hoje? Estou pensando em viajar para os Estados Unidos no fim do ano e queria planejar")
+check("hub: a longer question gets the data in the context for the model (no tool round)",
+      _long["instant"] is None and "Live data" in _long["block"] and "5.0828" in _long["block"])
+cx.online_allowed = lambda: False
+cx._load()["data"] = {k: [v[0] - 99999, v[1]] for k, v in cx._load()["data"].items()}  # expired copy
+_off = cx.call("currency", {"amount": 1.0, "from_currency": "USD", "to_currency": "BRL"})
+check("offline: the last copy is used and marked as possibly outdated", _off.get("stale_from") and len(_cx_calls) == 1)
+cx.CONNECTORS["currency"].fetch, cx.online_allowed = _real
+cx.toggle("currency", False)
+check("integration turned off: no answer, no tool", cx.route("Quanto está o dólar hoje?") == []
+      and "convert_currency" not in {x["function"]["name"] for x in assistant.turn_tools()})
+cx.toggle("currency", True)
+check("lookup tool lists only the integrations that are on", "lookup" in {x["function"]["name"] for x in assistant.turn_tools()}
+      and next(x for x in assistant.turn_tools() if x["function"]["name"] == "lookup")["function"]["parameters"]
+      ["properties"]["service"]["enum"] == ["crypto", "clock", "translate", "holidays", "air"])
+_c1 = cx.add_custom("Gasolina", "gasolina, combustível", "https://api.exemplo.com/gas?q={query}", 60)
+_c2 = cx.add_custom("Ruim", "x", "http://inseguro.com/x")
+check("custom integrations: https only, routed by keyword, removable",
+      _c1["ok"] and not _c2["ok"] and cx.route("quanto está a gasolina em Curitiba?")[0][0] == _c1["id"]
+      and cx.remove_custom(_c1["id"])["ok"] and not settings["custom_connectors"])
+check("hub status: every integration with its state", {x["id"] for x in cx.status()} >= set(cx.ORDER)
+      and all(x["state"] in ("off", "active", "offline", "error", "cached", "sleeping") for x in cx.status()))
+check("media: phrases recognised without the AI (and not ordinary talk)", [(_media.detect(q) or {}).get("action") for q in (
+    "pausa a música", "próxima música", "volume em 30%", "aumenta o volume", "o que está tocando?", "música para estudar",
+    "para de falar", "aumenta", "what song is this", "baja el volumen")]
+      == ["pause", "next", "volume", "volume_up", "now_playing", None, None, None, "now_playing", "volume_down"])
+_apps._apps, _apps._loaded = [{"name": "Visual Studio Code", "id": "Microsoft.VisualStudioCode"},
+                              {"name": "RetroArch", "id": "D:\\Emuladores\\RetroArch\\retroarch.exe"},
+                              {"name": "Steam", "id": "{7C5A40EF}\\Steam\\Steam.exe"},
+                              {"name": "Wallpaper Engine", "id": "steam://rungameid/431960"},
+                              {"name": "Counter-Strike 2", "id": "steam://rungameid/730"},
+                              {"name": "WhatsApp", "id": "5319275A.WhatsAppDesktop!App"}], 1e12
+check("apps: found by name or nickname", [(_apps.detect(q) or {}).get("name") for q in (
+    "abre o vscode", "abre o zap", "vamos jogar counter-strike 2", "abre o Discord", "abre o arquivo relatório.pdf")]
+      == ["Visual Studio Code", "WhatsApp", "Counter-Strike 2", None, None])
+check("apps: games, launchers and work apps (the user can change it)",
+      [_apps.kind(a) for a in _apps._apps] == ["work", "game", "launcher", "work", "game", "work"])
+settings["apps_work"] = ["RetroArch"]
+check("apps: marked by the user", _apps.kind(_apps._apps[1]) == "work")
+settings["apps_work"] = []
+_opened = []
+_real_launch, _real_hook = _apps.launch, tools.app_hook
+_apps.launch = lambda app: _opened.append(app["name"]) or {"ok": True, "name": app["name"], "kind": _apps.kind(app)}
+tools.app_hook = lambda app: _opened.append("suspend:" + app["name"])
+settings["app_mode"] = "developer"
+_ev = []
+_bot = assistant.Assistant(lambda e, p: _ev.append((e, p)))
+_bot.ask("vamos jogar counter-strike 2")
+_said = [p["text"] for e, p in _ev if e == "done"][-1]
+check("apps: a game opens and NEXUS suspends itself to free the graphics card",
+      _opened == ["Counter-Strike 2", "suspend:Counter-Strike 2"] and "suspenso" in _said, f"{_opened} {_said}")
+_ev.clear()
+_bot.ask("quanto é 15% de 230?")
+check("assistant: the calculator answers without the model and the exchange is in the history",
+      [p["text"] for e, p in _ev if e == "done"] == ["15% de 230 = 34,5."] and memory.history(1)[-1]["content"] == "15% de 230 = 34,5.")
+_apps.launch, tools.app_hook = _real_launch, _real_hook
+settings["app_mode"] = "user"
+check("beta: media and apps start off for users", not features.enabled("media") and not features.enabled("apps")
+      and "open_app" not in {x["function"]["name"] for x in assistant.turn_tools()})
+check("terms 1.2: new services are listed (and accepted again)", _legal.VERSION == "1.2" and all(
+    w in (_isolated.ROOT / "nexus" / "web" / "legal.js").read_text("utf-8") for w in ("CoinGecko", "MyMemory", "Nager.Date")))
 
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

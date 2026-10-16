@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 3.3  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.17.5
+ Versión del documento: 3.4  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.18.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -91,6 +91,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-LLM-038  La IA dijo que abrió (o abriría) un menú y no se abrió nada
       NX-LLM-039  Entrenamiento: los datos generales desaparecían o se juzgaban sin evidencia
       NX-LLM-040  Entrenamiento: la IA preguntaba "¿quieres que lo guarde?" en cada lección
+      NX-LLM-041  Preguntas en vivo: la IA llamaba a la herramienta otra vez (respuesta en dos rondas)
  VOZ  NX-VOZ-001  El micrófono no responde en el primer uso (descarga Whisper)
       NX-VOZ-002  Micrófono equivocado seleccionado (p. ej. DroidCam)
       NX-VOZ-003  Palabra de activación "Nexus" no reconocida / falsos disparos
@@ -150,6 +151,9 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-INT-004  "El JSON debe tener al menos el campo 'name'"
       NX-INT-005  Una integración en línea no responde (clima, noticias, divisas, Wikipedia)
       NX-INT-006  Calendario ICS: faltan eventos o con hora distinta
+      NX-INT-007  Ciudad equivocada en clima/reloj ("New York" se volvía York, Nebraska)
+      NX-INT-008  La primera respuesta después de despertar del modo suspendido tarda ~16 s
+      NX-INT-009  "¿Qué está sonando?" no encuentra el reproductor
  ENV  NX-ENV-001  requirements.txt ignorado por Git
       NX-ENV-002  setup.ps1 / build.ps1 bloqueados por la política de PowerShell
       NX-ENV-003  Dependencias no compatibles con la versión de Python
@@ -720,6 +724,20 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                a la IA; todo se verifica y guarda al final. Las preguntas
                (que terminan en "?") siguen yendo a la IA. 1,88 s -> 0,001 s
                por lección.
+
+[NX-LLM-041] Preguntas en vivo: la IA llamaba a la herramienta otra vez (respuesta en dos rondas)
+  Severidad  : MEDIA            Estado: CORREGIDO (v0.18.0) Observado: SÍ
+  Síntoma    : "¿A cuánto está el dólar?" tardaba 7,4 s; "¿y el euro?" llamó
+               también al clima (9,3 s); las noticias tardaban 29,9 s.
+  Causa      : La IA pedía la herramienta, esperaba a internet y solo entonces
+               respondía (dos generaciones). Con el dato ya en el contexto, la red
+               de seguridad "llama a get_news ahora" forzaba otra ronda.
+  Corrección : La central de integraciones (nexus/connectors.py) reconoce lo que
+               el mensaje necesita sin la IA, lo busca (o usa la caché) y responde
+               al instante cuando es un dato simple; en preguntas más largas el
+               dato va en el contexto y cuenta como herramienta ya usada. Dólar
+               7,4 s -> 0,4 s (0 s de la caché), clima 8,1 s -> 0,2-2,4 s,
+               noticias 29,9 s -> 0,3 s.
 
 ================================================================================
  VOZ — RECONOCIMIENTO Y SÍNTESIS
@@ -1361,6 +1379,32 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                calendario > "Dirección secreta en formato iCal". Para
                sincronizar ya, di "actualiza mi agenda". No compartas ese
                enlace: da acceso de lectura a tu calendario.
+
+[NX-INT-007] Ciudad equivocada en clima/reloj ("New York" se volvía York, Nebraska)
+  Severidad  : MEDIA            Estado: CORREGIDO (v0.18.0) Observado: SÍ
+  Causa      : La búsqueda de ciudades de Open-Meteo busca el nombre en el idioma
+               pedido; en portugués "New York" es "Nova Iorque" y el primer
+               resultado era York (EE. UU.) o un pueblo inglés.
+  Corrección : Busca en el idioma de NEXUS y en inglés y elige el nombre exacto
+               con mayor población. Los lugares se guardan 30 días.
+
+[NX-INT-008] La primera respuesta después de despertar del modo suspendido tarda ~16 s
+  Severidad  : BAJA             Estado: CONOCIDO           Observado: SÍ
+  Causa      : Para liberar la tarjeta gráfica para el juego, el modelo sale de
+               la VRAM (6,1 GB en una RX 6600 XT). Al despertar se carga de nuevo.
+  Consejos   : NEXUS recarga en segundo plano en cuanto despierta; si vuelves a
+               la ventana antes de preguntar, la espera desaparece. Para no
+               suspender: Configuración > Apps y multimedia > "Seguir activo".
+
+[NX-INT-009] "¿Qué está sonando?" no encuentra el reproductor
+  Severidad  : BAJA             Estado: CONOCIDO           Observado: PREVISTO
+  Causa      : NEXUS lee los controles multimedia de Windows. Los reproductores
+               que no se registran allí (algunos sitios, reproductores antiguos)
+               no aparecen, y las teclas multimedia van al que Windows considera
+               actual.
+  Consejos   : Spotify, LiMusic, Chrome/Edge/Brave (YouTube) y el Reproductor
+               multimedia funcionan. Si nada responde, dale a reproducir una vez
+               en el reproductor para que Windows lo registre.
 
 ================================================================================
  ENV — ENTORNO, INSTALACIÓN Y COMPILACIÓN

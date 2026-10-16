@@ -130,6 +130,20 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Integrações, mídia e aplicativos (v0.18.0)
+
+- **Central de integrações** (Configurações → Integrações): clima, câmbio, criptomoedas, relógio mundial, tradutor,
+  feriados, qualidade do ar e UV, notícias, Wikipédia, calendário (Google ou Outlook), calculadora e conversor de
+  unidades — mais as **suas integrações** (qualquer endereço https, ativado por palavras-chave). Cada uma **dorme até
+  uma mensagem precisar dela**, guarda a resposta por um tempo (câmbio 1 h, clima 15 min, tradução 30 dias) e mostra o
+  estado: dormindo, ativa agora, em cache, sem internet. Sem internet, usa a última cópia e avisa.
+- Perguntas simples são respondidas **sem a IA**: "quanto está o dólar?" 7,4 s → 0,4 s (do cache, na hora);
+  "quanto é 15% de 230?" e "10 milhas em km" com o valor exato.
+- **Controle de mídia** (beta): "pausa a música", "próxima", "volume em 30", "o que está tocando?" — Spotify,
+  [LiMusic](https://simohypers.github.io/limusic/), YouTube no navegador, qualquer player dos controles de mídia do Windows.
+- **Abrir aplicativos** (beta): "abre o Discord", "vamos jogar Minecraft". Ao abrir um **jogo**, o NEXUS se suspende:
+  tira a IA da placa de vídeo (6,1 GB livres na RX 6600 XT), minimiza e só volta com "Nexus" ou quando você volta à janela.
+
 ### Treinamento e importar memórias (v0.17.5, beta)
 
 Ligue em **Configurações → Beta** (no modo desenvolvedor já vêm ligadas).
@@ -369,6 +383,9 @@ nexus/
   features.py   funções beta e modo usuário / desenvolvedor
   training.py   modo treinamento: lições, verificação com fontes e aprendizados
   memory_import.py importar memórias de outras IAs (ChatGPT, Claude, Gemini, Copilot)
+  connectors.py central de integrações: rota sem IA, cache em disco, respostas na hora, integrações do usuário
+  media.py      controle de mídia (teclas de mídia, volume do sistema, o que está tocando)
+  apps.py       abrir aplicativos pelo nome, jogos x trabalho, detectar jogos em primeiro plano
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -402,4 +419,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.17.5 (protótipo)**.
+Versão atual: **v0.18.0 (protótipo)**.

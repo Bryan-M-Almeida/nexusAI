@@ -5,7 +5,8 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import emergency, features, knowledge, llm, memory, netprobe, profile, skills, tools, training, ui_nav, workspace
+from . import (apps, connectors, emergency, features, knowledge, llm, media, memory, netprobe, profile, skills, tools,
+               training, ui_nav, workspace)
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
@@ -161,8 +162,21 @@ def turn_tools() -> list:
     if workspace.active:
         keep = {"search_knowledge", "wikipedia", "get_datetime", "conversation_control"}
         return workspace.SCHEMAS + [x for x in tools.SCHEMAS if x["function"]["name"] in keep]
-    # v0.15.5: tools of beta features that are off stay out of the prompt (smaller prompt = faster first answer)
-    return [x for x in tools.SCHEMAS if features.tool_allowed(x["function"]["name"])]
+    # v0.15.5: tools of beta features that are off stay out of the prompt (smaller prompt = faster first answer);
+    # v0.18.0: the same for integrations turned off in Settings > Integrations
+    out = []
+    for x in tools.SCHEMAS:
+        name = x["function"]["name"]
+        if not features.tool_allowed(name) or not tools.integration_allowed(name):
+            continue
+        if name == "lookup":
+            services = [s for s in connectors.LOOKUP if connectors.enabled(s)]
+            if not services:
+                continue
+            x = json.loads(json.dumps(x))
+            x["function"]["parameters"]["properties"]["service"]["enum"] = services
+        out.append(x)
+    return out
 
 
 def build_context(user_text: str, emergency_topic: str | None = None) -> str:
@@ -492,6 +506,41 @@ class Assistant:
         """Stop the generation in progress (closing the stream also stops Ollama)."""
         self.cancel.set()
 
+    _hub: dict = {}
+
+    def _instant(self, text: str, reply: str, tool: str, args: dict, speak: bool = True):
+        memory.add_message("user", text)
+        memory.add_message("assistant", reply)
+        self.emit("tool", {"name": tool, "args": args})
+        self.emit("done", {"text": reply, "speak": speak, "interrupted": False})
+
+    def _local_command(self, text: str) -> bool:
+        """v0.18.0: things that don't need the model. Media keys and volume, opening an installed app (a game also
+        suspends NEXUS), and integrations whose answer is a fact ("quanto está o dólar?" 7.4 s -> ~0.6 s; from the
+        cache, instant). Anything else that needs live data gets it fetched here and passed to the model."""
+        self._hub = {}
+        if workspace.active or any(rx.search(text) for rx, _, _ in INTENTS):
+            return False
+        code = detect(text) or lang()
+        if features.enabled("media"):
+            hit = media.handle(text, code)
+            if hit:
+                result, reply = hit
+                self._instant(text, reply, "media_control", result, speak=result["action"] == "now_playing")
+                return True
+        if features.enabled("apps"):
+            app = apps.detect(text)
+            nav = ui_nav.detect(text)
+            words = len(apps._norm(app["name"]).split()) if app else 0
+            if app and (not nav or words >= 2 and apps._norm(app["name"]) in apps._norm(text)):
+                self._instant(text, *tools.open_app_reply(app, code))
+                return True
+        self._hub = connectors.prepare(text)
+        if self._hub.get("instant"):
+            self._instant(text, self._hub["instant"], self._hub["used"][0], {})
+            return True
+        return False
+
     def _ask(self, text, spoken):
         topic = emergency.detect(text)
         if topic and self.emergencies.first_time(topic):
@@ -523,6 +572,8 @@ class Assistant:
             self.emit("done", {"text": t("training_noted", n=len(training.session["lessons"])), "speak": True,
                                "interrupted": False})
             return
+        if self._local_command(text):  # v0.18.0: media, apps and integrations answered without the model
+            return
         nav = ui_nav.detect(text)
         if nav and tools.ui_hook:  # v0.16.5: "abre as configurações", "quero mudar a cor do aro" - instant, no model
             nav, reply = ui_nav.reply(nav)
@@ -535,6 +586,8 @@ class Assistant:
         # keeps only the raw text. v0.15.5 measured keeping the context blocks too: the knowledge excerpts fill the
         # history window, it jumps more often and answers got slower (14.9 s vs 13.5 s over 16 questions).
         context = build_context(text, emergency_topic=topic)
+        if self._hub.get("block"):  # v0.18.0: live data already fetched for this message (one model step, no tool call)
+            context += "\n" + self._hub["block"]
         if getattr(self, "attachments", None):
             context += "\n" + attachment_context(text, self.attachments)
             names = ", ".join(a["name"] for a in self.attachments)
@@ -547,6 +600,9 @@ class Assistant:
         previous = last_reply()
         memory.add_message("user", text_for_history)
         reply, changed, nudged, finished, round_text, called = "", False, False, False, "", set()
+        # v0.18.0: data the hub already fetched counts as the live tool having run (no "call get_news now" nudge)
+        called |= {tool for tool, cid in tools.INTEGRATION_TOOLS.items()
+                   if cid in self._hub.get("used", []) and "error" not in self._hub.get("data", {}).get(cid, {"error": 1})}
         kept = ""  # real answer text written before a tool call: stays on screen and in the reply (v0.12)
         used: set = set()  # every tool that ran this turn (skills XP)
         try:

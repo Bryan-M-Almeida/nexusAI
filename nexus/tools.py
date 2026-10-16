@@ -5,7 +5,7 @@ import json
 import time
 from datetime import datetime, timedelta
 
-from . import integrations, knowledge, memory, profile
+from . import connectors, integrations, knowledge, memory, profile
 from .config import DATA_DIR, settings
 from .db import db, now
 
@@ -247,10 +247,25 @@ def web_search(query):
     return browser.web_search(query)
 
 
-def play_music(query, service="youtube"):
+def _play_music_browser(query, service="youtube"):
     from . import browser
 
     return browser.music_search(query, service)
+
+
+def play_music(query, service=""):
+    service = (service or settings.get("music_player", "youtube")).lower()
+    if service == "limusic":
+        from . import apps, media
+
+        app = apps.find("limusic")
+        if not app:
+            return {"error": "LiMusic is not installed (https://simohypers.github.io/limusic/)"}
+        apps.launch(app)
+        return {"ok": True, "opened": "LiMusic", "note": "LiMusic has no search link: it was opened; tell the user to "
+                "search the song there (Ctrl+K). Play/pause/next work by voice.", "query": query,
+                "media": media.now_playing().get("current")}
+    return _play_music_browser(query, service if service in ("youtube", "youtube music", "spotify") else "youtube")
 
 
 # v0.16.5: the AI opens the interface for the user ("quero mudar a cor do aro" -> Settings > Interface).
@@ -270,40 +285,77 @@ def open_interface(target, section=None):
 
 
 # ---------------------------------------------------------------- online integrations (v0.6)
-# v0.14: online answers are reused for a while (weather and news change slowly; rates once a day), so asking
-# twice doesn't wait for the network again. Errors are never cached.
-ONLINE_TTL = {"get_weather": 900, "get_news": 900, "convert_currency": 3600, "wikipedia": 86400}
-_online_cache: dict = {}
+# v0.18.0: every integration goes through the hub (nexus/connectors.py): one cache (kept on disk), the on/off switch of
+# each integration, offline copies and the status shown in Settings > Integrations. Errors are never cached.
+INTEGRATION_TOOLS = {"get_weather": "weather", "get_news": "news", "convert_currency": "currency", "wikipedia": "wikipedia",
+                     "sync_calendar": "calendar"}
 
 
-def _online(fn):
-    @functools.wraps(fn)  # keeps the real signature: execute() filters arguments with inspect.signature
-    def wrapper(**kwargs):
-        if not settings["integrations"]:
-            return {"error": "online integrations are disabled in Settings"}
-        from . import netprobe
-
-        if netprobe.effective() == "offline":
-            return {"error": "NEXUS is in offline mode: no internet access (Settings > Performance)"}
-        ttl = ONLINE_TTL.get(fn.__name__)
-        key = (fn.__name__, json.dumps(kwargs, sort_keys=True, default=str), settings["home_city"], settings["language"])
-        hit = _online_cache.get(key)
-        if ttl and hit and time.time() - hit[0] < ttl:
-            return hit[1]
-        result = fn(**kwargs)
-        if isinstance(result, dict) and "error" in result:
-            netprobe.report_failure()  # auto mode: the connection may have changed - measure again soon
-        if ttl and isinstance(result, dict) and "error" not in result:
-            _online_cache[key] = (time.time(), result)
-        return result
-    return wrapper
+def integration_allowed(name: str) -> bool:
+    cid = INTEGRATION_TOOLS.get(name)
+    return cid is None or connectors.enabled(cid)
 
 
-get_weather = _online(integrations.get_weather)
-get_news = _online(integrations.get_news)
-convert_currency = _online(integrations.convert_currency)
-wikipedia = _online(integrations.wikipedia)
-sync_calendar = _online(integrations.sync_calendar)
+def get_weather(city="", days=3):
+    city = city or settings["home_city"]
+    if not city and connectors.online_allowed():
+        return {"error": "no city: ask the user which city (it can be saved in Settings > Integrations)"}
+    return connectors.call("weather", {"city": city, "days": max(1, min(int(days or 3), 7))})
+
+
+def get_news(topic="", limit=5):
+    return connectors.call("news", {"topic": topic or "", "limit": int(limit or 5)})
+
+
+def convert_currency(amount=1, from_currency="USD", to_currency="BRL"):
+    return connectors.call("currency", {"amount": float(amount or 1), "from_currency": str(from_currency).upper(),
+                                        "to_currency": str(to_currency).upper()})
+
+
+def wikipedia(query):
+    return connectors.call("wikipedia", {"query": query})
+
+
+def sync_calendar(days=30):
+    return connectors.call("calendar", {"days": int(days or 30)})
+
+
+def lookup(service, query):
+    return connectors.lookup(service, query)
+
+
+# ---------------------------------------------------------------- apps and media (v0.18.0, beta)
+app_hook = None  # set by the app: app_hook(app) after a game opens -> NEXUS suspends itself
+
+
+def open_app_reply(app: dict, code: str) -> tuple[str, str, dict]:
+    """Opens the app; (reply, tool name, args) for the assistant's instant path."""
+    from . import apps, i18n
+
+    result = apps.launch(app)
+    if not result["ok"]:
+        return i18n.STRINGS[code]["app_failed"].format(name=app["name"]), "open_app", result
+    suspend = result["kind"] == "game" and settings.get("apps_suspend", "games") == "games" and app_hook is not None
+    if suspend:
+        app_hook(app)
+    key = "app_game" if suspend else "app_opened"
+    return i18n.STRINGS[code][key].format(name=app["name"]), "open_app", result
+
+
+def open_app(name):
+    from . import apps, i18n
+
+    app = apps.find(name)
+    if not app:
+        return {"error": f"no installed app called '{name}'"}
+    reply, _, result = open_app_reply(app, i18n.lang())
+    return {**result, "said": reply}
+
+
+def media_control(action, level=None):
+    from . import media
+
+    return media.control(action, level)
 
 
 def get_datetime():
@@ -379,7 +431,7 @@ SCHEMAS = [
         {"query": S}, ["query"]),
     _fn("play_music", "Play a song/artist/video: opens the first YouTube result in the browser (or a Spotify / "
         "YouTube Music search when the user names that service).",
-        {"query": S, "service": {"type": "string", "enum": ["youtube", "youtube music", "spotify"]}}, ["query"]),
+        {"query": S, "service": {"type": "string", "enum": ["youtube", "youtube music", "spotify", "limusic"]}}, ["query"]),
     _fn("open_interface", "Open (or close) a part of the NEXUS interface for the user when they want to see or change "
         "something in NEXUS itself: settings (with a section), panel (schedule, tasks, memory), conversations, "
         "notifications, library, workspace, skills, guide (all shortcuts), tutorial; 'close' closes the open menu.",
@@ -396,6 +448,17 @@ SCHEMAS = [
     _fn("wikipedia", "Look up a person, place or concept on Wikipedia (internet) when the local base has nothing.",
         {"query": S}, ["query"]),
     _fn("sync_calendar", "Import the user's calendar (ICS link from Settings) into the schedule now."),
+    _fn("lookup", "Live data from an online service: crypto prices, the time in another city (clock), translations, "
+        "public holidays, air quality / UV. query = the request in natural language, e.g. 'bitcoin in BRL', "
+        "'Tokyo', 'translate good night to Spanish', 'air quality in Lisbon'.",
+        {"service": {"type": "string", "enum": ["crypto", "clock", "translate", "holidays", "air"]}, "query": S},
+        ["service", "query"]),
+    _fn("open_app", "Open an app installed on the user's PC by name (Discord, VS Code, Spotify, a game...).",
+        {"name": S}, ["name"]),
+    _fn("media_control", "Control the music/video playing on the PC (Spotify, LiMusic, YouTube...) or the system volume.",
+        {"action": {"type": "string", "enum": ["play", "pause", "next", "previous", "volume", "volume_up", "volume_down",
+                                               "mute", "unmute", "now_playing"]},
+         "level": {"type": "integer", "description": "0-100 for 'volume'"}}, ["action"]),
 ]
 
 REGISTRY = {s["function"]["name"]: globals()[s["function"]["name"]] for s in SCHEMAS}

@@ -8,6 +8,68 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.18.0 — Protótipo · 2026-10-16
+
+**Central de integrações (12 integrações + as suas), respostas ao vivo sem a IA, controle de mídia e abrir aplicativos
+com modo suspenso para jogos.**
+
+### Novo
+- **Central de integrações** (`nexus/connectors.py`, Configurações → Integrações): cada integração é um cartão com
+  estado ao vivo (**dormindo · ativa agora · em cache até 14:32 · sem internet · erro**), fonte, quanto tempo guarda,
+  quantas vezes foi usada e quantas vieram do cache, botão **Testar** e liga/desliga.
+  - **Novas**: criptomoedas (CoinGecko), relógio mundial ("que horas são em Tóquio?"), tradutor (MyMemory: "traduza
+    bom dia para inglês", "como se diz obrigado em japonês?"), feriados (Nager.Date: "qual o próximo feriado?"),
+    qualidade do ar e índice UV (Open-Meteo/CAMS), nascer e pôr do sol, **calculadora** e **conversor de unidades**
+    (no computador, sem internet). Já existentes: clima, câmbio, notícias, Wikipédia e calendário ICS (agora também
+    Outlook).
+  - **Suas integrações**: nome, palavras-chave e um endereço https com `{query}`; quando a mensagem tem uma das
+    palavras, o NEXUS consulta e usa a resposta. Só https, resposta limitada.
+  - **Modular**: nada roda em segundo plano. O NEXUS reconhece sem a IA qual integração a mensagem precisa e só ela é
+    ativada; a resposta fica guardada (câmbio 1 h, clima 15 min, cripto 5 min, feriados 1 dia, tradução 30 dias) num
+    arquivo da pasta de dados, então perguntar de novo não usa a internet. Sem internet, usa a última cópia e avisa
+    que pode estar desatualizada. Integrações desligadas também saem da lista de ferramentas da IA.
+  - Sua moeda e seu país (feriados) em Configurações → Integrações (padrão: pelo idioma).
+- **Controle de mídia** (beta): "pausa a música", "continua", "próxima", "música anterior", "volume em 30", "aumenta
+  o volume", "muta", "o que está tocando?" — instantâneo, sem a IA. Funciona com qualquer player dos controles de mídia
+  do Windows (Spotify, **LiMusic**, YouTube no navegador…). Configurações → Apps e mídia mostra o que está tocando,
+  botões e o volume do PC. Player preferido para "toca…": YouTube, YouTube Music, Spotify ou LiMusic.
+- **Abrir aplicativos** (beta): "abre o Discord", "abre o vscode", "abre o zap", "vamos jogar RetroArch". A lista vem
+  do menu Iniciar (programas, apps da Loja e atalhos da Steam); cada app é **trabalho**, **jogo** ou **launcher** e você
+  pode mudar em Configurações → Apps e mídia.
+  - **Modo suspenso para jogos**: ao abrir um jogo, o NEXUS avisa, tira a IA da placa de vídeo, minimiza, roda em
+    prioridade baixa e só volta quando você diz "Nexus" ou volta para a janela (os lembretes continuam). Opcional:
+    suspender também quando um jogo aberto por fora vem para a frente (Steam, Epic, Riot, Xbox, emuladores). Botão
+    "Suspender agora". O aro mostra **SUSPENSO**.
+- Termos de Uso / Política de Privacidade **versão 1.2**: lista os novos serviços (CoinGecko, MyMemory, Nager.Date),
+  as integrações do usuário e explica que a lista de apps e o que está tocando ficam no computador.
+
+### Desempenho
+- **Perguntas ao vivo** (qwen3:8b na RX 6600 XT): dólar **7,4 s → 0,4 s** (do cache, **0 s**); euro 9,3 s → 0,2 s;
+  clima 8,1 s → 2,4 s (cidade nova) / 0,2 s; notícias **29,9 s → 0,3 s**; relógio mundial 0,8 s; tradução 1,1 s;
+  calculadora e unidades ~1 ms. Uma pergunta longa sobre o clima ("vale a pena ir de bicicleta?") 12,6 s → 6,1 s: o
+  dado já vai no contexto e a IA responde numa rodada só.
+- **Conexões reaproveitadas** com os serviços: cada nova conexão segura custava ~0,6 s; o clima (2 pedidos) ficou
+  ~1 s mais rápido.
+- Avaliação de conversa: média **6,3 s → 5,3 s** por resposta.
+- **Modo suspenso**: libera **6,1 GB de VRAM** (o modelo inteiro) para o jogo em 0,6 s; ao acordar, o NEXUS recarrega o
+  modelo em segundo plano (~16 s).
+
+### Corrigido
+- NX-LLM-041: perguntas ao vivo em duas rodadas (a IA chamava a ferramenta mesmo com o dado no contexto).
+- NX-INT-007: "New York" no clima/relógio virava York, Nebraska (busca de cidade por idioma).
+
+### Testes desta versão
+- 279/279 testes unitários (21 novos: rota de cada integração e nada para conversa/gastos, argumentos tirados da
+  mensagem, calculadora e unidades exatas, código nunca executado, resposta na hora com nome e símbolo, cache sem
+  internet, cópia offline marcada, integração desligada sai das ferramentas, ferramenta lookup, integrações do
+  usuário só https, estado de cada integração, frases de mídia, apps por nome/apelido, jogos x launchers x trabalho,
+  jogo abre e suspende, calculadora sem a IA, beta desligado, termos 1.2).
+- Avaliação de conversa **35/35** (3 novos: as perguntas ao vivo trazem o dado) e da área de trabalho 7/7 com o modelo
+  real.
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.17.5 — Protótipo · 2026-10-16
 
 **Modo treinamento com a aba Aprendizados e importação de memórias de outras IAs (as duas em beta).**

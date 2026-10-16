@@ -6,12 +6,13 @@ import re
 import time
 from datetime import datetime, timedelta
 
-from nexus import assistant, knowledge, llm, memory, tools
+from nexus import assistant, knowledge, legal, llm, memory, tools
 from nexus.config import settings
 from nexus.db import db
 
 settings["auto_memory"] = True  # exercised on purpose: questions must not become memories
 settings["app_mode"] = "developer"  # v0.15.5: the eval covers the beta features too (library, browser)
+legal.accept()  # v0.18.0: the integrations only go online after the terms are accepted
 knowledge.load_seed()
 _isolated.load_example_profile()
 status = llm.status()
@@ -95,8 +96,11 @@ for question, tool in [("Vai chover hoje?", "get_weather"),
                        ("Quais são as principais notícias de hoje?", "get_news")]:
     tool_calls.clear()
     answer = ask(question)
-    check(f"integração: '{question}' usa {tool} (dado ao vivo, nunca inventado)", tool in tool_calls,
-          f"ferramentas={tool_calls} resposta={answer}")
+    # v0.18.0: the integrations hub fetches it before the model (the event carries the integration id)
+    check(f"integração: '{question}' usa {tool} (dado ao vivo, nunca inventado)",
+          tool in tool_calls or tools.INTEGRATION_TOOLS[tool] in tool_calls, f"ferramentas={tool_calls} resposta={answer}")
+    check(f"integração: '{question}' traz o dado (não diz que está indisponível)",
+          not re.search(r"n[aã]o (est[aá]|est[aã]o) dispon[ií]ve|indispon", answer), answer[:160])
 ada = ask("Quem foi Ada Lovelace?")  # historical fact: own knowledge or Wikipedia are both fine
 check("Ada Lovelace: resposta correta (Babbage / século XIX)", bool(re.search(r"(Babbage|18[0-9]{2})", ada)), ada)
 

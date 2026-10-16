@@ -466,6 +466,7 @@
       <button type="button" data-sec="perf" data-i18n="secPerf">Desempenho</button>
       <button type="button" data-sec="notif" data-i18n="secNotif">Notificações</button>
       <button type="button" data-sec="integ" data-i18n="secInteg">Integrações</button>
+      <button type="button" data-sec="apps" data-i18n="secApps" data-feature-any="apps,media">Apps e mídia</button>
       <button type="button" data-sec="ui" data-i18n="secUi">Interface</button>
       <button type="button" data-sec="data" data-i18n="secData">Dados</button>
       <button type="button" data-sec="keys" data-i18n="secKeys">Atalhos</button>
@@ -619,13 +620,62 @@
         </div>
       </section>
 
-      <!-- INTEGRATIONS -->
+      <!-- INTEGRATIONS (v0.18.0: hub) -->
       <section class="set-sec" data-sec="integ" hidden>
         <h2 data-i18n="secInteg">Integrações</h2>
-        <label class="check"><input type="checkbox" name="integrations"><span data-i18n="integrationsOn">Integrações online (clima, notícias, câmbio, Wikipédia, calendário)</span></label>
-        <label><span data-i18n="homeCity">Sua cidade (clima)</span><input name="home_city" data-i18n-ph="homeCityPh"></label>
+        <label class="check"><input type="checkbox" name="integrations"><span data-i18n="integrationsOn">Integrações online (precisam de internet; nenhuma pede conta ou chave)</span></label>
+        <p class="hint" data-i18n="integHubHint">Cada integração dorme até uma mensagem precisar dela. A resposta fica guardada por um tempo (câmbio 1 h, clima 15 min, tradução 30 dias…), então perguntar de novo não usa a internet. Sem internet, o NEXUS usa a última cópia e avisa.</p>
+        <div class="integ-summary mono" id="integSummary"></div>
+        <div class="integ-grid" id="integGrid"></div>
+        <p class="sub mono" data-i18n="integWhere">ONDE VOCÊ ESTÁ</p>
+        <div class="grid-3">
+          <label><span data-i18n="homeCity">Sua cidade (clima)</span><input name="home_city" data-i18n-ph="homeCityPh"></label>
+          <label><span data-i18n="homeCurrency">Sua moeda</span><select name="home_currency"><option value="" data-i18n="byLanguage">Pelo idioma</option><option>BRL</option><option>USD</option><option>EUR</option><option>GBP</option><option>MXN</option><option>CAD</option><option>JPY</option><option>CHF</option><option>AUD</option><option>CNY</option></select></label>
+          <label><span data-i18n="homeCountry">País (feriados)</span><select name="home_country"><option value="" data-i18n="byLanguage">Pelo idioma</option><option value="BR">Brasil</option><option value="PT">Portugal</option><option value="US">United States</option><option value="GB">United Kingdom</option><option value="ES">España</option><option value="MX">México</option><option value="AR">Argentina</option><option value="CO">Colombia</option><option value="CL">Chile</option><option value="CA">Canada</option></select></label>
+        </div>
         <label><span data-i18n="calendarIcs">Link do calendário (ICS)</span><input name="calendar_ics_url" spellcheck="false" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics"></label>
-        <p class="hint" data-i18n="calendarHelp">Google Agenda: Configurações da agenda → Integrar agenda → "Endereço secreto no formato iCal". Somente leitura.</p>
+        <p class="hint" data-i18n="calendarHelp">Google Agenda: Configurações da agenda → Integrar agenda → "Endereço secreto no formato iCal". Outlook: Calendário → Compartilhar → Publicar (ICS). Somente leitura.</p>
+        <p class="sub mono" data-i18n="integCustomTitle">SUAS INTEGRAÇÕES</p>
+        <p class="hint" data-i18n="integCustomHint">Qualquer serviço com um endereço que devolva dados (JSON ou texto). Quando uma mensagem tiver uma das palavras-chave, o NEXUS consulta o endereço trocando {query} pelo que você pediu e usa a resposta.</p>
+        <div id="integCustomList"></div>
+        <div class="integ-add">
+          <input id="icName" data-i18n-ph="icName" placeholder="Nome (ex.: Cotação da gasolina)">
+          <input id="icKeys" data-i18n-ph="icKeys" placeholder="Palavras-chave, separadas por vírgula">
+          <input id="icUrl" spellcheck="false" placeholder="https://api.exemplo.com/busca?q={query}">
+          <select id="icTtl"><option value="5">5 min</option><option value="30" selected>30 min</option><option value="60">1 h</option><option value="360">6 h</option><option value="1440">24 h</option></select>
+          <button class="btn-ghost" type="button" id="btnIcAdd" data-i18n="icAdd">Adicionar</button>
+        </div>
+        <p class="hint warn-cloud" data-i18n="icWarn">Só endereços https. O que você pedir é enviado a esse serviço; não coloque senhas no endereço.</p>
+      </section>
+
+      <!-- APPS AND MEDIA (v0.18.0, beta) -->
+      <section class="set-sec" data-sec="apps" hidden>
+        <h2 data-i18n="secApps">Apps e mídia</h2>
+        <div data-feature="media">
+          <p class="sub mono" data-i18n="mediaTitle">TOCANDO AGORA</p>
+          <div class="media-card" id="mediaCard">
+            <div class="media-info"><b id="mediaTitle">—</b><small id="mediaSub"></small></div>
+            <div class="media-btns">
+              <button type="button" class="icon-btn" data-media="previous" aria-label="Previous">⏮</button>
+              <button type="button" class="icon-btn" data-media="play_pause" aria-label="Play/Pause">⏯</button>
+              <button type="button" class="icon-btn" data-media="next" aria-label="Next">⏭</button>
+            </div>
+            <label class="media-vol"><span data-i18n="mediaVolume">Volume do PC</span><input type="range" id="mediaVol" min="0" max="100" step="1"><output id="mediaVolOut"></output></label>
+          </div>
+          <p class="hint" data-i18n="mediaHint">Funciona com qualquer player que aparece nos controles de mídia do Windows: Spotify, LiMusic, YouTube no navegador… Diga "pausa a música", "próxima", "volume em 30" ou "o que está tocando?".</p>
+          <label><span data-i18n="musicPlayer">Player preferido para "toca…"</span><select name="music_player"><option value="youtube">YouTube</option><option value="youtube music">YouTube Music</option><option value="spotify">Spotify</option><option value="limusic">LiMusic</option></select></label>
+          <p class="hint" data-i18n="limusicHint">LiMusic: player leve de YouTube Music para desktop (simohypers.github.io/limusic). O NEXUS abre o LiMusic e controla tocar, pausar, próxima e volume.</p>
+        </div>
+        <div data-feature="apps">
+          <p class="sub mono" data-i18n="appsTitle">APLICATIVOS</p>
+          <p class="hint" data-i18n="appsHint">Diga "abre o Discord" ou "vamos jogar Minecraft". Ao abrir um jogo, o NEXUS se suspende: tira a IA da placa de vídeo, minimiza e só volta quando você diz "Nexus" ou volta para a janela.</p>
+          <label><span data-i18n="appsSuspend">Ao abrir um jogo</span><select name="apps_suspend"><option value="games" data-i18n="suspendGames">Suspender o NEXUS (libera a placa de vídeo)</option><option value="never" data-i18n="suspendNever">Continuar ativo</option></select></label>
+          <label class="check"><input type="checkbox" name="game_watch"><span data-i18n="gameWatch">Suspender também quando eu abrir um jogo por fora (Steam, Epic, Riot, Xbox, emuladores)</span></label>
+          <div class="row-btns"><button class="btn-ghost" type="button" id="btnSuspendNow" data-i18n="suspendNow">Suspender agora</button>
+            <button class="btn-ghost" type="button" id="btnAppsRefresh" data-i18n="appsRefresh">Atualizar lista</button>
+            <input id="appsFilter" class="apps-filter" data-i18n-ph="appsFilter" placeholder="Filtrar…"></div>
+          <div class="apps-list" id="appsList"></div>
+        </div>
       </section>
 
       <!-- INTERFACE -->
@@ -734,6 +784,8 @@
           <label class="check"><input type="checkbox" name="beta_map"><span data-i18n="betaMap">Mapa conceitual: habilidades e conhecimento ligados ao aro (Ctrl+7)</span></label>
           <label class="check"><input type="checkbox" name="beta_training"><span data-i18n="betaTraining">Modo treinamento: você ensina e o NEXUS confere nas fontes antes de guardar (aba Aprendizados)</span></label>
           <label class="check"><input type="checkbox" name="beta_memory_import"><span data-i18n="betaMemoryImport">Importar memórias de outras IAs (ChatGPT, Claude, Gemini, Copilot…)</span></label>
+          <label class="check"><input type="checkbox" name="beta_media"><span data-i18n="betaMedia">Controle de mídia: tocar, pausar, próxima, volume e "o que está tocando" (Spotify, LiMusic, navegador…)</span></label>
+          <label class="check"><input type="checkbox" name="beta_apps"><span data-i18n="betaApps">Abrir aplicativos pelo nome; jogos suspendem o NEXUS para liberar a placa de vídeo</span></label>
           <label class="check"><input type="checkbox" name="beta_hold_talk"><span data-i18n="betaHoldTalk">Segurar para falar: o microfone fica ligado enquanto a tecla de falar estiver apertada e envia ao soltar</span></label>
         </div>
         <p class="hint" id="betaDevHint" hidden data-i18n="betaDevOn">No modo desenvolvedor todas ficam ligadas.</p>

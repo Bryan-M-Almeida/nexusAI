@@ -1,10 +1,10 @@
 // Terms of Use and Privacy Policy shown on first start and in Settings > Privacy & terms (v0.17.0).
-// Version 1.1 - 2026-10-16 (1.1: MIT License). Keep nexus/legal.py VERSION in sync when the texts change in substance.
+// Version 1.2 - 2026-10-16 (1.1: MIT License; 1.2: new integrations, apps and media). Keep nexus/legal.py VERSION in sync when the texts change in substance.
 window.LEGAL = {
   pt: {
     terms: `
 <h3>Termos de Uso do N.E.X.U.S</h3>
-<p class="legal-meta">Versão 1.1 · 16/10/2026 · Protótipo</p>
+<p class="legal-meta">Versão 1.2 · 16/10/2026 · Protótipo</p>
 <h4>1. O que é o NEXUS</h4>
 <p>O N.E.X.U.S é um assistente pessoal para Windows, em fase de <b>protótipo</b> (versões 0.x), criado para um hackathon. Ele roda no seu computador: conversa por texto e voz, organiza agenda, tarefas, lembretes, notas e dados, e consulta uma base de conhecimento local.</p>
 <h4>2. Aceite</h4>
@@ -37,7 +37,7 @@ window.LEGAL = {
 <p>Dúvidas, pedidos e relatos de problemas: pelo repositório do projeto no GitHub (github.com/Bryan-M-Almeida/nexusAI), na seção Issues.</p>`,
     privacy: `
 <h3>Política de Privacidade do N.E.X.U.S</h3>
-<p class="legal-meta">Versão 1.1 · 16/10/2026</p>
+<p class="legal-meta">Versão 1.2 · 16/10/2026</p>
 <h4>1. Resumo</h4>
 <p>O NEXUS funciona <b>no seu computador</b>. Não há conta, cadastro, anúncios nem telemetria: o autor do NEXUS <b>não recebe</b> seus dados. Algumas funções, que você controla, enviam informações a serviços de terceiros, descritas abaixo.</p>
 <h4>2. Quais dados o NEXUS guarda</h4>
@@ -55,7 +55,8 @@ window.LEGAL = {
 <h4>4. O que sai do computador (e quando)</h4>
 <ul>
 <li><b>IA:</b> com a IA local (Ollama/LM Studio), nada sai. Se você escolher um provedor na nuvem (OpenAI, Anthropic, Google, etc.), suas mensagens e o contexto necessário (por exemplo, trechos de memórias, agenda ou arquivos anexados) são enviados a esse provedor, sob a política dele.</li>
-<li><b>Integrações:</b> clima (Open-Meteo: a cidade), notícias (Google Notícias: o tema), câmbio (Frankfurter: as moedas), Wikipédia (o termo pesquisado) e o calendário ICS que você informar. Podem ser desligadas em Configurações › Integrações ou com o modo offline.</li>
+<li><b>Integrações:</b> clima, qualidade do ar e horário de outras cidades (Open-Meteo: a cidade), notícias (Google Notícias: o tema), câmbio (Frankfurter: as moedas), criptomoedas (CoinGecko: a moeda), tradução (MyMemory: o texto a traduzir), feriados (Nager.Date: o país), Wikipédia (o termo pesquisado), o calendário ICS que você informar e as integrações que você mesmo adicionar (o endereço que você escolheu recebe o que você pediu). Cada uma só é usada quando uma mensagem precisa dela, a resposta fica guardada no computador por um tempo, e todas podem ser desligadas em Configurações › Integrações ou com o modo offline. A calculadora e o conversor de unidades funcionam sem internet.</li>
+<li><b>Aplicativos e mídia (beta):</b> para abrir aplicativos pelo nome, o NEXUS lê a lista do menu Iniciar; para controlar a música, lê o título e o artista do que está tocando nos controles de mídia do Windows. Essas informações ficam no computador e não são enviadas a ninguém.</li>
 <li><b>Conexão automática:</b> para escolher entre offline, híbrido e online, o NEXUS mede a internet com pedidos a servidores do Google e da Cloudflare, sem enviar dados pessoais.</li>
 <li><b>Downloads:</b> o modelo de voz é baixado uma vez do Hugging Face; as fontes da interface podem ser carregadas do Google Fonts (não no modo offline).</li>
 <li><b>Navegador:</b> quando você pede para abrir um site, pesquisar ou tocar uma música, o seu navegador acessa esses sites (Google, YouTube, etc.).</li>
@@ -81,7 +82,7 @@ window.LEGAL = {
   en: {
     terms: `
 <h3>N.E.X.U.S Terms of Use</h3>
-<p class="legal-meta">Version 1.1 · 2026-10-16 · Prototype</p>
+<p class="legal-meta">Version 1.2 · 2026-10-16 · Prototype</p>
 <h4>1. What NEXUS is</h4>
 <p>N.E.X.U.S is a personal assistant for Windows at <b>prototype</b> stage (0.x versions), built for a hackathon. It runs on your computer: it talks by text and voice, organizes your schedule, tasks, reminders, notes and data, and uses a local knowledge base.</p>
 <h4>2. Acceptance</h4>
@@ -114,7 +115,7 @@ window.LEGAL = {
 <p>Questions, requests and problem reports: through the project's GitHub repository (github.com/Bryan-M-Almeida/nexusAI), in the Issues section.</p>`,
     privacy: `
 <h3>N.E.X.U.S Privacy Policy</h3>
-<p class="legal-meta">Version 1.1 · 2026-10-16</p>
+<p class="legal-meta">Version 1.2 · 2026-10-16</p>
 <h4>1. Summary</h4>
 <p>NEXUS works <b>on your computer</b>. There is no account, sign-up, ads or telemetry: the author of NEXUS <b>does not receive</b> your data. Some features, which you control, send information to third-party services, described below.</p>
 <h4>2. What NEXUS stores</h4>
@@ -132,7 +133,8 @@ window.LEGAL = {
 <h4>4. What leaves the computer (and when)</h4>
 <ul>
 <li><b>AI:</b> with local AI (Ollama/LM Studio), nothing leaves. If you choose a cloud provider (OpenAI, Anthropic, Google, etc.), your messages and the context needed (for example, parts of memories, schedule or attached files) are sent to that provider, under its policy.</li>
-<li><b>Integrations:</b> weather (Open-Meteo: the city), news (Google News: the topic), exchange rates (Frankfurter: the currencies), Wikipedia (the search term) and the ICS calendar you provide. They can be turned off in Settings › Integrations or with offline mode.</li>
+<li><b>Integrations:</b> weather, air quality and the time in other cities (Open-Meteo: the city), news (Google News: the topic), exchange rates (Frankfurter: the currencies), crypto prices (CoinGecko: the currency), translation (MyMemory: the text to translate), public holidays (Nager.Date: the country), Wikipedia (the search term), the ICS calendar you provide and the integrations you add yourself (the address you chose receives what you asked). Each one is only used when a message needs it, the answer is kept on the computer for a while, and all can be turned off in Settings › Integrations or with offline mode. The calculator and unit converter work without internet.</li>
+<li><b>Apps and media (beta):</b> to open apps by name, NEXUS reads the Start menu list; to control music, it reads the title and artist of what is playing from Windows' media controls. This information stays on the computer and is not sent to anyone.</li>
 <li><b>Automatic connection:</b> to choose between offline, hybrid and online, NEXUS measures the internet with requests to Google and Cloudflare servers, without sending personal data.</li>
 <li><b>Downloads:</b> the voice model is downloaded once from Hugging Face; interface fonts may be loaded from Google Fonts (not in offline mode).</li>
 <li><b>Browser:</b> when you ask to open a site, search or play a song, your browser visits those sites (Google, YouTube, etc.).</li>
@@ -158,7 +160,7 @@ window.LEGAL = {
   es: {
     terms: `
 <h3>Términos de Uso de N.E.X.U.S</h3>
-<p class="legal-meta">Versión 1.1 · 16/10/2026 · Prototipo</p>
+<p class="legal-meta">Versión 1.2 · 16/10/2026 · Prototipo</p>
 <h4>1. Qué es NEXUS</h4>
 <p>N.E.X.U.S es un asistente personal para Windows en fase de <b>prototipo</b> (versiones 0.x), creado para un hackathon. Funciona en tu ordenador: conversa por texto y voz, organiza agenda, tareas, recordatorios, notas y datos, y usa una base de conocimiento local.</p>
 <h4>2. Aceptación</h4>
@@ -191,7 +193,7 @@ window.LEGAL = {
 <p>Dudas, solicitudes y reportes de problemas: en el repositorio del proyecto en GitHub (github.com/Bryan-M-Almeida/nexusAI), sección Issues.</p>`,
     privacy: `
 <h3>Política de Privacidad de N.E.X.U.S</h3>
-<p class="legal-meta">Versión 1.1 · 16/10/2026</p>
+<p class="legal-meta">Versión 1.2 · 16/10/2026</p>
 <h4>1. Resumen</h4>
 <p>NEXUS funciona <b>en tu ordenador</b>. No hay cuenta, registro, anuncios ni telemetría: el autor de NEXUS <b>no recibe</b> tus datos. Algunas funciones, que tú controlas, envían información a servicios de terceros, descritos abajo.</p>
 <h4>2. Qué datos guarda NEXUS</h4>
@@ -209,7 +211,8 @@ window.LEGAL = {
 <h4>4. Qué sale del ordenador (y cuándo)</h4>
 <ul>
 <li><b>IA:</b> con la IA local (Ollama/LM Studio), no sale nada. Si eliges un proveedor en la nube (OpenAI, Anthropic, Google, etc.), tus mensajes y el contexto necesario (por ejemplo, partes de recuerdos, agenda o archivos adjuntos) se envían a ese proveedor, bajo su política.</li>
-<li><b>Integraciones:</b> clima (Open-Meteo: la ciudad), noticias (Google Noticias: el tema), cambio (Frankfurter: las monedas), Wikipedia (el término buscado) y el calendario ICS que indiques. Se pueden desactivar en Configuración › Integraciones o con el modo sin conexión.</li>
+<li><b>Integraciones:</b> clima, calidad del aire y hora de otras ciudades (Open-Meteo: la ciudad), noticias (Google Noticias: el tema), divisas (Frankfurter: las monedas), criptomonedas (CoinGecko: la moneda), traducción (MyMemory: el texto a traducir), festivos (Nager.Date: el país), Wikipedia (el término buscado), el calendario ICS que indiques y las integraciones que tú mismo añadas (la dirección que elegiste recibe lo que pediste). Cada una solo se usa cuando un mensaje la necesita, la respuesta se guarda en el equipo un tiempo, y todas se pueden desactivar en Configuración › Integraciones o con el modo sin conexión. La calculadora y el conversor de unidades funcionan sin internet.</li>
+<li><b>Aplicaciones y multimedia (beta):</b> para abrir aplicaciones por nombre, NEXUS lee la lista del menú Inicio; para controlar la música, lee el título y el artista de lo que suena en los controles multimedia de Windows. Esta información se queda en el equipo y no se envía a nadie.</li>
 <li><b>Conexión automática:</b> para elegir entre sin conexión, híbrido y en línea, NEXUS mide internet con peticiones a servidores de Google y Cloudflare, sin enviar datos personales.</li>
 <li><b>Descargas:</b> el modelo de voz se descarga una vez de Hugging Face; las fuentes de la interfaz pueden cargarse de Google Fonts (no en modo sin conexión).</li>
 <li><b>Navegador:</b> cuando pides abrir un sitio, buscar o poner una canción, tu navegador accede a esos sitios (Google, YouTube, etc.).</li>

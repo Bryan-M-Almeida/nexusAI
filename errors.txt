@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 3.3  ·  Date: 2026-10-16  ·  App version: 0.17.5
+ Document version: 3.4  ·  Date: 2026-10-16  ·  App version: 0.18.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -90,6 +90,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-038  The AI said it opened (or would open) a menu and nothing opened
       NX-LLM-039  Training: general facts disappeared or were judged without evidence
       NX-LLM-040  Training: the AI asked "shall I save it?" after every lesson
+      NX-LLM-041  Live questions: the AI called the tool again (answer in two rounds)
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -149,6 +150,9 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-INT-004  "The JSON must contain at least the 'name' field"
       NX-INT-005  Online integration doesn't respond (weather, news, currency, Wikipedia)
       NX-INT-006  ICS calendar: missing events or different times
+      NX-INT-007  Wrong city for weather/clock ("New York" became York, Nebraska)
+      NX-INT-008  First answer after waking from suspended mode takes ~16 s
+      NX-INT-009  "What's playing?" doesn't find the player
  ENV  NX-ENV-001  requirements.txt ignored by Git
       NX-ENV-002  setup.ps1 / build.ps1 blocked by PowerShell policy
       NX-ENV-003  Dependencies not supported on the Python version
@@ -693,6 +697,20 @@ QUICK DIAGNOSTICS (run these before investigating)
   Fix        : Lessons are noted instantly ("Noted (n).") with no AI call;
                everything is checked and saved at the end. Questions (ending
                with "?") still go to the AI. 1.88 s -> 0.001 s per lesson.
+
+[NX-LLM-041] Live questions: the AI called the tool again (answer in two rounds)
+  Severity   : MEDIUM           Status: FIXED (v0.18.0)    Observed: YES
+  Symptom    : "How much is the dollar?" took 7.4 s; "how much is the euro?"
+               also called the weather (9.3 s); news took 29.9 s.
+  Cause      : The AI asked for the tool, waited for the internet and only then
+               answered (two generations). With the data already in the context,
+               the "call get_news now" safety net forced another round.
+  Fix        : The integrations hub (nexus/connectors.py) recognises what the
+               message needs without the AI, fetches it (or uses the cache) and
+               answers instantly when it is a simple fact; for longer questions
+               the data goes into the context and counts as a tool already used.
+               Dollar 7.4 s -> 0.4 s (0 s from cache), weather 8.1 s -> 0.2-2.4 s,
+               news 29.9 s -> 0.3 s.
 
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS
@@ -1314,6 +1332,31 @@ QUICK DIAGNOSTICS (run these before investigating)
                "Secret address in iCal format". To sync now, say "update my
                calendar". Don't share that link: it grants read access to your
                calendar.
+
+[NX-INT-007] Wrong city for weather/clock ("New York" became York, Nebraska)
+  Severity   : MEDIUM           Status: FIXED (v0.18.0)    Observed: YES
+  Cause      : Open-Meteo's city search looks the name up in the requested
+               language; in Portuguese "New York" is "Nova Iorque" and the first
+               result was York (USA) or an English village.
+  Fix        : Searches in NEXUS's language and in English and picks the exact
+               name with the largest population. Places are kept for 30 days.
+
+[NX-INT-008] First answer after waking from suspended mode takes ~16 s
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Cause      : To free the graphics card for the game, the model leaves the VRAM
+               (6.1 GB on an RX 6600 XT). When NEXUS wakes it loads again.
+  Tips       : NEXUS reloads in the background as soon as it wakes; going back
+               to the window before asking hides the wait. To never suspend:
+               Settings > Apps and media > "Stay active".
+
+[NX-INT-009] "What's playing?" doesn't find the player
+  Severity   : LOW              Status: KNOWN              Observed: EXPECTED
+  Cause      : NEXUS reads Windows' media controls. Players that don't register
+               there (some sites, old players) don't show up, and the media keys
+               go to the player Windows considers current.
+  Tips       : Spotify, LiMusic, Chrome/Edge/Brave (YouTube) and the Media
+               Player work. If nothing responds, press play once in the player
+               so Windows registers it.
 
 ================================================================================
  ENV — ENVIRONMENT, INSTALLATION AND BUILD

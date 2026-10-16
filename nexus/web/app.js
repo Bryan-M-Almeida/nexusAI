@@ -1,6 +1,6 @@
 /* Fonts from Google only when not offline (v0.12). The last known mode is cached so the boot animation doesn't
    flash fallback fonts; offline it falls back to Bahnschrift / Segoe UI / Consolas, already in the CSS. */
-const LEGAL_VERSION = "1.1";  // nexus/legal.py VERSION
+const LEGAL_VERSION = "1.2";  // nexus/legal.py VERSION
 function termsAccepted() { try { return localStorage.getItem("nexus.terms") === LEGAL_VERSION; } catch (e) { return false; } }
 function loadFonts(mode) {
   try { localStorage.setItem("nexus.net", mode); } catch (e) { /* ignore */ }
@@ -132,6 +132,7 @@ window.nexus = {
       case "ui_open": return onUiOpen(p);
       case "stt_progress": return onSttProgress(p);
       case "training": return onTrainingState(p);
+      case "suspended": return onSuspended(p);
       case "training_progress": return onTrainingProgress(p);
       case "training_done": return showTrainingResult(p);
       case "mic_level": ringMicTarget = Math.max(ringMicTarget, p); return wakeRing();
@@ -404,7 +405,7 @@ function setVoiceState(st) {
   if (st === "speaking") wakeRing();
   const label = $("#coreLabel");
   label.textContent = sttDownload >= 0 ? T("sttDownloading") : trainingPct >= 0 ? T("trainingAnalyzing")
-    : aiDown && !aiBusy ? T("aiDown") : trainingOn && ["idle", "standby"].includes(shown) ? T("st_training") : T("st_" + shown) || "";
+    : suspendedOn ? T("st_suspended") : aiDown && !aiBusy ? T("aiDown") : trainingOn && ["idle", "standby"].includes(shown) ? T("st_training") : T("st_" + shown) || "";
   label.className = "core-label " + (["listening", "awake"].includes(shown) ? "red" : ["speaking", "thinking"].includes(shown) ? "blue" : "");
   $("#chipVoice").classList.toggle("on", state.ui_mode === "audio" && !state.mic_muted && state.stt === "ready");
   updateDock();
@@ -522,6 +523,9 @@ function applyInterface() {
   $("#btnTraining").hidden = $("#trainingRailTitle").hidden = !feature("training");
   $("#tabLearned").hidden = !feature("training");
   $("#btnImportMem").hidden = !feature("memory_import");
+  // v0.18.0: parts of a settings section that belong to a beta feature
+  $$("[data-feature]").forEach((el) => (el.hidden = !feature(el.dataset.feature)));
+  $$("[data-feature-any]").forEach((el) => (el.hidden = !el.dataset.featureAny.split(",").some(feature)));
   // v0.15.5: beta features that are off disappear from the interface (Settings > Beta)
   $("#btnWorkspaces").hidden = !feature("workspace");
   $("#btnLibrary").hidden = !feature("library");
@@ -1326,6 +1330,110 @@ function collectSettings() {
 function showSection(sec) {
   $$("#setNav [data-sec]").forEach((b) => b.classList.toggle("on", b.dataset.sec === sec));
   $$(".set-sec").forEach((x) => (x.hidden = x.dataset.sec !== sec));
+  clearInterval(integTimer);
+  if (sec === "integ") { renderIntegrations(); integTimer = setInterval(() => { if (!$("#settings").hidden) renderIntegrations(); }, 6000); }
+  if (sec === "apps") { if (feature("media")) renderMedia(); if (feature("apps")) renderApps(false); }
+}
+
+/* ------------------------------------------------------------------ integrations hub, apps, media (v0.18.0) */
+const INTEG_ICON = { weather: "☁", currency: "$", crypto: "₿", clock: "◷", translate: "文", holidays: "▦", air: "≋",
+  news: "▤", wikipedia: "W", calendar: "▣", calc: "∑", units: "⇄" };
+let integTimer;
+const hhmm = (ts) => ts ? new Date(ts * 1000).toTimeString().slice(0, 5) : "";
+
+async function renderIntegrations() {
+  const r = await api().integrations_status();
+  const builtIn = r.items.filter((x) => x.kind !== "custom"), custom = r.items.filter((x) => x.kind === "custom");
+  const sum = (k) => r.items.reduce((a, x) => a + (x[k] || 0), 0);
+  $("#integSummary").textContent = T("integSummary", { on: builtIn.filter((x) => x.on).length, total: builtIn.length,
+    uses: sum("uses"), cached: sum("cached"), net: sum("net") }) + (r.online ? "" : " · " + T("integOffline"));
+  const open = $$(".integ-test:not([hidden])").map((el) => [el.closest("[data-cx]").dataset.cx, el.innerHTML]);
+  $("#integGrid").innerHTML = builtIn.map(integCard).join("");
+  $("#integCustomList").innerHTML = custom.map(integCard).join("") || `<p class="muted small">${esc(T("icNone"))}</p>`;
+  for (const [id, html] of open) {
+    const el = $(`[data-cx="${id}"] .integ-test`);
+    if (el) { el.innerHTML = html; el.hidden = false; }
+  }
+}
+
+function integCard(x) {
+  const custom = x.kind === "custom";
+  const name = custom ? x.name : T("cx_" + x.id), desc = custom ? x.keywords : T("cxd_" + x.id);
+  const ttl = x.ttl ? (x.ttl >= 86400 ? `${Math.round(x.ttl / 86400)} d` : x.ttl >= 3600 ? `${Math.round(x.ttl / 3600)} h` : `${Math.round(x.ttl / 60)} min`) : "—";
+  return `<div class="integ-card st-${x.state}${x.on ? "" : " off"}" data-cx="${esc(x.id)}">
+    <div class="integ-top"><span class="integ-ico">${esc(INTEG_ICON[x.id] || "⌁")}</span><b>${esc(name)}</b>
+      <input type="checkbox" class="cx-on" data-cx-toggle="${esc(x.id)}" ${x.on ? "checked" : ""} aria-label="on/off"></div>
+    <small class="integ-desc">${esc(desc)}</small>
+    <div class="integ-meta mono"><span class="pill">${esc(T("cxs_" + x.state, { until: hhmm(x.until) }))}</span>
+      <span title="${esc(T("cxSource"))}">${esc(x.kind === "local" ? T("cxLocal") : x.provider)}</span></div>
+    <div class="integ-meta mono"><span>${esc(T("cxUses", { n: x.uses, c: x.cached }))} · ${esc(T("cxTtl", { t: ttl }))}</span>
+      <span class="integ-acts"><button type="button" class="link-btn" data-cx-test="${esc(x.id)}">${esc(T("cxTest"))}</button>${custom
+        ? `<button type="button" class="link-btn" data-cx-del="${esc(x.id)}" aria-label="remove">✕</button>` : ""}</span></div>
+    <div class="integ-test small mono" hidden></div></div>`;
+}
+
+async function onIntegClick(e) {
+  const tog = e.target.closest("[data-cx-toggle]"), test = e.target.closest("[data-cx-test]"), del = e.target.closest("[data-cx-del]");
+  if (tog) { await api().integration_toggle(tog.dataset.cxToggle, tog.checked); return renderIntegrations(); }
+  if (del) { await api().integration_remove(del.dataset.cxDel); return renderIntegrations(); }
+  if (!test) return;
+  const id = test.dataset.cxTest, boxOf = () => $(`[data-cx="${id}"] .integ-test`);
+  boxOf().hidden = false; boxOf().textContent = "…";
+  const r = await api().integration_test(id);
+  const box = boxOf();  // the grid may have been redrawn while the test ran
+  if (!box) return;
+  box.hidden = false;
+  box.innerHTML = r.ok ? `<span class="ok">✓ ${r.ms} ms${r.cached ? " · " + esc(T("cxFromCache")) : ""}</span><br>${esc(r.preview || "")}`
+    : `<span class="bad">✕ ${esc(r.error === "city" ? T("cxNeedCity") : r.error)}</span>`;
+  renderIntegrations();
+}
+
+async function addCustomIntegration() {
+  const r = await api().integration_add($("#icName").value, $("#icKeys").value, $("#icUrl").value, +$("#icTtl").value);
+  if (!r.ok) return notice(T(r.error === "url" ? "icBadUrl" : "icBadKeys"));
+  $("#icName").value = $("#icKeys").value = $("#icUrl").value = "";
+  renderIntegrations();
+}
+
+let appsCache = [];
+async function renderApps(refresh) {
+  $("#appsList").innerHTML = `<p class="muted small">${esc(T("appsLoading"))}</p>`;
+  appsCache = (await api().apps_list(!!refresh)).items || [];
+  drawApps();
+}
+function drawApps() {
+  const q = ($("#appsFilter").value || "").toLowerCase();
+  const rows = appsCache.filter((a) => !q || a.name.toLowerCase().includes(q)).slice(0, 250);
+  $("#appsList").innerHTML = rows.map((a) => `<div class="app-row k-${a.kind}" data-app="${esc(a.name)}">
+      <span class="app-name">${esc(a.name)}</span>
+      <span class="app-kind mono">${["work", "game"].map((k) => `<button type="button" class="${(a.kind === k || (k === "work" && a.kind === "launcher")) ? "on" : ""}" data-kind="${k}">${esc(T(k === "work" && a.kind === "launcher" ? "kindLauncher" : "kind_" + k))}</button>`).join("")}</span>
+      <button type="button" class="link-btn" data-app-open>${esc(T("appOpen"))}</button></div>`).join("")
+    || `<p class="muted small">${esc(T("appsNone"))}</p>`;
+}
+async function onAppsClick(e) {
+  const row = e.target.closest("[data-app]");
+  if (!row) return;
+  const kind = e.target.closest("[data-kind]");
+  if (kind) { appsCache = (await api().app_mark(row.dataset.app, kind.dataset.kind)).items; return drawApps(); }
+  if (e.target.closest("[data-app-open]")) { const r = await api().app_open(row.dataset.app); if (r.said) notice(r.said); }
+}
+
+let volTimer;
+async function renderMedia() {
+  const r = await api().media_state(), cur = r.current;
+  $("#mediaTitle").textContent = cur ? cur.title : T("mediaNothing");
+  $("#mediaSub").textContent = cur ? [cur.artist, cur.app, T(cur.status === "playing" ? "mediaPlaying" : "mediaPaused")].filter(Boolean).join(" · ") : "";
+  $("#mediaCard").classList.toggle("playing", !!cur && cur.status === "playing");
+  if (r.volume != null) { $("#mediaVol").value = r.volume; $("#mediaVolOut").textContent = r.volume + "%"; }
+}
+
+let suspendedOn = false;
+function onSuspended(p) {
+  suspendedOn = !!p.on;
+  $("#app").classList.toggle("suspended", suspendedOn);
+  if (p.on) notice(T(p.app ? "suspendedOn" : "suspendedManual", { app: p.app || "" }), p.vram_freed_mb ? T("suspendedVram", { mb: p.vram_freed_mb }) : "");
+  else notice(T("suspendedOff"));
+  setVoiceState(voiceState);
 }
 
 function onPresetChange() {
@@ -1516,6 +1624,18 @@ function wire() {
     if (b) { memFilter = b.dataset.src; renderDashboard(dash); }
   });
   $("#btnImportMem").onclick = () => openImport();
+  $("#integGrid").addEventListener("click", onIntegClick);
+  $("#integCustomList").addEventListener("click", onIntegClick);
+  $("#btnIcAdd").onclick = addCustomIntegration;
+  $("#appsList").addEventListener("click", onAppsClick);
+  $("#appsFilter").oninput = drawApps;
+  $("#btnAppsRefresh").onclick = () => renderApps(true);
+  $("#btnSuspendNow").onclick = () => api().suspend("manual", "");
+  $$("[data-media]").forEach((b) => (b.onclick = async () => { await api().media_action(b.dataset.media); setTimeout(renderMedia, 700); }));
+  $("#mediaVol").oninput = (e) => {
+    $("#mediaVolOut").textContent = e.target.value + "%";
+    clearTimeout(volTimer); volTimer = setTimeout(() => api().media_action("volume", +e.target.value), 120);
+  };
   $("#importAis").addEventListener("click", (e) => {
     const b = e.target.closest("[data-ai]");
     if (b) { importAi = b.dataset.ai; renderImportAis(); }

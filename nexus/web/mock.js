@@ -8,13 +8,27 @@ if (!window.pywebview && location.search.includes("mock")) {
   const profile = { name: "Alex Martins", profession: "Full-Stack Developer", routine: "Starts at 9 AM · deep focus in the afternoon",
     interests: ["AI", "games", "coffee"], goals: ["Ship NEXUS"], profile: "developer", tone: "técnico e direto",
     modules: ["código", "agenda", "foco/pomodoro"], language: "pt-BR" };
+  const now_s = Date.now() / 1000;
+  let mockCx = [["weather", "online", "Open-Meteo", 900, "cached", 6, 3], ["currency", "online", "Frankfurter (BCE/ECB)", 3600, "cached", 9, 7],
+    ["crypto", "online", "CoinGecko", 300, "sleeping", 1, 0], ["clock", "online", "Open-Meteo", 21600, "sleeping", 2, 1],
+    ["translate", "online", "MyMemory", 2592000, "cached", 3, 1], ["holidays", "online", "Nager.Date", 86400, "sleeping", 1, 0],
+    ["air", "online", "Open-Meteo (CAMS)", 1800, "sleeping", 0, 0], ["news", "online", "Google News", 900, "active", 4, 1],
+    ["wikipedia", "online", "Wikipedia", 86400, "sleeping", 2, 0], ["calendar", "online", "ICS", 0, "sleeping", 0, 0],
+    ["calc", "local", "NEXUS", 0, "sleeping", 12, 0], ["units", "local", "NEXUS", 0, "sleeping", 3, 0]]
+    .map(([id, kind, provider, ttl, st, uses, cached]) => ({ id, kind, provider, ttl, on: true, state: st, uses, cached, net: uses - cached,
+      until: st === "cached" ? now_s + 1500 : 0, last: now_s - 60, error: "" }));
+  mockCx.push({ id: "custom_gas", kind: "custom", name: "Preço da gasolina", keywords: "gasolina, combustível", url: "https://api.exemplo.com/gas?q={query}",
+    provider: "api.exemplo.com", ttl: 3600, on: true, state: "sleeping", uses: 0, net: 0, cached: 0, until: 0, error: "" });
+  const mockApps = [["RetroArch", "game"], ["PCSX2", "game"], ["Steam", "launcher"], ["XBOX", "launcher"], ["Visual Studio Code", "work"],
+    ["Discord", "work"], ["Google Chrome", "work"], ["LiMusic", "work"], ["Notion", "work"], ["WhatsApp", "work"], ["Spotify", "work"]]
+    .map(([name, kind]) => ({ name, kind, id: name }));
   let mockFull = false; let mockTrain = false; let mockTerms = /terms=1/.test(location.search), mockGpu = false;
   const settings = { ui_layout: "computer", bar_top: "hover", bar_left: "hover", bar_right: "hover", bar_bottom: "hover", ring_wander: true, rest_minutes: 3, show_exchange: true, exchange_follow: false, exchange_hide_seconds: 45, cursor_style: "ring", cursor_size: "medium", shortcuts: {}, tutorial_done: true, speak_menus: true, beta_map: true, beta_hold_talk: false, beta_training: true, beta_memory_import: true, app_mode: "user", beta_library: true, color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c", llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, tts_volume: 100, llm_preset: "ollama", llm_api_key: "ollama",
     llm_temperature: 0.3, llm_context: 8192, history_turns: 12, auto_title: true, greet_on_start: true, start_fullscreen: true,
     mic_device: "", vad_threshold: 0.5, vad_silence: 0.7, reminder_leads: "60,10,0", speak_reminders: true,
     ai_target: "local", bg_wake_only: true, bg_release_minutes: 10, pause_when_unfocused: true, network_mode: "hybrid", performance: "balanced", stt_beam: 5, llm_keep_alive: "2h", llm_num_gpu: -1, desktop_notifications: true, notify_sound: true, quiet_hours: "", daily_briefing: "", show_hud: true, show_captions: true, reduce_motion: false, auto_memory: true, voice_enabled: true, bridge_port: 47800,
-    integrations: true, home_city: "São Paulo", calendar_ics_url: "", ai_mode: "assistant",
+    integrations: true, home_city: "São Paulo", beta_media: true, beta_apps: true, music_player: "limusic", apps_suspend: "games", game_watch: false, home_currency: "", home_country: "", calendar_ics_url: "", ai_mode: "assistant",
     ui_mode: "audio", mic_muted: false, require_wake_word: false };
   const llm = { online: true, model_ready: true, model: "qwen3:8b", models: ["qwen3:8b"] };
   const VOICES = [{ name: "Microsoft Maria", gender: "female", lang: "pt" }, { name: "Microsoft Zira", gender: "female", lang: "en" },
@@ -38,7 +52,7 @@ if (!window.pywebview && location.search.includes("mock")) {
     boot: async () => {
       ["memory", "knowledge", "ai", "voice"].forEach((k, i) => emit("boot", { key: k, ok: true, detail: ["3", "198", "qwen3:8b", "small"][i] }, 600 + i * 200));
       return { profile, lang: "pt", llm, settings, stt: "ready", version: "0.17.0", model_name: "NEX-1.0",
-        terms: { accepted: mockTerms, version: "1.1", accepted_at: mockTerms ? new Date().toISOString() : "" } };
+        terms: { accepted: mockTerms, version: "1.2", accepted_at: mockTerms ? new Date().toISOString() : "" } };
     },
     greet: async () => { speak(2.5, 200); return "Olá, Alex, o que teremos para hoje?"; },
     history: async () => [],
@@ -135,8 +149,22 @@ if (!window.pywebview && location.search.includes("mock")) {
     import_prompt: async () => ({ prompt: "Liste tudo o que você sabe e lembra sobre mim... - [preferencia] ...", sources: { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", copilot: "Copilot", other: "IA" } }),
     import_memories: async (src, text) => ({ ok: true, added: (text.match(/^\s*-/gm) || []).length, skipped: 0 }),
     memory_sources: async () => [],
-    accept_terms: async () => { mockTerms = true; return { accepted: true, version: "1.1", accepted_at: new Date().toISOString() }; },
-    revoke_terms: async () => { mockTerms = false; return { accepted: false, version: "1.1" }; },
+    // v0.18.0: integrations hub, apps, media
+    integrations_status: async () => ({ online: true, home_city: "São Paulo", home_currency: "BRL", home_country: "BR", items: mockCx }),
+    integration_toggle: async (id, on) => { const x = mockCx.find((c) => c.id === id); if (x) { x.on = on; x.state = on ? "sleeping" : "off"; } return { ok: true, items: mockCx }; },
+    integration_test: async (id) => ({ ok: true, ms: 214, cached: id === "currency", preview: '{"amount": 1, "from": "USD", "to": "BRL", "result": 5.08}' }),
+    integration_add: async (name, keys, url) => { if (!/^https:\/\//.test(url)) return { ok: false, error: "url" };
+      mockCx.push({ id: "custom_" + mockCx.length, kind: "custom", name, keywords: keys, url, provider: url.split("/")[2], ttl: 1800, on: true, state: "sleeping", uses: 0, net: 0, cached: 0, until: 0, error: "" });
+      return { ok: true, items: mockCx }; },
+    integration_remove: async (id) => { mockCx = mockCx.filter((c) => c.id !== id); return { ok: true, items: mockCx }; },
+    apps_list: async () => ({ items: mockApps }),
+    app_mark: async (name, kind) => { const a = mockApps.find((x) => x.name === name); if (a) a.kind = kind; return { items: mockApps }; },
+    app_open: async (name) => ({ ok: true, said: `Abrindo ${name}.` }),
+    media_state: async () => ({ sessions: [], current: { app: "LiMusic", title: "Midnight City", artist: "M83", status: "playing" }, volume: 38, muted: false }),
+    media_action: async () => ({ ok: true }),
+    suspend: async () => { emit("suspended", { on: true, reason: "manual", app: "", vram_freed_mb: 5630 }, 300); emit("suspended", { on: false, source: "window" }, 3500); return { ok: true }; },
+    accept_terms: async () => { mockTerms = true; return { accepted: true, version: "1.2", accepted_at: new Date().toISOString() }; },
+    revoke_terms: async () => { mockTerms = false; return { accepted: false, version: "1.2" }; },
     gpu_tune_status: async () => ({ amd: true, vulkan: true, applied: mockGpu, suggest: true, installed: true }),
     gpu_tune: async (on) => { mockGpu = !!on; return { amd: true, vulkan: true, applied: mockGpu, suggest: true, installed: true, restarted: true }; },
     optimize: async (k) => (k === "data" ? { ok: true, backup: "C:/x/nexus-backup-test.zip", rss_mb: 120 } : { ok: true, freed_mb: 312.4, rss_mb: 188.1, freed_disk_mb: 1.2 }),

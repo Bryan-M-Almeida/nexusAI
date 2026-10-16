@@ -191,6 +191,18 @@ def prefill(messages: list, tools: list | None = None) -> dict:
     return {k: data.get(k) for k in ("load_duration", "prompt_eval_count", "prompt_eval_duration", "total_duration")}
 
 
+def loaded() -> list[dict]:
+    """Models Ollama has in memory now, with how much of each is on the graphics card (v0.18.0)."""
+    if not _is_ollama():
+        return []
+    try:
+        rows = httpx.get(f"{_ollama_root()}/api/ps", timeout=3).json().get("models", [])
+    except (httpx.HTTPError, ValueError):
+        return []
+    return [{"name": m.get("name", ""), "size_mb": round((m.get("size") or 0) / 2 ** 20),
+             "vram_mb": round((m.get("size_vram") or 0) / 2 ** 20)} for m in rows]
+
+
 def unload():
     """Free the GPU memory when NEXUS closes (games and other apps get the VRAM back)."""
     if _is_ollama():

@@ -133,6 +133,18 @@ DEFAULTS = {
     "cursor_size": "medium",      # small | medium | large
     "shortcuts": {},              # action id -> key combination chosen by the user (Settings > Shortcuts)
     "tutorial_done": False,       # first run: NEXUS narrates a short tutorial
+    # v0.18.0: integrations hub, media, apps
+    "connectors": {},             # integration id -> on/off (missing = on)
+    "custom_connectors": [],      # the user's own integrations: {id, name, keywords, url, ttl_min, on}
+    "home_currency": "",          # "" = by language (BRL / USD)
+    "home_country": "",           # holidays; "" = by language (BR / US / ES)
+    "music_player": "youtube",    # youtube | youtube music | spotify | limusic
+    "beta_media": False,
+    "beta_apps": False,
+    "apps_suspend": "games",      # games (suspend when NEXUS opens a game) | never
+    "game_watch": False,          # also suspend when a game started elsewhere comes to the foreground
+    "apps_games": [],             # app names the user marked as games
+    "apps_work": [],              # app names the user marked as work apps
     # v0.16.8
     "speak_menus": True,          # NEXUS says which menu it opened ("Abrindo as configurações")
     "beta_map": False,            # concept map (skills and knowledge around the ring) - beta
