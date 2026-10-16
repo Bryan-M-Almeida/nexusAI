@@ -5,7 +5,7 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import emergency, features, knowledge, llm, memory, netprobe, profile, skills, tools, ui_nav, workspace
+from . import emergency, features, knowledge, llm, memory, netprobe, profile, skills, tools, training, ui_nav, workspace
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
@@ -151,6 +151,8 @@ def workspace_context(user_text: str) -> str:
     parts.append(f"\nReply ONLY in {LANG_NAMES[detect(user_text) or lang()]}.")
     if MODES.get(settings["ai_mode"]):
         parts.append(MODES[settings["ai_mode"]])
+    if training.session["active"]:  # v0.17.5: the user is teaching - acknowledge, don't lecture or store
+        parts.append(training.CONTEXT)
     return "\n".join(parts)
 
 
@@ -225,6 +227,8 @@ def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     parts.append(f"\nReply ONLY in {LANG_NAMES[msg_lang or lang()]}.")
     if MODES.get(settings["ai_mode"]):
         parts.append(MODES[settings["ai_mode"]])
+    if training.session["active"]:  # v0.17.5: the user is teaching - acknowledge, don't lecture or store
+        parts.append(training.CONTEXT)
     if netprobe.effective() == "online" and settings["integrations"] and not hits:
         # v0.15 auto/online mode with a fast connection: online lookups first when the local base has nothing
         parts.append("Internet is fast right now: for current events or facts the local base doesn't cover, call "
@@ -306,6 +310,8 @@ def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None
             return (f"This needs LIVE data that you do not know. Call `{tool}` now; never say it is unavailable and "
                     f"never invent headlines, rates or forecasts. Then answer briefly from the tool result.")
     for rx, expected, tool in INTENTS:
+        if training.session["active"]:
+            break  # "aprenda que..." during training is a lesson: it is verified and saved when the training ends
         if rx.search(user_text) and not (called or set()) & expected and features.tool_allowed(tool):
             return (f"The user explicitly asked you to store this, but you did NOT call any tool, so nothing was saved. "
                     f"Call `{tool}` now with the information from the user's message, then confirm briefly in the "
@@ -506,6 +512,17 @@ class Assistant:
             self.emit("tool", {"name": "report_issue", "args": {}})
             self.emit("done", {"text": reply, "speak": True, "interrupted": False})
             return
+        cmd = training.detect(text) if features.enabled("training") else None
+        if cmd:  # v0.17.5 (beta): "começa o treinamento" / "termina o treinamento"
+            self._training_command(cmd)
+            return
+        if training.session["active"] and not text.strip().endswith("?"):
+            # a lesson: noted instantly, no model call (asked to just acknowledge, qwen3 kept asking "shall I save it?");
+            # everything is checked and saved when the training ends. Questions still go to the AI.
+            training.add_lesson(text)
+            self.emit("done", {"text": t("training_noted", n=len(training.session["lessons"])), "speak": True,
+                               "interrupted": False})
+            return
         nav = ui_nav.detect(text)
         if nav and tools.ui_hook:  # v0.16.5: "abre as configurações", "quero mudar a cor do aro" - instant, no model
             nav, reply = ui_nav.reply(nav)
@@ -629,7 +646,8 @@ class Assistant:
         # Automatic memory: only self-statements, never in emergencies or temporary conversations, and not when
         # the model already called `remember` this turn (no second LLM pass).
         if (settings["auto_memory"] and reply and not finished and not topic and "remember" not in called
-                and not memory.temporary and not workspace.active and memory.states_fact(text)):
+                and not memory.temporary and not workspace.active and not training.session["active"]
+                and memory.states_fact(text)):
             threading.Thread(target=self._extract_memories, args=(text, reply), daemon=True).start()
         cid = memory.current_conversation()
         if reply and not interrupted and cid and not memory.temporary and settings["auto_title"] and not workspace.active:
@@ -654,6 +672,30 @@ class Assistant:
         if title:
             memory.set_conversation_title(cid, title, str(data.get("description", "")), final=final)
             self.emit("conversations", None)
+
+    def _training_command(self, cmd):
+        action, topic = cmd
+        if action == "start":
+            if not training.session["active"]:
+                training.start(topic)
+            reply = t("training_started", topic=f" ({topic})" if topic else "")
+            self.emit("training", training.state())
+            self.emit("done", {"text": reply, "speak": True, "interrupted": False})
+            return
+        if not training.session["active"]:
+            self.emit("done", {"text": t("training_none"), "speak": True, "interrupted": False})
+            return
+        self.emit("training_progress", 0)
+        try:
+            result = training.finish(lambda pct: self.emit("training_progress", pct))
+        except Exception as exc:  # the AI went away mid-analysis: keep the lessons for a new try
+            from .logs import log
+
+            log.warning(f"training analysis failed: {exc}")
+            result = {"ok": False, "error": str(exc)}
+        self.emit("training_done", result)
+        self.emit("training", training.state())
+        self.emit("done", {"text": training.summary_text(result), "speak": True, "interrupted": False})
 
     def _level_up(self, text, used, spoken=False):
         """Skills XP for the finished turn (v0.13); a level-up shows a toast in the interface."""

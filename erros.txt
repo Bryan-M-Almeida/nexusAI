@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 3.2  ·  Data: 2026-10-15  ·  Versão do app: 0.17.0
+ Versão do documento: 3.3  ·  Data: 2026-10-16  ·  Versão do app: 0.17.5
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -86,6 +86,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-036  Lembrete marcado para depois de amanhã ("amanhã" virava o dia 17)
       NX-LLM-037  Primeira resposta lenta depois de trocar de idioma
       NX-LLM-038  A IA disse que abriu (ou ia abrir) um menu e nada abriu
+      NX-LLM-039  Treinamento: fatos gerais sumiam ou eram julgados sem evidência
+      NX-LLM-040  Treinamento: a IA perguntava "quer que eu armazene?" a cada lição
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -665,6 +667,33 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                reconhecidos sem a IA (nexus/ui_nav.py; instantâneo). Para as
                outras frases, se a IA disser que abriu ou que vai abrir sem
                chamar open_interface, ela é obrigada a chamar.
+
+[NX-LLM-039] Treinamento: fatos gerais sumiam ou eram julgados sem evidência
+  Severidade : ALTA             Status: CORRIGIDO (v0.17.5) Observado: SIM
+  Sintoma    : No teste do modo treinamento (beta), "Júpiter é o maior
+               planeta" e "Marte é o planeta mais próximo do Sol" não
+               apareciam na análise; quando apareciam, a IA "confirmava" o
+               errado.
+  Causa      : Pedir para a IA "extrair os fatos ensinados" fazia o qwen3
+               manter só os fatos sobre o usuário. E a busca da Wikipédia
+               por título não acha nada para uma frase inteira, então a IA
+               julgava de memória.
+  Correção   : Cada frase afirmativa vira um fato, sem IA (perguntas e
+               cumprimentos ficam de fora; frases com eu/meu/minha são
+               pessoais). A evidência vem da busca de texto completo da
+               Wikipédia (2 melhores artigos) e da base local; sem evidência
+               e sem certeza, o fato fica "não verificado" e não entra na
+               concordância. Teste: Júpiter confirmado, Marte contestado
+               (nota: Mercúrio), pessoal salvo na memória.
+
+[NX-LLM-040] Treinamento: a IA perguntava "quer que eu armazene?" a cada lição
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.17.5) Observado: SIM
+  Sintoma    : Durante o treinamento, cada frase ensinada recebia uma
+               resposta longa terminando em "quer que eu armazene isso?",
+               mesmo com a instrução de só confirmar.
+  Correção   : As lições são anotadas na hora ("Anotado (n).") sem chamar a
+               IA; tudo é verificado e salvo no fim. Perguntas (terminadas em
+               "?") continuam indo para a IA. 1,88 s -> 0,001 s por lição.
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE

@@ -137,6 +137,9 @@ DEFAULTS = {
     "speak_menus": True,          # NEXUS says which menu it opened ("Abrindo as configurações")
     "beta_map": False,            # concept map (skills and knowledge around the ring) - beta
     "beta_hold_talk": False,      # hold the talk key to speak, release to send - beta
+    # v0.17.5 beta features
+    "beta_training": False,       # training mode + "Aprendizados" tab
+    "beta_memory_import": False,  # import memories from other AIs (ChatGPT, Claude, Gemini...)
     # v0.17.0: Terms of Use / Privacy Policy accepted (version and when)
     "terms_version": "",
     "terms_accepted_at": "",          # the ring drifts around the screen by itself

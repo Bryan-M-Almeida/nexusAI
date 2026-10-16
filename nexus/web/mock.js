@@ -8,8 +8,8 @@ if (!window.pywebview && location.search.includes("mock")) {
   const profile = { name: "Alex Martins", profession: "Full-Stack Developer", routine: "Starts at 9 AM · deep focus in the afternoon",
     interests: ["AI", "games", "coffee"], goals: ["Ship NEXUS"], profile: "developer", tone: "técnico e direto",
     modules: ["código", "agenda", "foco/pomodoro"], language: "pt-BR" };
-  let mockFull = false; let mockTerms = /terms=1/.test(location.search), mockGpu = false;
-  const settings = { ui_layout: "computer", bar_top: "hover", bar_left: "hover", bar_right: "hover", bar_bottom: "hover", ring_wander: true, rest_minutes: 3, show_exchange: true, exchange_follow: false, exchange_hide_seconds: 45, cursor_style: "ring", cursor_size: "medium", shortcuts: {}, tutorial_done: true, speak_menus: true, beta_map: true, beta_hold_talk: false, app_mode: "user", beta_library: true, color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c", llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
+  let mockFull = false; let mockTrain = false; let mockTerms = /terms=1/.test(location.search), mockGpu = false;
+  const settings = { ui_layout: "computer", bar_top: "hover", bar_left: "hover", bar_right: "hover", bar_bottom: "hover", ring_wander: true, rest_minutes: 3, show_exchange: true, exchange_follow: false, exchange_hide_seconds: 45, cursor_style: "ring", cursor_size: "medium", shortcuts: {}, tutorial_done: true, speak_menus: true, beta_map: true, beta_hold_talk: false, beta_training: true, beta_memory_import: true, app_mode: "user", beta_library: true, color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c", llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, tts_volume: 100, llm_preset: "ollama", llm_api_key: "ollama",
     llm_temperature: 0.3, llm_context: 8192, history_turns: 12, auto_title: true, greet_on_start: true, start_fullscreen: true,
     mic_device: "", vad_threshold: 0.5, vad_silence: 0.7, reminder_leads: "60,10,0", speak_reminders: true,
@@ -46,7 +46,7 @@ if (!window.pywebview && location.search.includes("mock")) {
       profile,
       tasks: [{ id: 1, title: "Revisar PRs do NEXUS", due: iso(18), priority: "high" }, { id: 2, title: "Comprar café", due: null, priority: "normal" }],
       events: [{ id: 1, title: "Daily com o time", start: iso(9, 30), notes: "" }, { id: 2, title: "Pitch do hackathon", start: iso(15, 0, 1), notes: "Sala 2" }],
-      memories: [{ id: 1, content: "Prefere café sem açúcar", category: "preferencia", created: iso(10), source: "chat" },
+      memories: [{ id: 1, content: "Prefere café sem açúcar", category: "preferencia", created: iso(10), source: "chat" }, { id: 9, content: "Trabalha como desenvolvedor full-stack", category: "trabalho", created: iso(9), source: "import:chatgpt" },
         { id: 2, content: "Trabalha melhor à tarde", category: "rotina", created: iso(10), source: "auto" }],
       actions: [{ ts: iso(10), kind: "tarefa", summary: "Criou tarefa #1: Revisar PRs do NEXUS" }],
       knowledge: [{ category: "Primeiros Socorros", docs: 1, chunks: 10 }, { category: "Filosofia", docs: 1, chunks: 11 }, { category: "Finanças", docs: 1, chunks: 12 }, { category: "Programação", docs: 1, chunks: 13 }, { category: "Saúde", docs: 1, chunks: 14 }, { category: "Produtividade", docs: 1, chunks: 15 }, { category: "Anatomia", docs: 1, chunks: 10 }, { category: "First Aid", docs: 1, chunks: 11 }, { category: "Philosophy", docs: 1, chunks: 12 }, { category: "Finance", docs: 1, chunks: 13 }, { category: "Programming", docs: 1, chunks: 14 }, { category: "Health", docs: 1, chunks: 15 }, { category: "Productivity", docs: 1, chunks: 10 }, { category: "Anatomy", docs: 1, chunks: 11 }, { category: "Primeros Auxilios", docs: 1, chunks: 12 }, { category: "Filosofía", docs: 1, chunks: 13 }, { category: "Finanzas", docs: 1, chunks: 14 }, { category: "Programación", docs: 1, chunks: 15 }, { category: "Salud", docs: 1, chunks: 10 }, { category: "Productividad", docs: 1, chunks: 11 }, { category: "Anatomía", docs: 1, chunks: 12 }],
@@ -117,6 +117,24 @@ if (!window.pywebview && location.search.includes("mock")) {
     toggle_fullscreen: async () => (mockFull = !mockFull), minimize: async () => {}, quit: async () => {},
     llm_status: async () => llm, speak_help: async () => speak(4),
     hold_start: async () => ({ ok: true }), hold_stop: async () => {},
+    training_state: async () => ({ active: mockTrain, lessons: 0 }),
+    training_start: async () => { mockTrain = true; emit("training", { active: true }); emit("done", { text: "Modo treinamento ativado. Pode me ensinar.", speak: true }, 50); },
+    training_finish: async () => {
+      mockTrain = false; emit("training", { active: false });
+      [0, 25, 55, 92, 100].forEach((p, i) => emit("training_progress", p, 300 * i));
+      emit("training_done", { ok: true, score: 50, lessons: 4, unchecked: 1,
+        learned: [{ fact: "Júpiter é o maior planeta do Sistema Solar.", verdict: "agree", note: "Wikipédia confirma.", source: "https://pt.wikipedia.org/wiki/Jupiter" },
+                  { fact: "Meu planeta favorito é Saturno.", verdict: "personal", note: "", source: "" }],
+        left_out: [{ fact: "Marte é o planeta mais próximo do Sol.", verdict: "disagree", note: "Mercúrio é o mais próximo do Sol.", source: "https://pt.wikipedia.org/wiki/Marte" },
+                   { fact: "A Lua leva cerca de 27 dias para orbitar a Terra.", verdict: "unknown", note: "sem evidência no resumo", source: "" }] }, 1600);
+      emit("done", { text: "Análise completa. Aprendi 2, deixei 2 de fora, e a concordância com as fontes foi de 50 por cento.", speak: true }, 1700);
+    },
+    training_history: async () => [{ id: 1, topic: "astronomia", started: "2026-10-16T12:00:00", finished: "2026-10-16T12:05:00", score: 50,
+      facts: [{ fact: "Júpiter é o maior planeta do Sistema Solar.", verdict: "agree", note: "", source: "" }, { fact: "Marte é o planeta mais próximo do Sol.", verdict: "disagree", note: "Mercúrio", source: "" }] }],
+    training_delete: async () => [],
+    import_prompt: async () => ({ prompt: "Liste tudo o que você sabe e lembra sobre mim... - [preferencia] ...", sources: { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", copilot: "Copilot", other: "IA" } }),
+    import_memories: async (src, text) => ({ ok: true, added: (text.match(/^\s*-/gm) || []).length, skipped: 0 }),
+    memory_sources: async () => [],
     accept_terms: async () => { mockTerms = true; return { accepted: true, version: "1.1", accepted_at: new Date().toISOString() }; },
     revoke_terms: async () => { mockTerms = false; return { accepted: false, version: "1.1" }; },
     gpu_tune_status: async () => ({ amd: true, vulkan: true, applied: mockGpu, suggest: true, installed: true }),

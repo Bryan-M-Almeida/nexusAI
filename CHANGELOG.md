@@ -8,6 +8,47 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.17.5 — Protótipo · 2026-10-16
+
+**Modo treinamento com a aba Aprendizados e importação de memórias de outras IAs (as duas em beta).**
+
+### Novo
+- **Modo treinamento** (beta, `Ctrl+8`, botão no menu esquerdo ou por voz: "começa o treinamento sobre astronomia" /
+  "termina o treinamento", em PT/EN/ES). Durante o treino o usuário ensina falando normalmente; cada frase é anotada na
+  hora ("Anotado (3).") e as perguntas continuam indo para a IA. O rótulo do aro mostra **TREINAMENTO**.
+  - Ao terminar, o NEXUS **analisa**: cada frase afirmativa vira um fato; os fatos sobre o usuário (eu/meu/minha) vão
+    para as memórias; os gerais são conferidos com a **Wikipédia** (busca de texto completo, só com os termos aceitos,
+    internet e integrações ligadas) e a **base local**, e a IA julga cada um (confirmado / contestado / não verificado)
+    numa única chamada. O aro mostra **ANALISANDO** com as ondas e a porcentagem no núcleo, como no download da voz.
+  - Fica o que foi confirmado (base de conhecimento, categoria **Aprendizados**, com a fonte); fica de fora o que foi
+    contestado (com a correção) ou não pôde ser verificado. O NEXUS diz: "Análise completa. Aprendi 2, deixei 2 de
+    fora, e a concordância com as fontes foi de 50 por cento." — a concordância conta só o que pôde ser comparado.
+  - Nova aba **Aprendizados** no painel: cada treinamento com tema, data, concordância e os fatos (expande ao clicar).
+- **Importar memórias de outras IAs** (beta, aba Memória → **Importar**): escolha ChatGPT, Claude, Gemini, Copilot ou
+  outra, copie o prompt pronto (PT/EN/ES), cole na outra IA e cole a resposta de volta. Cada linha `- [categoria] texto`
+  vira uma memória marcada com a origem; as repetidas são ignoradas. A aba Memória ganhou **filtros por origem**
+  ("Todas · 3", "NEXUS · 2", "ChatGPT · 1").
+
+### Desempenho
+- **Lições do treinamento sem chamar a IA**: 1,88 s → 0,001 s por lição (medido com qwen3:8b na RX 6600 XT, 4 lições).
+- **Extração dos fatos sem a IA**: a chamada de extração levava 8,8 s; a extração determinística leva 0,1 ms. Uma
+  análise completa de 4 lições (busca na Wikipédia + julgamento) termina em 6,5 s.
+
+### Corrigido
+- NX-LLM-039: a extração pela IA perdia os fatos gerais e o julgamento era feito sem evidência.
+- NX-LLM-040: a IA perguntava "quer que eu armazene?" a cada lição.
+
+### Testes desta versão
+- 258/258 testes unitários (10 novos: comandos de treino nos 3 idiomas, extração de fatos, anotação instantânea,
+  análise e concordância, o que é salvo e o histórico, importação, origem e repetidas, prompt nos 3 idiomas, beta
+  desligado para usuários).
+- Avaliação de conversa 32/32 e da área de trabalho 7/7 com o modelo real.
+- Teste com o modelo real: Júpiter confirmado (fonte: Wikipédia), Marte contestado (nota: Mercúrio), Lua não
+  verificada, "meu planeta favorito é Saturno" salvo na memória; concordância 50%.
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.17.1 — Protótipo · 2026-10-16
 
 **Licença MIT.**

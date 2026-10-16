@@ -803,6 +803,53 @@ _lic = (WEB.parent.parent / "LICENSE").read_text("utf-8")
 check("license: MIT file present and the terms say so in the three languages (hackathon rule)",
       _lic.startswith("MIT License") and "Bryan Maciel de Almeida" in _lic
       and all(x in _legal_js for x in ("Licença MIT", "MIT License", "Licencia MIT")))
+# -- v0.17.5: training mode and memory import (beta) -------------------------------------------------------------
+from nexus import memory_import, training  # noqa: E402
+
+check("training: start/finish commands in PT/EN/ES (with topic)",
+      training.detect("Nexus, começa o treinamento sobre astronomia") == ("start", "astronomia")
+      and training.detect("termina o treinamento") == ("finish", "") and training.detect("start training about chess")[0] == "start"
+      and training.detect("termina el entrenamiento") == ("finish", "") and training.detect("vamos estudar JS") is None)
+_facts = training.extract_facts(["A Lua leva cerca de 27 dias para orbitar a Terra. Júpiter é o maior planeta.",
+                                 "Meu planeta favorito é Saturno.", "Qual é o maior planeta?", "Obrigado!"])
+check("training: every statement becomes a fact, personal ones marked, questions skipped",
+      [f["personal"] for f in _facts] == [False, False, True] and len(_facts) == 3, str(_facts))
+import nexus.training as _tr  # noqa: E402
+
+_real_complete, _real_ev = _tr.llm.complete, _tr.evidence
+_tr.llm.complete = lambda *a, **k: '[{"i":1,"verdict":"agree","note":"ok"},{"i":2,"verdict":"disagree","note":"Mercúrio"},{"i":3,"verdict":"unknown","note":""}]'
+_tr.evidence = lambda fact: {"local": "", "online": "x", "source": "https://pt.wikipedia.org/wiki/X"}
+settings["app_mode"] = "developer"
+memory.new_conversation()
+_ev = []
+_bot = assistant.Assistant(lambda e, p: _ev.append((e, p)))
+_bot.ask("começa o treinamento sobre astronomia")
+_bot.ask("Júpiter é o maior planeta do Sistema Solar.")
+_noted = [p["text"] for e, p in _ev if e == "done"][-1]
+_bot.ask("Marte é o planeta mais próximo do Sol. A Lua tem anéis.")
+_bot.ask("Meu planeta favorito é Saturno.")
+_bot.ask("termina o treinamento")
+_tr.llm.complete, _tr.evidence = _real_complete, _real_ev
+_res = [p for e, p in _ev if e == "training_done"][0]
+_said = [p["text"] for e, p in _ev if e == "done"][-1]
+check("training: lessons are noted instantly without the AI", _noted.startswith("Anotado"), _noted)
+check("training: analysis keeps confirmed + personal, leaves out contradicted/unchecked",
+      [f["verdict"] for f in _res["learned"]] == ["agree", "personal"] and len(_res["left_out"]) == 2, str(_res)[:300])
+check("training: agreement counts only what could be compared (1 of 2 = 50%)", _res["score"] == 50 and _said.startswith("Análise completa"))
+check("training: confirmed knowledge and personal memory are saved; session is in the history",
+      any(d["category"] == "Aprendizados" for d in knowledge.documents())
+      and any(m["source"] == "training" for m in memory.all_memories()) and training.history()[0]["score"] == 50)
+settings["app_mode"] = "user"
+_ans = "Claro:\n- [preferencia] Gosta de chá verde.\n- [trabalho] Trabalha com dados.\n* [xyz] Mora no Rio.\nEspero ter ajudado!"
+check("memory import: one memory per list line, unknown categories become 'outros'",
+      memory_import.parse(_ans) == [("preferencia", "Gosta de chá verde."), ("trabalho", "Trabalha com dados."), ("outros", "Mora no Rio.")])
+_imp1 = memory_import.import_text("chatgpt", _ans)
+_imp2 = memory_import.import_text("claude", "- [preferencia] Gosta de chá verde.")
+check("memory import: tagged by source, duplicates skipped", _imp1["added"] == 3 and _imp2["added"] == 0 and _imp2["skipped"] == 1
+      and any(x["source"] == "chatgpt" and x["count"] == 3 for x in memory_import.by_source()))
+check("memory import: ready-made prompt in the three languages; 'NONE' imports nothing",
+      all(len(memory_import.prompt(x)) > 200 for x in ("pt", "en", "es")) and memory_import.import_text("gemini", "NENHUMA")["added"] == 0)
+check("beta: training and memory import start off for users", not features.enabled("training") and not features.enabled("memory_import"))
 _gs = gpu_tune.status()
 check("gpu tuning: status reports card, backend and setting", set(_gs) >= {"amd", "vulkan", "applied", "suggest", "installed"})
 check("colours: default ring/core/background are valid hex colours",

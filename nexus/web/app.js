@@ -131,6 +131,9 @@ window.nexus = {
       case "speak_env": ringSpeak(p); return wakeRing();
       case "ui_open": return onUiOpen(p);
       case "stt_progress": return onSttProgress(p);
+      case "training": return onTrainingState(p);
+      case "training_progress": return onTrainingProgress(p);
+      case "training_done": return showTrainingResult(p);
       case "mic_level": ringMicTarget = Math.max(ringMicTarget, p); return wakeRing();
       case "control": return onControl(p);
       case "ai_state": return setAiState(p);
@@ -195,6 +198,8 @@ async function start() {
   caption(hello, 7000);
   if (!profile) openOnboarding();
   setFull(!!st.fullscreen);
+  api().training_state().then(onTrainingState);
+  api().import_prompt(L).then((r) => (importSources = r.sources || {}));
   if (!settings.tutorial_done) {  // first run: narrated tutorial once the profile question is out of the way
     const go = () => setTimeout(startTutorial, 1800);
     if ($("#onboarding").hidden) go();
@@ -398,7 +403,8 @@ function setVoiceState(st) {
   $("#dockRing").dataset.state = shown;
   if (st === "speaking") wakeRing();
   const label = $("#coreLabel");
-  label.textContent = sttDownload >= 0 ? T("sttDownloading") : aiDown && !aiBusy ? T("aiDown") : T("st_" + shown) || "";
+  label.textContent = sttDownload >= 0 ? T("sttDownloading") : trainingPct >= 0 ? T("trainingAnalyzing")
+    : aiDown && !aiBusy ? T("aiDown") : trainingOn && ["idle", "standby"].includes(shown) ? T("st_training") : T("st_" + shown) || "";
   label.className = "core-label " + (["listening", "awake"].includes(shown) ? "red" : ["speaking", "thinking"].includes(shown) ? "blue" : "");
   $("#chipVoice").classList.toggle("on", state.ui_mode === "audio" && !state.mic_muted && state.stt === "ready");
   updateDock();
@@ -513,6 +519,9 @@ function applyInterface() {
   setRingPos(ringPos[0], ringPos[1], false);
   $("#btnSkillsRail").hidden = !feature("skills");
   $("#btnMapRail").hidden = !feature("map");
+  $("#btnTraining").hidden = $("#trainingRailTitle").hidden = !feature("training");
+  $("#tabLearned").hidden = !feature("training");
+  $("#btnImportMem").hidden = !feature("memory_import");
   // v0.15.5: beta features that are off disappear from the interface (Settings > Beta)
   $("#btnWorkspaces").hidden = !feature("workspace");
   $("#btnLibrary").hidden = !feature("library");
@@ -539,6 +548,7 @@ const ACTIONS = [
   { id: "workspace", def: "Ctrl+5", label: "kWorkspace", panel: "wsDrawer", feature: "workspace", run: () => openWorkspaces() },
   { id: "skills", def: "Ctrl+6", label: "kSkills", panel: "skillsDrawer", feature: "skills", run: () => openSkills() },
   { id: "map", def: "Ctrl+7", label: "kMap", panel: "mapDrawer", feature: "map", run: () => openMap() },
+  { id: "training", def: "Ctrl+8", label: "kTraining", feature: "training", run: () => toggleTraining() },
   { id: "clearText", def: "Ctrl+L", label: "kClearText", run: () => $("#app").classList.add("ex-faded") },
   { id: "settings", def: "Ctrl+,", label: "kSettings", panel: "settings", run: () => openSettings() },
   { id: "mode", def: "Ctrl+M", label: "kMode", run: () => dock(state.ui_mode === "audio" ? "text" : "audio") },
@@ -876,6 +886,81 @@ function onSttProgress(pct) {
   setVoiceState(voiceState);
 }
 
+/* Training mode (beta, v0.17.5): while it is on, what the user says is noted; at the end the ring waves with the
+   analysis percentage in the core, NEXUS says "Análise completa" and the result opens (also kept in "Aprendizados"). */
+let trainingOn = false, trainingPct = -1;
+function onTrainingState(p) {
+  trainingOn = !!(p && p.active);
+  $("#app").classList.toggle("training-on", trainingOn);
+  $("#trainingName").textContent = T(trainingOn ? "trainingFinish" : "trainingStart");
+  $("#trainingHint").textContent = T(trainingOn ? "trainingFinishHint" : "trainingStartHint");
+  $("#btnTraining").classList.toggle("on", trainingOn);
+  setVoiceState(voiceState);
+}
+function toggleTraining() {
+  if (!feature("training")) return;
+  if (trainingOn) api().training_finish(); else api().training_start("");
+}
+function onTrainingProgress(pct) {
+  trainingPct = pct >= 0 && pct < 100 ? pct : -1;
+  $("#app").classList.toggle("dl", trainingPct >= 0 || sttDownload >= 0);
+  $("#coreText").textContent = trainingPct >= 0 ? `${pct}%` : "";
+  setVoiceState(voiceState);
+}
+const VERDICT_ICON = { agree: "✓", personal: "◆", disagree: "✕", unknown: "?" };
+function trainItem(f) {
+  return `<li class="v-${esc(f.verdict)}"><i>${VERDICT_ICON[f.verdict] || "·"}</i><span>${esc(f.fact)}`
+    + `<small>${esc(T("verdict_" + f.verdict))}${f.note ? " · " + esc(f.note) : ""}${f.source ? " · " + esc(f.source.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]) : ""}</small></span></li>`;
+}
+function showTrainingResult(r) {
+  onTrainingProgress(100);
+  if (!r || !r.ok) { notice(T("trainingFailed")); return; }
+  $("#trainScore").textContent = r.score == null ? "—" : `${r.score}%`;
+  $("#trainScoreLabel").textContent = T(r.score == null ? "trainingNoScore" : "trainingScore");
+  $("#trainLearned").innerHTML = r.learned.map(trainItem).join("") || `<li class="empty">${esc(T("trainingNone"))}</li>`;
+  $("#trainLeft").innerHTML = r.left_out.map(trainItem).join("") || `<li class="empty">${esc(T("trainingNone"))}</li>`;
+  $("#trainingModal").hidden = false;
+}
+async function renderLearned() {
+  const rows = await api().training_history();
+  $("#learnedList").innerHTML = rows.map((r) => {
+    const facts = r.facts || [], learned = facts.filter((f) => ["agree", "personal"].includes(f.verdict)).length;
+    return `<li class="learned-item"><div class="learned-head" data-training="${r.id}">
+      <span class="body">${esc(r.topic || T("trainingUntitled"))}<span class="meta">${esc((r.finished || r.started).replace("T", " ").slice(0, 16))} · ${learned}/${facts.length}</span></span>
+      <span class="learned-score">${r.score == null ? "—" : r.score + "%"}</span>
+      <button class="x" data-del-training="${r.id}">✕</button></div>
+      <ul class="train-list">${facts.map(trainItem).join("")}</ul></li>`;
+  }).join("") || `<li class="empty">${esc(T("noLearned"))}</li>`;
+}
+
+/* Memories by source (v0.17.5): NEXUS's own + imported from other AIs; "all" is the merged NEXUS memory */
+let memFilter = "all", importAi = "chatgpt", importSources = {};
+const memSource = (m) => (m.source || "").startsWith("import:") ? m.source.slice(7) : "nexus";
+function renderMemSources(mems) {
+  const counts = {};
+  mems.forEach((m) => (counts[memSource(m)] = (counts[memSource(m)] || 0) + 1));
+  const keys = Object.keys(counts);
+  const box = $("#memSources");
+  box.hidden = keys.length < 2;
+  if (box.hidden) { memFilter = "all"; return; }
+  const name = (k) => (k === "nexus" ? "NEXUS" : importSources[k] || k);
+  box.innerHTML = [`<button type="button" class="chip-opt ${memFilter === "all" ? "on" : ""}" data-src="all">${esc(T("memAll"))} · ${mems.length}</button>`]
+    .concat(keys.map((k) => `<button type="button" class="chip-opt ${memFilter === k ? "on" : ""}" data-src="${esc(k)}">${esc(name(k))} · ${counts[k]}</button>`)).join("");
+}
+async function openImport() {
+  const r = await api().import_prompt(L);
+  importSources = r.sources || {};
+  $("#importPrompt").value = r.prompt;
+  $("#importAnswer").value = "";
+  $("#importResult").textContent = "";
+  renderImportAis();
+  $("#importModal").hidden = false;
+}
+function renderImportAis() {
+  $("#importAis").innerHTML = Object.entries(importSources).map(([k, v]) =>
+    `<button type="button" class="chip-opt ${k === importAi ? "on" : ""}" data-ai="${esc(k)}">${esc(k === "other" ? T("importOther") : v)}</button>`).join("");
+}
+
 /* Concept map (beta, v0.16.8): skills, knowledge and memories linked to the ring. The ring only spins; the
    cards float and slowly orbit with it, pulling the lines that connect them. */
 let mapNodes = [], mapRunning = false;
@@ -1141,7 +1226,8 @@ function renderDashboard(d) {
     <li class="prio-${t.priority}"><button class="check-btn" data-done="${t.id}" aria-label="done"></button>
       <span class="body">${esc(t.title)}${t.due ? `<span class="meta">${esc(fmtWhen(t.due))}</span>` : ""}</span>
       <button class="x" data-del-task="${t.id}">✕</button></li>`).join("") || empty("noTasks");
-  $("#memoryList").innerHTML = d.memories.map((m) => `
+  renderMemSources(d.memories);
+  $("#memoryList").innerHTML = d.memories.filter((m) => memFilter === "all" || memSource(m) === memFilter).map((m) => `
     <li><span class="body">${esc(m.content)}<span class="meta">${esc(m.category)} · ${esc(m.created.slice(0, 10))}${m.source === "auto" ? " · auto" : ""}</span></span>
       <button class="x" data-forget="${m.id}">✕</button></li>`).join("") || empty("noMemories");
   $("#actionList").innerHTML = d.actions.map((a) => `
@@ -1417,6 +1503,30 @@ function wire() {
   }));
   $("#btnSkillsRail").onclick = () => openSkills();
   $("#btnMapRail").onclick = () => openMap();
+  $("#btnTraining").onclick = () => toggleTraining();
+  $("#tabLearned").addEventListener("click", renderLearned);
+  $("#learnedList").addEventListener("click", async (e) => {
+    const del = e.target.closest("[data-del-training]");
+    if (del) { await api().training_delete(+del.dataset.delTraining); return renderLearned(); }
+    const head = e.target.closest("[data-training]");
+    if (head) head.closest("li").classList.toggle("open");
+  });
+  $("#memSources").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-src]");
+    if (b) { memFilter = b.dataset.src; renderDashboard(dash); }
+  });
+  $("#btnImportMem").onclick = () => openImport();
+  $("#importAis").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-ai]");
+    if (b) { importAi = b.dataset.ai; renderImportAis(); }
+  });
+  $("#btnImportCopy").onclick = (e) => copyText($("#importPrompt").value, e.currentTarget);
+  $("#btnImportGo").onclick = async () => {
+    const r = await api().import_memories(importAi, $("#importAnswer").value);
+    $("#importResult").textContent = r.added || r.skipped ? T("importResult", { added: r.added, skipped: r.skipped }) : T("importNone");
+    if (r.added) $("#importAnswer").value = "";
+    loadDashboard();
+  };
   $("#mapNodes").addEventListener("click", (e) => {
     const b = e.target.closest("[data-node]");
     if (!b) return;

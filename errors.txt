@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 3.2  ·  Date: 2026-10-15  ·  App version: 0.17.0
+ Document version: 3.3  ·  Date: 2026-10-16  ·  App version: 0.17.5
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -88,6 +88,8 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-036  Reminder set for the day after tomorrow ("tomorrow" became the 17th)
       NX-LLM-037  Slow first answer after switching language
       NX-LLM-038  The AI said it opened (or would open) a menu and nothing opened
+      NX-LLM-039  Training: general facts disappeared or were judged without evidence
+      NX-LLM-040  Training: the AI asked "shall I save it?" after every lesson
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -666,6 +668,31 @@ QUICK DIAGNOSTICS (run these before investigating)
                recognised without the AI (nexus/ui_nav.py; instant). For other
                sentences, if the AI says it opened or will open something
                without calling open_interface, it has to call it.
+
+[NX-LLM-039] Training: general facts disappeared or were judged without evidence
+  Severity   : HIGH             Status: FIXED (v0.17.5)    Observed: YES
+  Symptom    : While testing training mode (beta), "Jupiter is the largest
+               planet" and "Mars is the planet closest to the Sun" were
+               missing from the analysis; when present, the AI "confirmed"
+               the wrong one.
+  Cause      : Asked to "extract the facts the user taught", qwen3 kept only
+               the facts about the user. And the Wikipedia title search finds
+               nothing for a whole sentence, so the AI judged from memory.
+  Fix        : Every statement becomes a fact, with no AI call (questions and
+               greetings are skipped; sentences with I/my/me are personal).
+               Evidence comes from Wikipedia full-text search (best 2
+               articles) and the local knowledge base; with no evidence and
+               no certainty a fact is "unchecked" and doesn't count towards
+               the agreement. Test: Jupiter confirmed, Mars contradicted
+               (note: Mercury), personal fact saved to memory.
+
+[NX-LLM-040] Training: the AI asked "shall I save it?" after every lesson
+  Severity   : MEDIUM           Status: FIXED (v0.17.5)    Observed: YES
+  Symptom    : During training every taught sentence got a long reply ending
+               with "shall I save this?", even when told only to acknowledge.
+  Fix        : Lessons are noted instantly ("Noted (n).") with no AI call;
+               everything is checked and saved at the end. Questions (ending
+               with "?") still go to the AI. 1.88 s -> 0.001 s per lesson.
 
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS

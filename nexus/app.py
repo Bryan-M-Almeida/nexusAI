@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import webview
 
 from . import (MODEL_NAME, __version__, assistant, bridge, control, features, gpu_tune, i18n, knowledge, legal, llm, memory,
-               notify, profile,
+               memory_import, notify, profile, training,
                library, netprobe, performance, scheduler, skills, tools, workspace)
 from . import files as filereader
 from .logs import log, setup as setup_logs
@@ -587,6 +587,41 @@ class Api:
         """Speak a sample with the current voice settings, even if the AI voice is muted."""
         self._speaker.stop()
         self._speaker.say(text, force=True, remember=False)
+
+    # -- training mode and memory import (v0.17.5, beta) -------------------------------------------------------
+    @staticmethod
+    def training_state():
+        return training.state()
+
+    def training_start(self, topic=""):
+        """Rail button: same as saying "começa o treinamento"."""
+        threading.Thread(target=self._brain._training_command, args=(("start", str(topic or "")),), daemon=True).start()
+
+    def training_finish(self):
+        threading.Thread(target=self._brain._training_command, args=(("finish", ""),), daemon=True).start()
+
+    @staticmethod
+    def training_history():
+        return training.history()
+
+    @staticmethod
+    def training_delete(tid):
+        training.delete(int(tid))
+        return training.history()
+
+    @staticmethod
+    def import_prompt(lang_code=None):
+        return {"prompt": memory_import.prompt(lang_code or lang()), "sources": memory_import.SOURCES}
+
+    @staticmethod
+    def import_memories(source, text):
+        result = memory_import.import_text(str(source), str(text))
+        emit("refresh")
+        return result
+
+    @staticmethod
+    def memory_sources():
+        return memory_import.by_source()
 
     def hold_start(self):
         """Beta (v0.16.8): talk while the key is held."""

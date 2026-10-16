@@ -75,6 +75,9 @@
     <button class="rail-btn" id="btnAiTarget"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>
       <span><b id="aiTargetName">IA local</b><small id="aiTargetHint" data-i18n="aiTargetHint">clique para trocar · local ⇄ API</small></span></button>
     <p class="rail-title mono rail-sep" data-i18n="focusTitle">FOCO</p>
+    <p class="rail-title mono rail-sep" id="trainingRailTitle" data-i18n="trainingTitle">TREINAMENTO</p>
+    <button class="rail-btn" id="btnTraining"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0-3.6 10.8V17h7.2v-3.2A6 6 0 0 0 12 3z"/><path d="M9.5 20h5M10.5 22h3"/></svg>
+      <span><b id="trainingName" data-i18n="trainingStart">Começar treinamento</b><small id="trainingHint" data-i18n="trainingStartHint">ensine; no fim o NEXUS confere nas fontes</small></span></button>
     <button class="rail-btn" id="btnFocus"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
       <span><b data-i18n="focusMode">Modo foco</b><small data-i18n="focusHint">sem distrações · avisos só no sino</small></span></button>
   </aside>
@@ -212,6 +215,37 @@
   </div>
 </div>
 
+<!-- ============ TRAINING RESULT (v0.17.5, beta) ============ -->
+<div class="modal" id="trainingModal" hidden>
+  <div class="modal-box training-box">
+    <button class="icon-btn drawer-close" type="button" data-close aria-label="Close">✕</button>
+    <p class="kicker mono" data-i18n="trainingTitle">TREINAMENTO</p>
+    <h2 data-i18n="trainingDoneTitle">Análise completa</h2>
+    <div class="train-score"><b id="trainScore">—</b><span id="trainScoreLabel" data-i18n="trainingScore">de concordância com as fontes</span></div>
+    <p class="sub mono" data-i18n="trainingLearned">APRENDIDO</p>
+    <ul class="train-list" id="trainLearned"></ul>
+    <p class="sub mono" data-i18n="trainingLeft">DEIXADO DE FORA</p>
+    <ul class="train-list" id="trainLeft"></ul>
+  </div>
+</div>
+
+<!-- ============ IMPORT MEMORIES FROM OTHER AIs (v0.17.5, beta) ============ -->
+<div class="modal" id="importModal" hidden>
+  <div class="modal-box import-box">
+    <button class="icon-btn drawer-close" type="button" data-close aria-label="Close">✕</button>
+    <p class="kicker mono" data-i18n="importKicker">MEMÓRIAS</p>
+    <h2 data-i18n="importTitle">Importar memórias de outra IA</h2>
+    <div class="chips-select" id="importAis"></div>
+    <p class="sub mono" data-i18n="importStep1">1 · COPIE ESTE PEDIDO E COLE NA OUTRA IA</p>
+    <textarea id="importPrompt" rows="5" readonly></textarea>
+    <div class="row-btns"><button class="btn-ghost" type="button" id="btnImportCopy" data-i18n="importCopy">Copiar pedido</button></div>
+    <p class="sub mono" data-i18n="importStep2">2 · COLE AQUI A RESPOSTA DELA</p>
+    <textarea id="importAnswer" rows="7"></textarea>
+    <p class="hint" id="importResult"></p>
+    <div class="row-btns"><button class="btn-primary" type="button" id="btnImportGo" data-i18n="importBtn">Importar</button></div>
+  </div>
+</div>
+
 <!-- ============ TUTORIAL (v0.16.5): first run, narrated by NEXUS ============ -->
 <div class="tutorial" id="tutorial" hidden>
   <p class="tut-count mono" id="tutCount"></p>
@@ -254,9 +288,12 @@
       <button data-tab="memory" class="on" data-i18n="memory">MEMÓRIA</button>
       <button data-tab="knowledge" data-i18n="knowledge">SABER</button>
       <button data-tab="data" data-i18n="data">DADOS</button>
+      <button data-tab="learned" id="tabLearned" data-i18n="learnedTab">APRENDIZADOS</button>
       <button data-tab="log" data-i18n="log">LOG</button>
     </nav>
     <section class="panel grow tab-body" data-body="memory">
+      <div class="mem-head"><div class="chips-select" id="memSources"></div>
+        <button class="btn-ghost small-btn" type="button" id="btnImportMem" data-i18n="importMem">Importar de outra IA</button></div>
       <ul class="list" id="memoryList"></ul>
     </section>
     <section class="panel grow tab-body" data-body="knowledge" hidden>
@@ -280,6 +317,9 @@
       <div id="recordView"></div>
       <h3 class="sub mono" data-i18n="notes">NOTAS</h3>
       <ul class="list" id="noteList"></ul>
+    </section>
+    <section class="panel grow tab-body" data-body="learned" hidden>
+      <ul class="list learned-list" id="learnedList"></ul>
     </section>
     <section class="panel grow tab-body" data-body="log" hidden>
       <ul class="list log" id="actionList"></ul>
@@ -692,6 +732,8 @@
           <label class="check"><input type="checkbox" name="beta_skills"><span data-i18n="betaSkills">Habilidades e níveis (E → S)</span></label>
           <label class="check"><input type="checkbox" name="beta_browser"><span data-i18n="betaBrowser">Navegador: abrir sites, pesquisar e tocar músicas no YouTube</span></label>
           <label class="check"><input type="checkbox" name="beta_map"><span data-i18n="betaMap">Mapa conceitual: habilidades e conhecimento ligados ao aro (Ctrl+7)</span></label>
+          <label class="check"><input type="checkbox" name="beta_training"><span data-i18n="betaTraining">Modo treinamento: você ensina e o NEXUS confere nas fontes antes de guardar (aba Aprendizados)</span></label>
+          <label class="check"><input type="checkbox" name="beta_memory_import"><span data-i18n="betaMemoryImport">Importar memórias de outras IAs (ChatGPT, Claude, Gemini, Copilot…)</span></label>
           <label class="check"><input type="checkbox" name="beta_hold_talk"><span data-i18n="betaHoldTalk">Segurar para falar: o microfone fica ligado enquanto a tecla de falar estiver apertada e envia ao soltar</span></label>
         </div>
         <p class="hint" id="betaDevHint" hidden data-i18n="betaDevOn">No modo desenvolvedor todas ficam ligadas.</p>

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 3.2  ·  Fecha: 2026-10-15  ·  Versión de la app: 0.17.0
+ Versión del documento: 3.3  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.17.5
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -89,6 +89,8 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-LLM-036  Recordatorio puesto para pasado mañana ("mañana" pasaba a ser el 17)
       NX-LLM-037  Primera respuesta lenta tras cambiar de idioma
       NX-LLM-038  La IA dijo que abrió (o abriría) un menú y no se abrió nada
+      NX-LLM-039  Entrenamiento: los datos generales desaparecían o se juzgaban sin evidencia
+      NX-LLM-040  Entrenamiento: la IA preguntaba "¿quieres que lo guarde?" en cada lección
  VOZ  NX-VOZ-001  El micrófono no responde en el primer uso (descarga Whisper)
       NX-VOZ-002  Micrófono equivocado seleccionado (p. ej. DroidCam)
       NX-VOZ-003  Palabra de activación "Nexus" no reconocida / falsos disparos
@@ -690,6 +692,34 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                reconocen sin la IA (nexus/ui_nav.py; instantáneo). Para las
                demás frases, si la IA dice que abrió o que abrirá algo sin
                llamar a open_interface, tiene que llamarla.
+
+[NX-LLM-039] Entrenamiento: los datos generales desaparecían o se juzgaban sin evidencia
+  Severidad  : ALTA             Estado: CORREGIDO (v0.17.5) Observado: SÍ
+  Síntoma    : Al probar el modo entrenamiento (beta), "Júpiter es el planeta
+               más grande" y "Marte es el planeta más cercano al Sol" no
+               aparecían en el análisis; cuando aparecían, la IA "confirmaba"
+               el incorrecto.
+  Causa      : Al pedirle "extraer los datos enseñados", qwen3 se quedaba solo
+               con los datos sobre el usuario. Y la búsqueda de Wikipedia por
+               título no encuentra nada para una frase entera, así que la IA
+               juzgaba de memoria.
+  Corrección : Cada frase afirmativa es un dato, sin IA (preguntas y saludos
+               se omiten; frases con yo/mi son personales). La evidencia viene
+               de la búsqueda de texto completo de Wikipedia (2 mejores
+               artículos) y de la base local; sin evidencia ni certeza, el
+               dato queda "sin verificar" y no cuenta en la concordancia.
+               Prueba: Júpiter confirmado, Marte contradicho (nota: Mercurio),
+               dato personal guardado en la memoria.
+
+[NX-LLM-040] Entrenamiento: la IA preguntaba "¿quieres que lo guarde?" en cada lección
+  Severidad  : MEDIA            Estado: CORREGIDO (v0.17.5) Observado: SÍ
+  Síntoma    : Durante el entrenamiento cada frase enseñada recibía una
+               respuesta larga que terminaba con "¿quieres que lo guarde?",
+               aunque se le pedía solo confirmar.
+  Corrección : Las lecciones se anotan al instante ("Anotado (n).") sin llamar
+               a la IA; todo se verifica y guarda al final. Las preguntas
+               (que terminan en "?") siguen yendo a la IA. 1,88 s -> 0,001 s
+               por lección.
 
 ================================================================================
  VOZ — RECONOCIMIENTO Y SÍNTESIS

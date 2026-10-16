@@ -130,6 +130,17 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Treinamento e importar memórias (v0.17.5, beta)
+
+Ligue em **Configurações → Beta** (no modo desenvolvedor já vêm ligadas).
+
+- **Treinamento** (`Ctrl+8`, ou diga "começa o treinamento sobre astronomia"): ensine falando normalmente — cada frase
+  é anotada na hora. Ao dizer "termina o treinamento", o NEXUS confere cada fato com a Wikipédia e a base local (o aro
+  mostra a porcentagem), guarda o que foi confirmado na aba **Aprendizados**, o que é sobre você nas memórias, deixa de
+  fora o que foi contestado ou não pôde ser verificado e diz a concordância com as fontes.
+- **Importar memórias** (aba Memória → Importar): copie o prompt pronto, cole no ChatGPT, Claude, Gemini ou Copilot e
+  cole a resposta de volta. Cada memória fica marcada com a origem (filtros no topo) e as repetidas são ignoradas.
+
 ### Termos, privacidade e placas AMD (v0.17.0)
 
 - Na primeira abertura o NEXUS mostra os **Termos de Uso** e a **Política de Privacidade** (PT/EN/ES); até o aceite,
@@ -356,6 +367,8 @@ nexus/
   browser.py    abrir links, pesquisas e músicas no navegador padrão
   netprobe.py   conexão automática (mede latência e velocidade)
   features.py   funções beta e modo usuário / desenvolvedor
+  training.py   modo treinamento: lições, verificação com fontes e aprendizados
+  memory_import.py importar memórias de outras IAs (ChatGPT, Claude, Gemini, Copilot)
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -389,4 +402,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.17.1 (protótipo)**.
+Versão atual: **v0.17.5 (protótipo)**.

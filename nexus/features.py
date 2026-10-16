@@ -12,6 +12,8 @@ BETA = {
     "browser": {"open_url", "web_search", "play_music"},
     "map": set(),        # v0.16.8: concept map of skills and knowledge
     "hold_talk": set(),  # v0.16.8: hold the talk key to speak
+    "training": set(),       # v0.17.5: training mode + "Aprendizados" tab
+    "memory_import": set(),  # v0.17.5: import memories from other AIs
 }
 TOOL_FEATURE = {tool: feat for feat, tools in BETA.items() for tool in tools}
 
