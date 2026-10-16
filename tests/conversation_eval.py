@@ -2,6 +2,7 @@
 Run:  .venv\\Scripts\\python tests\\conversation_eval.py        (takes a few minutes)"""
 import _isolated  # noqa: F401  (must be first: isolates the data folder)
 
+import os
 import re
 import time
 from datetime import datetime, timedelta
@@ -13,6 +14,16 @@ from nexus.db import db
 settings["auto_memory"] = True  # exercised on purpose: questions must not become memories
 settings["app_mode"] = "developer"  # v0.15.5: the eval covers the beta features too (library, browser)
 legal.accept()  # v0.18.0: the integrations only go online after the terms are accepted
+from nexus import apps as _apps, browser as _browser, media as _media  # noqa: E402
+
+# Nothing really opens on the user's PC during the eval: browser pages, apps and media keys are recorded only
+# (a small model searched a quiz question in the real browser while the eval ran, v0.18.6).
+_browser.OPEN = lambda url, new=0: None
+_apps.launch = lambda app: {"ok": True, "name": app["name"], "kind": _apps.kind(app)}
+_media._key = lambda vk: None
+if os.environ.get("NEXUS_EVAL_MODEL"):  # v0.18.6: the same checks with another local model (tests/bench_models.py)
+    settings["llm_model"] = os.environ["NEXUS_EVAL_MODEL"]
+    settings["llm_provider"] = "ollama"
 knowledge.load_seed()
 _isolated.load_example_profile()
 status = llm.status()
@@ -206,5 +217,7 @@ tools.ui_hook = None
 settings["language"] = "auto"
 
 passed = sum(ok for _, ok in results)
+_ps = llm.perf_summary()
+print(f"\nPERF model={settings['llm_model']} tok_s={_ps['tok_s']} first_s={_ps['first_s']} answers={_ps['count']}")
 print(f"\n{passed}/{len(results)} checks passed")
 raise SystemExit(0 if passed == len(results) else 1)

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 3.6  ·  Data: 2026-10-16  ·  Versão do app: 0.18.5
+ Versão do documento: 3.7  ·  Data: 2026-10-16  ·  Versão do app: 0.18.6
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -90,6 +90,8 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-040  Treinamento: a IA perguntava "quer que eu armazene?" a cada lição
       NX-LLM-041  Perguntas ao vivo: a IA chamava a ferramenta de novo (resposta em duas rodadas)
       NX-LLM-042  "Pronto: tema AMD." sem mudar nada (a IA não chamava set_preference)
+      NX-LLM-043  "qwen3:4b" leva ~70 s por resposta (é o modelo que pensa antes de responder)
+      NX-LLM-044  "Toca no YouTube" abria o YouTube Music
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -727,6 +729,25 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                obrigada a chamar. Sem valor ("quero mudar a cor do aro"), o
                NEXUS abre Configurações > Personalização. Teste: 4/4 frases
                pela IA mudaram de verdade (antes 0/4).
+
+[NX-LLM-043] "qwen3:4b" leva ~70 s por resposta (é o modelo que pensa antes de responder)
+  Severidade : ALTA             Status: CONTORNADO (v0.18.6) Observado: SIM
+  Sintoma    : No comparativo de modelos, o qwen3:4b teve resposta média de
+               69,6 s e 13,8 s até a primeira palavra (o 8B: 5,5 s e 1,5 s).
+  Causa      : No Ollama a tag "qwen3:4b" é a versão 2507 "thinking": ela
+               raciocina escondida (~3.000 caracteres) antes de cada resposta,
+               e desligar o raciocínio só o faz pensar dentro da resposta.
+  Solução    : O NEX-1.0 Mini usa "qwen3:4b-instruct-2507-q4_K_M" (o mesmo
+               modelo, versão que responde direto): 6,6 s por resposta, 36/37
+               na avaliação. Configurações > Inteligência > Modelos baixa a
+               versão certa.
+
+[NX-LLM-044] "Toca no YouTube" abria o YouTube Music
+  Severidade : BAIXA            Status: CORRIGIDO (v0.18.6) Observado: SIM
+  Causa      : A IA podia escolher "youtube music" na ferramenta de música e
+               às vezes escolhia mesmo com o usuário dizendo "YouTube".
+  Correção   : A IA escolhe só entre YouTube, Spotify e LiMusic; o YouTube
+               Music fica como player preferido em Configurações > Apps e mídia.
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE

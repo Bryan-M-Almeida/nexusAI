@@ -1,0 +1,97 @@
+{
+  "pc": {
+    "os": "Windows 11",
+    "cpu": "AMD Ryzen 5 5600G with Radeon Graphics",
+    "cores": 12,
+    "ram_gb": 15.8,
+    "gpus": [
+      {
+        "name": "AMD Radeon RX 6600 XT",
+        "vram_gb": 8.0
+      }
+    ],
+    "vram_gb": 8.0
+  },
+  "date": "2026-10-16",
+  "models": {
+    "qwen3:8b": {
+      "size_mb": 6782,
+      "vram_mb": 6242,
+      "on_gpu_pct": 92,
+      "cold_start_s": 14.5,
+      "load_s": 8.2,
+      "tok_s": 21.4,
+      "first_s": 1.5,
+      "avg_answer_s": 5.48,
+      "checks": "37/37",
+      "fails": [],
+      "eval_minutes": 2.9
+    },
+    "qwen3:1.7b": {
+      "size_mb": 2604,
+      "vram_mb": 2604,
+      "on_gpu_pct": 100,
+      "cold_start_s": 5.3,
+      "load_s": 2.9,
+      "tok_s": 30.2,
+      "first_s": 0.4,
+      "avg_answer_s": 2.84,
+      "checks": "32/37",
+      "fails": [
+        "memória salva",
+        "conhecimento aprendido",
+        "simulado: corrige a resposta na hora",
+        "piada: explica em vez de repetir",
+        "biblioteca: 'lê o livro' inicia o podcast"
+      ],
+      "eval_minutes": 1.7
+    },
+    "qwen3:4b": {
+      "size_mb": 5688,
+      "vram_mb": 5688,
+      "on_gpu_pct": 100,
+      "cold_start_s": 14.5,
+      "load_s": 4.1,
+      "tok_s": 23.5,
+      "first_s": 13.8,
+      "avg_answer_s": 69.64,
+      "checks": "32/37",
+      "fails": [
+        "conversa: título do modelo sobre o coração",
+        "Ada Lovelace: resposta correta (Babbage / século XIX)",
+        "modo Direto responde mais curto",
+        "simulado: corrige a resposta na hora",
+        "piada: explica em vez de repetir"
+      ],
+      "eval_minutes": 31.7
+    },
+    "qwen3:14b": {
+      "size_mb": 10919,
+      "vram_mb": 6349,
+      "on_gpu_pct": 58,
+      "cold_start_s": 31.8,
+      "load_s": 14.7,
+      "tok_s": 7.3,
+      "first_s": 3.9,
+      "avg_answer_s": 12.88,
+      "checks": "37/37",
+      "fails": [],
+      "eval_minutes": 6.2
+    },
+    "qwen3:4b-instruct-2507-q4_K_M": {
+      "size_mb": 5688,
+      "vram_mb": 5688,
+      "on_gpu_pct": 100,
+      "cold_start_s": 17.9,
+      "load_s": 4.4,
+      "tok_s": 24.2,
+      "first_s": 2.7,
+      "avg_answer_s": 6.56,
+      "checks": "36/37",
+      "fails": [
+        "conhecimento aprendido"
+      ],
+      "eval_minutes": 3.4
+    }
+  }
+}

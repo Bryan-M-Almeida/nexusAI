@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 3.6  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.18.5
+ Versión del documento: 3.7  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.18.6
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -93,6 +93,8 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-LLM-040  Entrenamiento: la IA preguntaba "¿quieres que lo guarde?" en cada lección
       NX-LLM-041  Preguntas en vivo: la IA llamaba a la herramienta otra vez (respuesta en dos rondas)
       NX-LLM-042  "Listo: tema AMD." sin cambiar nada (la IA no llamaba a set_preference)
+      NX-LLM-043  "qwen3:4b" tarda ~70 s por respuesta (es el modelo que piensa antes de responder)
+      NX-LLM-044  "Ponlo en YouTube" abría YouTube Music
  VOZ  NX-VOZ-001  El micrófono no responde en el primer uso (descarga Whisper)
       NX-VOZ-002  Micrófono equivocado seleccionado (p. ej. DroidCam)
       NX-VOZ-003  Palabra de activación "Nexus" no reconocida / falsos disparos
@@ -754,6 +756,27 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                llamarla. Sin valor ("quiero cambiar el color del anillo"), NEXUS
                abre Configuración > Personalización. Prueba: 4/4 frases por la IA
                cambiaron de verdad (antes 0/4).
+
+[NX-LLM-043] "qwen3:4b" tarda ~70 s por respuesta (es el modelo que piensa antes de responder)
+  Gravedad   : ALTA             Estado: SOLUCIONADO (v0.18.6) Observado: SÍ
+  Síntoma    : En la comparación de modelos, qwen3:4b promedió 69,6 s por
+               respuesta y 13,8 s hasta la primera palabra (el 8B: 5,5 s y 1,5 s).
+  Causa      : En Ollama la etiqueta "qwen3:4b" es la versión 2507 "thinking":
+               razona oculto (~3.000 caracteres) antes de cada respuesta, y
+               desactivar el razonamiento solo lo hace pensar dentro de la
+               respuesta.
+  Solución   : NEX-1.0 Mini usa "qwen3:4b-instruct-2507-q4_K_M" (el mismo
+               modelo, la versión que responde directo): 6,6 s por respuesta,
+               36/37 en la evaluación. Configuración > Inteligencia > Modelos
+               descarga la correcta.
+
+[NX-LLM-044] "Ponlo en YouTube" abría YouTube Music
+  Gravedad   : BAJA             Estado: CORREGIDO (v0.18.6) Observado: SÍ
+  Causa      : La IA podía elegir "youtube music" en la herramienta de música y a
+               veces lo hacía aunque el usuario dijera "YouTube".
+  Corrección : La IA elige solo entre YouTube, Spotify y LiMusic; YouTube Music
+               queda como reproductor preferido en Configuración > Apps y
+               multimedia.
 
 ================================================================================
  VOZ — RECONOCIMIENTO Y SÍNTESIS

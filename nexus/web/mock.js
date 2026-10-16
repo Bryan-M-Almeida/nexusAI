@@ -22,7 +22,7 @@ if (!window.pywebview && location.search.includes("mock")) {
   const mockApps = [["RetroArch", "game"], ["PCSX2", "game"], ["Steam", "launcher"], ["XBOX", "launcher"], ["Visual Studio Code", "work"],
     ["Discord", "work"], ["Google Chrome", "work"], ["LiMusic", "work"], ["Notion", "work"], ["WhatsApp", "work"], ["Spotify", "work"]]
     .map(([name, kind]) => ({ name, kind, id: name }));
-  let mockT = 0;
+  let mockT = 0, mockActive = "qwen3:8b";
   const mockModel = () => [{ name: "qwen3:8b", size_mb: 6782, vram_mb: 6242 }];
   const mockAi = () => ({ count: 9, tok_s: 22.7, prompt_tok_s: 7604, first_s: 2.4, last: { gen_tokens: 72, tok_s: 22.4, total_s: 5.9 },
     history: [22.7, 23.1, 21.8, 22.4, 24.0, 22.9, 23.3, 22.1, 22.4] });
@@ -169,6 +169,15 @@ if (!window.pywebview && location.search.includes("mock")) {
     amd_live: async () => { mockT += 1; const busy = mockT % 6 < 3; return { gpu_pct: busy ? 70 + Math.random() * 15 : 3 + Math.random() * 4,
       engines: busy ? { Copy: 78, "3D": 4 } : { "3D": 4 }, ai_gpu_pct: busy ? 69 : 0, nexus_gpu_pct: 0, vram_used_mb: 7681, shared_used_mb: 1161,
       ai_vram_mb: 6213, ai: mockAi(), model: mockModel() }; },
+    // v0.18.6: local models
+    models_catalog: async () => ({ active: mockActive, recommended: "qwen3:8b", pc: { vram_gb: 8, ram_gb: 15.8 }, models: [
+      ["qwen3:1.7b", "NEX-1.0 Lite", "lite", 1.4, "gpu", 100, true], ["qwen3:4b", "NEX-1.0 Mini", "mini", 2.5, "gpu", 100, true],
+      ["qwen3:8b", "NEX-1.0", "standard", 5.2, "gpu", 94, true], ["qwen3:14b", "NEX-1.0 Pro", "pro", 9.3, "partial", 56, false],
+      ["qwen3:30b-a3b", "NEX-1.0 Max", "max", 18.6, "no", 31, false]].map(([id, name, tier, file_gb, status, on_gpu_pct, installed]) => ({
+        id, name, tier, file_gb, status, on_gpu_pct, installed, active: id === mockActive, recommended: id === "qwen3:8b",
+        measured: id === "qwen3:8b" ? { tok_s: 22.7, checks: "37/37", avg_answer_s: 5.06 } : null })) }),
+    model_pull: async (id) => { [10, 35, 62, 88, 100].forEach((pct, i) => emit("model_progress", { id, pct }, 400 * (i + 1))); return { ok: true }; },
+    model_use: async (id) => { mockActive = id; return { ok: true, id, name: id }; },
     amd_open_ref: async () => ({ ok: true }), amd_free: async () => ({ freed_mb: 6213 }), amd_warm: async () => ({ ok: true }),
     set_preferences: async (c) => { Object.assign(settings, c); return { ok: true, applied: c, settings }; },
     app_mark: async (name, kind) => { const a = mockApps.find((x) => x.name === name); if (a) a.kind = kind; return { items: mockApps }; },

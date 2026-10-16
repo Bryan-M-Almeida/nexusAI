@@ -134,6 +134,7 @@ window.nexus = {
       case "training": return onTrainingState(p);
       case "suspended": return onSuspended(p);
       case "prefs": return onPrefs(p);
+      case "model_progress": return onModelProgress(p);
       case "training_progress": return onTrainingProgress(p);
       case "training_done": return showTrainingResult(p);
       case "mic_level": ringMicTarget = Math.max(ringMicTarget, p); return wakeRing();
@@ -405,7 +406,7 @@ function setVoiceState(st) {
   $("#dockRing").dataset.state = shown;
   if (st === "speaking") wakeRing();
   const label = $("#coreLabel");
-  label.textContent = sttDownload >= 0 ? T("sttDownloading") : trainingPct >= 0 ? T("trainingAnalyzing")
+  label.textContent = modelDownload >= 0 ? T("modelDownloading") : sttDownload >= 0 ? T("sttDownloading") : trainingPct >= 0 ? T("trainingAnalyzing")
     : suspendedOn ? T("st_suspended") : aiDown && !aiBusy ? T("aiDown") : trainingOn && ["idle", "standby"].includes(shown) ? T("st_training") : T("st_" + shown) || "";
   label.className = "core-label " + (["listening", "awake"].includes(shown) ? "red" : ["speaking", "thinking"].includes(shown) ? "blue" : "");
   $("#chipVoice").classList.toggle("on", state.ui_mode === "audio" && !state.mic_muted && state.stt === "ready");
@@ -883,6 +884,51 @@ function onUiOpen(p) {
 
 /* Voice model download: the ring waves and the core shows the percentage (v0.16.8) */
 let sttDownload = -1;
+/* local models (v0.18.6): catalog, fit for this PC, download on the ring, switch */
+let modelDownload = -1, modelPending = null;
+const gbTxt = (x) => (L === "en" ? x.toFixed(1) : x.toFixed(1).replace(".", ",")) + " GB";
+async function renderModels() {
+  const r = await api().models_catalog();
+  $("#modelsPc").textContent = T("modelsPc", { vram: r.pc.vram_gb, ram: r.pc.ram_gb });
+  $("#modelGrid").innerHTML = r.models.map((m) => {
+    const ms = m.measured;
+    const meas = ms ? T("modelMeasured", { tok: ms.tok_s ?? "—", checks: ms.checks, avg: ms.avg_answer_s }) : T("modelNotMeasured");
+    const btn = m.active ? `<span class="pill on">${esc(T("modelActive"))}</span>`
+      : m.installed ? `<button type="button" class="btn-ghost" data-model-use="${m.id}">${esc(T("modelUse"))}</button>`
+      : m.status === "no" ? `<span class="pill">${esc(T("modelTooBig"))}</span>`
+      : `<button type="button" class="btn-ghost" data-model-pull="${m.id}">${esc(T("modelDownload"))} · ${gbTxt(m.file_gb)}</button>`;
+    return `<div class="model-card fit-${m.status}${m.active ? " active" : ""}">
+      <div class="model-top"><b>${esc(m.name)}</b>${m.recommended ? `<span class="pill rec">${esc(T("modelRecommended"))}</span>` : ""}</div>
+      <small class="mono">${esc(m.id)} · ${gbTxt(m.file_gb)}</small>
+      <small>${esc(T("tier_" + m.tier))}</small>
+      <div class="model-fit mono"><i style="width:${m.on_gpu_pct}%"></i><span>${esc(T("fit_" + m.status, { pct: m.on_gpu_pct }))}</span></div>
+      <small class="muted">${esc(meas)}</small>
+      <div class="model-act">${btn}</div></div>`;
+  }).join("");
+}
+function onModelProgress(p) {
+  modelDownload = p.pct >= 0 && p.pct < 100 ? p.pct : -1;
+  $("#app").classList.toggle("dl", modelDownload >= 0 || sttDownload >= 0);
+  $("#coreText").textContent = modelDownload >= 0 ? `${p.pct}%` : "";
+  if (p.pct < 0) notice(T("modelDlFailed"));
+  if (p.pct >= 100) { notice(T("modelDlDone")); if (!$("#settings").hidden) renderModels(); }
+  setVoiceState(voiceState);
+}
+async function onModelsClick(e) {
+  const pull = e.target.closest("[data-model-pull]"), use = e.target.closest("[data-model-use]");
+  if (use) {
+    const r = await api().model_use(use.dataset.modelUse);
+    if (r.ok) { notice(T("modelSwitched", { name: r.name })); $("#modelName").textContent = r.name; }
+    return renderModels();
+  }
+  if (!pull) return;
+  modelPending = pull.dataset.modelPull;
+  const card = pull.closest(".model-card");
+  $("#modelConfirmText").textContent = T("modelConfirm", { name: card.querySelector("b").textContent, id: modelPending,
+    size: card.querySelector(".mono").textContent.split("·")[1].trim() });
+  $("#modelConfirm").hidden = false;
+}
+
 function onSttProgress(pct) {
   const app = $("#app");
   sttDownload = pct >= 0 && pct < 100 ? pct : -1;
@@ -1337,6 +1383,7 @@ function showSection(sec) {
   $$("#setNav [data-sec]").forEach((b) => b.classList.toggle("on", b.dataset.sec === sec));
   $$(".set-sec").forEach((x) => (x.hidden = x.dataset.sec !== sec));
   clearInterval(integTimer);
+  if (sec === "ai") renderModels();
   if (sec === "integ") { renderIntegrations(); integTimer = setInterval(() => { if (!$("#settings").hidden) renderIntegrations(); }, 6000); }
   if (sec === "apps") { if (feature("media")) renderMedia(); if (feature("apps")) renderApps(false); }
   clearInterval(amdTimer);
@@ -1708,6 +1755,13 @@ function wire() {
   });
   $("#btnImportMem").onclick = () => openImport();
   $("#integGrid").addEventListener("click", onIntegClick);
+  $("#modelGrid").addEventListener("click", onModelsClick);
+  $("#modelNo").onclick = () => { $("#modelConfirm").hidden = true; modelPending = null; };
+  $("#modelYes").onclick = async () => {
+    $("#modelConfirm").hidden = true;
+    const r = await api().model_pull(modelPending);
+    notice(r.ok ? T("modelDlStarted") : T("modelDlBusy"));
+  };
   $("#integCustomList").addEventListener("click", onIntegClick);
   $("#btnIcAdd").onclick = addCustomIntegration;
   $("#appsList").addEventListener("click", onAppsClick);

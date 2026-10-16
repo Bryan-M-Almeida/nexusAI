@@ -505,6 +505,15 @@
         <p class="hint" data-i18n="aiSegHint">As duas configurações ficam guardadas; troque a qualquer momento pela borda esquerda.</p>
         <div class="locked-card" aria-disabled="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><div><b data-i18n="dualAi">IA dupla: API + local</b>
           <small data-i18n="dualAiHint">A IA de API responde e a IA local cuida das ações simples (abrir menus, comandos rápidos) ao mesmo tempo. Em breve.</small></div></div>
+        <p class="sub mono" data-i18n="modelsTitle">MODELOS LOCAIS</p>
+        <p class="hint" id="modelsPc"></p>
+        <div class="model-grid" id="modelGrid"></div>
+        <div class="opt-confirm" id="modelConfirm" hidden>
+          <p id="modelConfirmText"></p>
+          <div class="row-btns"><button class="btn-ghost" type="button" id="modelNo" data-i18n="cancel">Cancelar</button>
+            <button class="btn-primary" type="button" id="modelYes" data-i18n="modelDownload">Baixar</button></div>
+        </div>
+        <p class="sub mono" data-i18n="providerTitle">PROVEDOR</p>
         <label><span data-i18n="provider">Provedor</span><select name="llm_preset" id="llmPreset"></select></label>
         <p class="hint warn-cloud" id="cloudWarn" hidden data-i18n="cloudWarn">Provedor na nuvem: suas mensagens, memórias e dados enviados no contexto saem do computador. Os locais (Ollama, LM Studio) não enviam nada.</p>
         <label><span data-i18n="llmUrl">Endereço do servidor</span><input name="llm_base_url" spellcheck="false"></label>

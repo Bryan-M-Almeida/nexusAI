@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import webview
 
 from . import (MODEL_NAME, __version__, assistant, bridge, control, features, gpu_tune, i18n, knowledge, legal, llm, memory,
-               memory_import, notify, profile, training, apps, connectors, media, amd, prefs,
+               memory_import, notify, profile, training, apps, connectors, media, amd, prefs, models,
                library, netprobe, performance, scheduler, skills, tools, workspace)
 from . import files as filereader
 from .logs import log, setup as setup_logs
@@ -143,6 +143,20 @@ class Api:
             elif game != woke_for or time.time() - self._last_activity > 120:
                 woke_for = game
                 self.suspend("game_watch", game)
+
+    # -- local models (v0.18.6) ----------------------------------------------------------------------------------------
+    def models_catalog(self):
+        return models.catalog()
+
+    def model_pull(self, model_id):
+        """Download a catalog model (the interface asked the user first); the ring shows the percentage."""
+        return models.pull_async(model_id, lambda pct: emit("model_progress", {"id": model_id, "pct": pct}))
+
+    def model_use(self, model_id):
+        result = models.use(model_id)
+        if result.get("ok"):
+            threading.Thread(target=self._warm_up, daemon=True, name="warm").start()
+        return {**result, "catalog": models.catalog()}
 
     # -- AMD panel and preferences (v0.18.5) --------------------------------------------------------------------------
     def amd_status(self):
@@ -314,7 +328,7 @@ class Api:
         step("voice", self._listener.model_state != "error", f"{settings['stt_model']} · {self._listener.model_state}")
         self._sync_listening()
         return {"profile": db.get_profile(), "lang": lang(), "llm": st, "settings": dict(settings),
-                "stt": self._listener.model_state, "version": __version__, "model_name": MODEL_NAME,
+                "stt": self._listener.model_state, "version": __version__, "model_name": models.display_name(),
                 "fullscreen": _fullscreen, "terms": legal.state()}
 
     # -- Terms of Use / Privacy Policy (v0.17.0) -----------------------------------------------------------------

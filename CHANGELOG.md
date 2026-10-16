@@ -8,6 +8,53 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.18.6 — Protótipo · 2026-10-16
+
+**Modelos locais para PCs mais fracos e mais fortes, testados de verdade: catálogo NEX-1.0 Lite / Mini / Pro / Max,
+o que cabe em cada PC, recomendação automática, download com progresso no aro e troca com um clique.**
+
+### Novo
+- **Configurações → Inteligência → Modelos locais** (`nexus/models.py`): um cartão por modelo com o nome do produto
+  (**NEX-1.0 Lite**, **Mini**, **NEX-1.0**, **Pro**, **Max**), tamanho, uma barra com **quanto dele cabe na sua placa**
+  (cabe, parte na RAM, só no processador ou não cabe), os números medidos no PC de referência, **RECOMENDADO** para o
+  seu PC e **EM USO**.
+  - **Baixar** pede confirmação (nome, tamanho) e o aro mostra **BAIXANDO MODELO** com a porcentagem; **Usar este**
+    tira o modelo anterior da placa e carrega o novo em segundo plano. O nome mostrado vira o do modelo (ex.:
+    "NEX-1.0 Pro").
+  - Recomendação: o maior modelo que roda (quase) inteiro na placa — sem placa ou 4 GB → Lite; 6 GB → Mini; 8 GB →
+    NEX-1.0; 12–16 GB → Pro; 24 GB → Max. Com **duas placas dedicadas** a memória delas soma (o Ollama divide o
+    modelo entre elas).
+- `tests/bench_models.py`: compara modelos no PC — partida a frio, quanto fica na placa, tokens/s, primeira palavra,
+  resposta média e a **avaliação completa de conversa (37 verificações)** com cada um.
+
+### Medido (Ryzen 5 5600G, 16 GB, RX 6600 XT 8 GB, Ollama 0.40.5/Vulkan)
+| Modelo | Na placa | Partida a frio | Tokens/s | 1ª palavra | Resposta média | Avaliação |
+|---|---|---|---|---|---|---|
+| NEX-1.0 Lite (qwen3:1.7b) | 100% | 5,3 s | 30,2 | 0,4 s | 2,8 s | 32/37 |
+| NEX-1.0 Mini (qwen3:4b-instruct-2507) | 100% | 17,9 s | 24,2 | 2,7 s | 6,6 s | 36/37 |
+| **NEX-1.0** (qwen3:8b) | 92% | 14,5 s | 21,4 | 1,5 s | 5,5 s | **37/37** |
+| NEX-1.0 Pro (qwen3:14b) | 58% | 31,8 s | 7,3 | 3,9 s | 12,9 s | 37/37 |
+- Numa placa de 8 GB o **Pro é 2,4x mais lento** que o NEX-1.0 sem acertar mais: o NEX-1.0 continua o padrão para
+  8 GB; o Pro é recomendado só onde cabe inteiro (12 GB ou mais).
+- O **Lite** é rápido mas falhou em guardar memória, aprender, corrigir o simulado, explicar a piada e abrir o livro:
+  bom para conversa simples em PCs fracos.
+- A GPU integrada do Ryzen (Vega 7) não ajudaria: usa a mesma RAM que o processador já usa para a parte do modelo que
+  não cabe na placa (e no PC de referência está desligada na BIOS).
+
+### Corrigido
+- NX-LLM-043: a tag "qwen3:4b" do Ollama é o modelo que **pensa** antes de responder — **69,6 s** por resposta; o Mini
+  usa a versão instruct do mesmo modelo: **6,6 s** (10x mais rápido).
+- NX-LLM-044: "toca … no YouTube" às vezes abria o YouTube Music (a IA escolhe só YouTube, Spotify ou LiMusic).
+- A avaliação de conversa não abre mais nada de verdade no PC (navegador, apps, teclas de mídia).
+
+### Testes desta versão
+- 304/304 testes unitários (7 novos: recomendação por PC, o que cabe numa placa de 8 GB, só processador, nomes NEX,
+  catálogo instalado/em uso/recomendado, troca recusada sem o modelo instalado, a tag pensante fora do catálogo).
+- Avaliação de conversa **37/37** com o NEX-1.0 (e com o Pro); 36/37 com o Mini; 32/37 com o Lite.
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.18.5 — Protótipo · 2026-10-16
 
 **Configurações reorganizadas em grupos, aba Personalização separada da Interface, painel AMD ao vivo e o NEXUS

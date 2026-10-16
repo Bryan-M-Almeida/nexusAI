@@ -436,7 +436,7 @@ SCHEMAS = [
         {"query": S}, ["query"]),
     _fn("play_music", "Play a song/artist/video: opens the first YouTube result. service only when the user names "
         "another one.",
-        {"query": S, "service": {"type": "string", "enum": ["youtube", "youtube music", "spotify", "limusic"]}}, ["query"]),
+        {"query": S, "service": {"type": "string", "enum": ["youtube", "spotify", "limusic"]}}, ["query"]),
     _fn("open_interface", "Open (or close) part of the NEXUS interface for the user to SEE: settings with a section, "
         "panel with a tab, menus. To CHANGE colour, theme, size or voice use set_preference.",
         {"target": {"type": "string", "enum": ["settings", "panel", "conversations", "notifications", "library",

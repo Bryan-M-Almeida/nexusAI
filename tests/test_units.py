@@ -1093,5 +1093,30 @@ check("prompt: tool list kept short (descriptions trimmed for the new set_prefer
       len(json.dumps(assistant.turn_tools(), ensure_ascii=False)) < 10500
       and "set_preference" in {x["function"]["name"] for x in assistant.turn_tools()})
 
+# -- v0.18.6: local models for better and weaker PCs -----------------------------------------------------------------
+from nexus import models as _models  # noqa: E402
+
+check("models: the recommended model follows the PC (no card/4 GB -> Lite, 6 GB -> Mini, 8 GB -> NEX-1.0, 12-16 GB -> Pro, 24 GB -> Max)",
+      [_models.recommended(v, r) for v, r in ((0, 8), (0, 16), (4, 16), (6, 16), (8, 16), (12, 32), (16, 32), (24, 64))]
+      == ["qwen3:1.7b", "qwen3:4b-instruct-2507-q4_K_M", "qwen3:1.7b", "qwen3:4b-instruct-2507-q4_K_M", "qwen3:8b", "qwen3:14b",
+          "qwen3:14b", "qwen3:30b-a3b"])
+check("models: the Ollama 'qwen3:4b' tag (a thinking model, 69.6 s per answer) is not in the catalog",
+      "qwen3:4b" not in _models.BY_ID and _models.MEASURED["qwen3:4b-instruct-2507-q4_K_M"]["avg_answer_s"] < 10)
+_f = {m["id"]: _models.fit(m, 8, 16)["status"] for m in _models.CATALOG}
+check("models: on an 8 GB card + 16 GB RAM the Pro spills to RAM and the Max doesn't fit",
+      _f == {"qwen3:1.7b": "gpu", "qwen3:4b-instruct-2507-q4_K_M": "gpu", "qwen3:8b": "gpu", "qwen3:14b": "partial", "qwen3:30b-a3b": "no"}, str(_f))
+check("models: without a usable card the small ones run on the processor",
+      _models.fit(_models.BY_ID["qwen3:1.7b"], 0, 16)["status"] == "cpu")
+check("models: product names (NEX-1.0 Lite / Pro) and unknown models keep their own name",
+      _models.display_name("qwen3:14b") == "NEX-1.0 Pro" and _models.display_name("qwen3:8b") == "NEX-1.0"
+      and _models.display_name("llama3:70b") == "NEX · llama3:70b")
+_real_inst = _models.installed
+_models.installed = lambda: {"qwen3:8b", "qwen3:4b-instruct-2507-q4_K_M"}
+_cat = _models.catalog()
+check("models: catalog marks installed, active and recommended", [m["installed"] for m in _cat["models"]] == [False, True, True, False, False]
+      and sum(m["active"] for m in _cat["models"]) <= 1)
+check("models: switching to a model that isn't installed is refused", not _models.use("qwen3:14b")["ok"])
+_models.installed = _real_inst
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

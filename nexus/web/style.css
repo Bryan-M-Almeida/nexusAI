@@ -1183,3 +1183,23 @@ body.font-clean { --f-brand: "Bahnschrift", "Segoe UI", "Arial", sans-serif; }
   border: 1px solid var(--line); border-left: 2px solid var(--amd); color: var(--text); }
 .amd-ref:hover { border-color: rgba(237, 28, 36, .6); }
 .amd-ref b { font-size: 13px; } .amd-ref small { font-size: 11px; color: var(--muted); line-height: 1.35; }
+
+/* ================================================================ v0.18.6 local models */
+.model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.model-card { display: flex; flex-direction: column; gap: 4px; padding: 10px 11px; background: var(--panel); border: 1px solid var(--line); }
+.model-card.active { border-color: color-mix(in srgb, var(--c-core) 60%, transparent); box-shadow: 0 0 20px -12px var(--c-core); }
+.model-card.fit-no { opacity: .55; }
+.model-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.model-top b { font-size: 14px; color: var(--text); }
+.model-card small { font-size: 11.5px; color: var(--silver); line-height: 1.35; }
+.model-card small.mono { font-size: 10.5px; color: var(--muted); }
+.model-card .pill { padding: 1px 6px; border: 1px solid var(--line-strong); font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .06em; color: var(--silver); }
+.model-card .pill.rec { color: #7be0a5; border-color: rgba(123, 224, 165, .5); }
+.model-card .pill.on { color: #fff; border-color: var(--c-core); background: color-mix(in srgb, var(--c-core) 25%, transparent); }
+.model-fit { position: relative; height: 16px; background: rgba(255, 255, 255, .05); border: 1px solid var(--line); margin: 3px 0; }
+.model-fit i { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--c-core) 45%, transparent); }
+.model-card.fit-partial .model-fit i { background: rgba(245, 158, 11, .45); }
+.model-card.fit-cpu .model-fit i, .model-card.fit-no .model-fit i { background: rgba(255, 155, 145, .4); }
+.model-fit span { position: relative; padding-left: 6px; font-size: 9.5px; line-height: 14px; color: #fff; letter-spacing: .04em; }
+.model-act { margin-top: 4px; }
+.model-act .btn-ghost { width: 100%; }

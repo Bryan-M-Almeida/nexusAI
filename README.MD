@@ -130,6 +130,22 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Modelos locais para cada PC (v0.18.6)
+
+Configurações → Inteligência → **Modelos locais**: o NEXUS mostra quanto de cada modelo cabe na sua placa, recomenda
+o melhor para o seu PC, baixa com confirmação (o aro mostra o progresso) e troca com um clique. Medido no PC de
+referência (Ryzen 5 5600G, 16 GB, RX 6600 XT 8 GB) com a avaliação completa de 37 verificações:
+
+| Modelo | Para | Na placa (8 GB) | Tokens/s | Resposta média | Avaliação |
+|---|---|---|---|---|---|
+| NEX-1.0 Lite (qwen3:1.7b) | sem placa / 4 GB | 100% | 30,2 | 2,8 s | 32/37 |
+| NEX-1.0 Mini (qwen3:4b-instruct-2507) | 6 GB | 100% | 24,2 | 6,6 s | 36/37 |
+| **NEX-1.0** (qwen3:8b) | 8 GB | 92% | 21,4 | 5,5 s | **37/37** |
+| NEX-1.0 Pro (qwen3:14b) | 12–16 GB | 58% (o resto na RAM) | 7,3 | 12,9 s | 37/37 |
+| NEX-1.0 Max (qwen3:30b-a3b) | 24 GB | não cabe | — | — | — |
+
+Numa placa de 8 GB o Pro é 2,4x mais lento que o NEX-1.0 sem acertar mais na avaliação: ele vale em placas maiores.
+
 ### Configurações em grupos, Personalização e painel AMD (v0.18.5)
 
 - **Configurações** em grupos (Sistema, Inteligência, Voz, Aparência, Conexões, Hardware, Dados e privacidade) e
@@ -402,6 +418,7 @@ nexus/
   apps.py       abrir aplicativos pelo nome, jogos x trabalho, detectar jogos em primeiro plano
   prefs.py      o NEXUS muda a própria aparência e voz quando pedem (temas, cores, tamanhos, desfazer)
   amd.py        painel AMD: placa e driver (registro), uso e memória ao vivo (contadores do Windows)
+  models.py     modelos locais: catálogo NEX-1.0 Lite/Mini/Pro/Max, o que cabe no PC, download e troca
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -435,4 +452,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.18.5 (protótipo)**.
+Versão atual: **v0.18.6 (protótipo)**.
