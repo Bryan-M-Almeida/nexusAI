@@ -130,6 +130,13 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Termos, privacidade e placas AMD (v0.17.0)
+
+- Na primeira abertura o NEXUS mostra os **Termos de Uso** e a **Política de Privacidade** (PT/EN/ES); até o aceite,
+  o microfone não abre e nada vai para a internet. Para reler ou revogar: **Configurações → Privacidade e termos**.
+- **Placa AMD sem ROCm** (ex.: RX 6600 XT): Configurações → Desempenho → **Otimizar o Ollama para esta placa**
+  (`OLLAMA_FLASH_ATTENTION=0`, reversível). Na RX 6600 XT: respostas 27–37% mais rápidas (14,2 s → 9,0 s no Ollama 0.40.5).
+
 ### Mapa conceitual, otimização e segurar para falar (v0.16.8)
 
 - **Mapa** (beta, `Ctrl+7`): habilidades, conhecimento e memórias ligados ao aro, flutuando enquanto ele gira.
@@ -360,4 +367,4 @@ nexus/
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.16.8 (protótipo)**.
+Versão atual: **v0.17.0 (protótipo)**.

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 3.1  ·  Date: 2026-10-15  ·  App version: 0.16.8
+ Document version: 3.2  ·  Date: 2026-10-15  ·  App version: 0.17.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -629,9 +629,14 @@ QUICK DIAGNOSTICS (run these before investigating)
                Flash Attention on, the RX 6600 XT read the prompt at 75 tokens/s;
                with it off, at 265 tokens/s (3.5x), while generation dropped from
                33 to 23 tokens/s. Measured with 5,500 tokens.
-  Solution   : (1) Update the AMD driver (Adrenalin), which enables ROCm; or
-               (2) set the environment variable OLLAMA_FLASH_ATTENTION=0 and
-               restart Ollama.
+  Solution   : Settings > Performance > Graphics card > "Optimize Ollama for this
+               card" (creates OLLAMA_FLASH_ATTENTION=0 in your user and restarts
+               Ollama; reversible). Measured in a conversation: 16.4 s -> 11.9 s
+               per answer (-27%; on Ollama 0.40.5: 14.2 s -> 9.0 s, -37%), with
+               ~0.5 GB of the model moving to RAM.
+               Updating the driver doesn't help: with Adrenalin 26.8.1 (the
+               latest in 2026-10) the warning stays, because Ollama has no ROCm
+               for the RX 6600 XT (gfx1032) on Windows.
 
 [NX-LLM-036] Reminder set for the day after tomorrow ("tomorrow" became the 17th)
   Severity   : HIGH             Status: FIXED (v0.15.5)    Observed: YES

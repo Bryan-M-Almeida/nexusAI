@@ -147,7 +147,9 @@ memory.new_conversation()
 tool_calls.clear()
 lesson = ask("vamos estudar JS")
 check("estudar JS: não registra dados", "record_data" not in tool_calls, str(tool_calls))
-check("estudar JS: ensina algo de JavaScript", bool(re.search(r"(javascript|vari[aá]ve|fun[cç][aã]o|let|const)", lesson.lower())), lesson)
+# a tutor may teach right away or first ask which JS topic to start with - both stay on JavaScript
+check("estudar JS: ensina algo de JavaScript",
+      bool(re.search(r"(javascript|vari[aá]ve|fun[cç](ão|ões|ao|oes)|\blet\b|\bconst\b|sintaxe|objetos?|arrays?|dom\b)", lesson.lower())), lesson)
 # 9) v0.15: music in the browser, attached files, library podcast (the browser is NOT really opened)
 import tempfile  # noqa: E402
 from pathlib import Path  # noqa: E402

@@ -70,8 +70,10 @@ def start(on_change=None):
         _listeners.append(on_change)
 
     def loop():
+        from . import legal
+
         while True:
-            if settings.get("network_mode") == "auto":
+            if settings.get("network_mode") == "auto" and legal.accepted():  # v0.17.0: nothing online before consent
                 try:
                     refresh()
                 except Exception:

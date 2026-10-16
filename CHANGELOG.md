@@ -8,6 +8,49 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.17.0 — Protótipo · 2026-10-15
+
+**Termos de Uso e Política de Privacidade (nada é captado nem enviado antes do aceite) e otimização do Ollama para
+placas AMD.**
+
+### Novo
+- **Termos de Uso e Política de Privacidade** (PT/EN/ES, versão 1.0) na primeira abertura, antes de qualquer outra
+  coisa: abas para ler os dois textos, confirmação de idade (18+ ou com consentimento de um responsável) e de leitura;
+  "Recusar e sair" fecha o NEXUS. A tela não fecha com Esc nem com clique fora.
+  - Escritos a partir do que o NEXUS realmente faz: o que fica no computador (e onde), o que sai e para quem
+    (provedores de IA na nuvem, Open-Meteo, Google Notícias, Frankfurter, Wikipédia, Google/Cloudflare para medir a
+    conexão, Hugging Face, Google Fonts, o navegador), o microfone (processado em memória, nunca gravado), a chave de API
+    (DPAPI), bases legais da LGPD, direitos (acessar, exportar, corrigir, apagar, revogar), retenção, menores de idade,
+    limites da IA, emergências, finanças, ações no computador, funções beta, sem garantia e contato pelo GitHub.
+  - **Antes do aceite nada é captado nem enviado**: o microfone não abre, a conexão não é medida e as fontes da
+    internet não são carregadas. Instalações existentes também veem a tela uma vez.
+  - Nova seção **Configurações → Privacidade e termos**: data e versão do aceite, os dois textos para ler quando quiser
+    e **Revogar o aceite** (fecha o microfone, para o acesso à internet e pede o aceite de novo).
+- **Configurações → Desempenho → Placa de vídeo**: em placas AMD que o Ollama roda pelo Vulkan (sem ROCm), o botão
+  **"Otimizar o Ollama para esta placa"** explica o efeito, pede confirmação, cria a variável de usuário
+  `OLLAMA_FLASH_ATTENTION=0` e reinicia o Ollama; **"Desfazer"** remove e reinicia de novo. Placas NVIDIA (e AMD com
+  ROCm) não veem a opção — nelas o Flash Attention ligado é o mais rápido.
+
+### Desempenho
+- **Ollama na RX 6600 XT (AMD, Vulkan)**: com o Flash Attention desligado, uma conversa de 8 perguntas passou de
+  **16,4 s para 11,9 s por resposta (−27%)** no Ollama 0.40.4 e de **14,2 s para 9,0 s (−37%)** no 0.40.5 — leitura
+  do prompt 6,8 s → 1,1 s. Custo: a geração fica ~30% mais lenta e
+  ~0,5 GB do modelo vai para a RAM (o Flash Attention desligado reserva 564 MB de cálculo na placa, contra 112 MB).
+  O driver AMD já estava atualizado (Adrenalin 26.8.1); o aviso "AMD driver is too old" do Ollama continua porque ele
+  não tem ROCm para esse chip no Windows (NX-LLM-035).
+
+### Testes desta versão
+- 247/247 testes unitários (6 novos: aceite e revogação, versão dos termos igual na interface e no Python, textos
+  nos 3 idiomas, todos os serviços externos citados na política, estado da otimização da placa).
+- 32/32 verificações de conversa com qwen3:8b no Ollama 0.40.5 com a otimização: **média 6,3 s, mediana 5,6 s, máximo
+  14,8 s** (v0.16.8: 14,0 s / 10,4 s / 48,4 s) e 7/7 na área de trabalho. A verificação "estudar JS" passou a aceitar
+  também o NEXUS perguntando por qual tópico começar (antes só reconhecia "função" no singular).
+- Interface conferida no modo de prévia: tela de aceite antes da saudação e sem fontes da internet, botão liberado só
+  com as duas confirmações, Esc e clique fora não fecham, abas dos textos, seção nas Configurações, revogar e aceitar de
+  novo, cartão da placa AMD com confirmação.
+
+---
+
 ## v0.16.8 — Protótipo · 2026-10-15
 
 **Mapa conceitual em volta do aro, download da voz no próprio aro, menus que encaixam nas metades da tela,

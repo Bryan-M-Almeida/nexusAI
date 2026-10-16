@@ -136,7 +136,10 @@ DEFAULTS = {
     # v0.16.8
     "speak_menus": True,          # NEXUS says which menu it opened ("Abrindo as configurações")
     "beta_map": False,            # concept map (skills and knowledge around the ring) - beta
-    "beta_hold_talk": False,      # hold the talk key to speak, release to send - beta          # the ring drifts around the screen by itself
+    "beta_hold_talk": False,      # hold the talk key to speak, release to send - beta
+    # v0.17.0: Terms of Use / Privacy Policy accepted (version and when)
+    "terms_version": "",
+    "terms_accepted_at": "",          # the ring drifts around the screen by itself
     "rest_minutes": 3,            # no interaction for this long: texts hide, only the ring plays (0 = never)
     # v0.16 interface colours (ring, core, background)
     "color_ring": "#cfe4ff",

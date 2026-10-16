@@ -1,8 +1,10 @@
 /* Fonts from Google only when not offline (v0.12). The last known mode is cached so the boot animation doesn't
    flash fallback fonts; offline it falls back to Bahnschrift / Segoe UI / Consolas, already in the CSS. */
+const LEGAL_VERSION = "1.0";  // nexus/legal.py VERSION
+function termsAccepted() { try { return localStorage.getItem("nexus.terms") === LEGAL_VERSION; } catch (e) { return false; } }
 function loadFonts(mode) {
   try { localStorage.setItem("nexus.net", mode); } catch (e) { /* ignore */ }
-  if (mode === "offline" || document.getElementById("gfonts")) return;
+  if (mode === "offline" || document.getElementById("gfonts") || !termsAccepted()) return;
   const l = Object.assign(document.createElement("link"), { id: "gfonts", rel: "stylesheet",
     href: "https://fonts.googleapis.com/css2?family=Michroma&family=Orbitron:wght@600;700;800&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" });
   document.head.appendChild(l);
@@ -184,6 +186,8 @@ async function start() {
   $("#app").hidden = false;
   requestAnimationFrame(() => $("#app").classList.add("on"));
   setTimeout(() => ($("#boot").hidden = true), 1200);
+  try { localStorage.setItem("nexus.terms", st.terms && st.terms.accepted ? LEGAL_VERSION : ""); } catch (e) { /* ignore */ }
+  if (!(st.terms && st.terms.accepted)) await showLegal();
   await loadDashboard();
   for (const m of await api().history()) addMsg(m.role === "user" ? "user" : "nexus", m.content);
   const hello = await api().greet();
@@ -1005,6 +1009,38 @@ async function endTutorial() {
   if (!settings.tutorial_done) settings = (await api().save_settings({ tutorial_done: true })).settings;
 }
 
+/* Terms of Use & Privacy Policy (v0.17.0): shown on the first start (and after a new version), readable any time
+   in Settings > Privacy & terms. Until accepted: no microphone, no internet checks, no web fonts. */
+function renderLegalDoc(target, doc) {
+  const texts = (window.LEGAL || {})[L] || (window.LEGAL || {}).pt || {};
+  $("#" + target).innerHTML = texts[doc] || "";
+  $("#" + target).scrollTop = 0;
+  $$(`[data-legal-tabs="${target === "legalDocModal" ? "modal" : "settings"}"] [data-doc]`)
+    .forEach((b) => b.classList.toggle("on", b.dataset.doc === doc));
+}
+let legalResolve = null;
+function showLegal() {
+  renderLegalDoc("legalDocModal", "terms");
+  $("#legalAge").checked = $("#legalAgree").checked = false;
+  $("#legalAccept").disabled = true;
+  $("#legalModal").hidden = false;
+  return new Promise((resolve) => (legalResolve = resolve));
+}
+async function acceptLegal() {
+  const st = await api().accept_terms();
+  settings.terms_version = st.version;
+  settings.terms_accepted_at = st.accepted_at;
+  try { localStorage.setItem("nexus.terms", LEGAL_VERSION); } catch (e) { /* ignore */ }
+  loadFonts(state.network || settings.network_mode || "hybrid");
+  $("#legalModal").hidden = true;
+  if (legalResolve) { legalResolve(); legalResolve = null; }
+}
+function renderLegalStatus() {
+  const at = settings.terms_accepted_at ? new Date(settings.terms_accepted_at).toLocaleString(document.documentElement.lang) : "—";
+  $("#legalStatus").textContent = T("legalStatusOk", { date: at, v: settings.terms_version || "—" });
+  renderLegalDoc("legalDocSettings", "terms");
+}
+
 /* Window state: no window buttons in full screen */
 function setFull(on) { state.fullscreen = on; $("#app").classList.toggle("is-full", on); }
 async function toggleFull() { setFull(await api().toggle_fullscreen()); }
@@ -1226,7 +1262,19 @@ function aiStatusHTML(llm) {
     : `<span class="bad">● ${esc(T("connNoModel", { model: llm.model }))}</span>`;
 }
 
+/* Settings > Performance: Ollama on AMD cards without ROCm (v0.17.0) */
+let gpuState = null;
+async function renderGpuTune() {
+  gpuState = await api().gpu_tune_status();
+  const box = $("#gpuTune");
+  box.hidden = !(gpuState.suggest || gpuState.applied) || !gpuState.installed;
+  $("#gpuConfirm").hidden = true;
+  $("#gpuTuneText").textContent = T(gpuState.applied ? "gpuOnText" : "gpuOffText");
+  $("#btnGpuTune").textContent = T(gpuState.applied ? "gpuUndo" : "gpuApply");
+}
+
 async function renderPerf() {
+  renderGpuTune();
   const f = $("#settingsForm"), info = await api().performance_info();
   $$("#netCards [data-net]").forEach((b) => b.classList.toggle("on", b.dataset.net === (f.elements.network_mode.value || settings.network_mode)));
   $$("#perfCards [data-perf]").forEach((b) => b.classList.toggle("on", b.dataset.perf === settings.performance));
@@ -1252,6 +1300,7 @@ async function pickProfile(name) {
 
 function openSettings(sec) {
   capturing = null;
+  renderLegalStatus();
   renderKeys();
   fillSettings();
   renderBeta();
@@ -1321,6 +1370,7 @@ function wire() {
       if (combo === "Esc") return renderKeys();
       return saveShortcut(id, combo === "Backspace" || combo === "Delete" ? "" : combo);
     }
+    if (!$("#legalModal").hidden) return;  // v0.17.0: nothing works before the terms are accepted
     if (e.key === "Escape" && confirmId) { answerConfirm(false); return; }
     if (e.key === "Escape" && $("#app").classList.contains("zen")) { toggleZen(false); return; }
     if (e.key === "Escape" && tutorialStep >= 0) { endTutorial(); return; }
@@ -1349,7 +1399,7 @@ function wire() {
   });
 
   // Click outside a modal/drawer box closes it (press and release on the backdrop, so selecting text doesn't).
-  $$(".modal:not(#confirmModal), .drawer").forEach((m) => {
+  $$(".modal:not(#confirmModal):not(#legalModal), .drawer").forEach((m) => {
     let downOnBackdrop = false;
     m.addEventListener("mousedown", (e) => (downOnBackdrop = e.target === m));
     m.addEventListener("click", (e) => { if (downOnBackdrop && e.target === m) m.hidden = true; });
@@ -1387,6 +1437,33 @@ function wire() {
     runOptimize(b.dataset.opt);
   }));
   $("#optNo").onclick = () => ($("#optConfirm").hidden = true);
+  $$("[data-legal-tabs]").forEach((tabs) => tabs.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-doc]");
+    if (b) renderLegalDoc(tabs.dataset.legalTabs === "modal" ? "legalDocModal" : "legalDocSettings", b.dataset.doc);
+  }));
+  const legalReady = () => ($("#legalAccept").disabled = !($("#legalAge").checked && $("#legalAgree").checked));
+  $("#legalAge").onchange = $("#legalAgree").onchange = legalReady;
+  $("#legalAccept").onclick = acceptLegal;
+  $("#legalDecline").onclick = () => api().quit();
+  $("#btnRevoke").onclick = async () => {
+    await api().revoke_terms();
+    settings.terms_version = settings.terms_accepted_at = "";
+    try { localStorage.setItem("nexus.terms", ""); } catch (e) { /* ignore */ }
+    $("#settings").hidden = true;
+    await showLegal();
+  };
+  $("#btnGpuTune").onclick = () => {
+    $("#gpuConfirmText").textContent = T(gpuState && gpuState.applied ? "gpuConfirmUndo" : "gpuConfirmApply");
+    $("#gpuConfirm").hidden = false;
+  };
+  $("#gpuNo").onclick = () => ($("#gpuConfirm").hidden = true);
+  $("#gpuYes").onclick = async () => {
+    $("#gpuConfirm").hidden = true;
+    $("#gpuTuneText").textContent = T("gpuWorking");
+    const r = await api().gpu_tune(!(gpuState && gpuState.applied));
+    notice(T(r.restarted ? "gpuDone" : "gpuNoRestart"));
+    renderGpuTune();
+  };
   $("#optYes").onclick = () => { $("#optConfirm").hidden = true; runOptimize("data"); };
   $("#btnAiFix").onclick = () => { api().speak_help(aiHelpText); notice(aiHelpText, T("moreAi")); };
   document.addEventListener("keydown", activity);

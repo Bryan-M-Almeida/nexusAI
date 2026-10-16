@@ -195,6 +195,23 @@
   </div>
 </div>
 
+<!-- ============ TERMS OF USE & PRIVACY (v0.17.0): first start, nothing is captured or sent before ============ -->
+<div class="modal" id="legalModal" hidden>
+  <div class="modal-box legal-box" role="dialog" aria-modal="true">
+    <p class="kicker mono" data-i18n="legalKicker">ANTES DE COMEÇAR</p>
+    <h2 data-i18n="legalTitle">Termos de Uso e Privacidade</h2>
+    <p class="hint" data-i18n="legalIntro">O NEXUS funciona no seu computador. Leia como ele usa os seus dados: nada é captado pelo microfone nem enviado à internet antes do seu aceite.</p>
+    <div class="seg mono legal-tabs" data-legal-tabs="modal"><button type="button" data-doc="terms" class="on" data-i18n="legalTerms">TERMOS DE USO</button><button type="button" data-doc="privacy" data-i18n="legalPrivacy">PRIVACIDADE</button></div>
+    <div class="legal-doc" id="legalDocModal"></div>
+    <label class="check"><input type="checkbox" id="legalAge"><span data-i18n="legalAge">Tenho 18 anos ou mais, ou uso o NEXUS com o consentimento de um responsável.</span></label>
+    <label class="check"><input type="checkbox" id="legalAgree"><span data-i18n="legalAgree">Li e aceito os Termos de Uso e a Política de Privacidade.</span></label>
+    <div class="row-btns legal-btns">
+      <button class="btn-ghost" type="button" id="legalDecline" data-i18n="legalDecline">Recusar e sair</button>
+      <button class="btn-primary" type="button" id="legalAccept" disabled data-i18n="legalAccept">Aceitar e continuar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ TUTORIAL (v0.16.5): first run, narrated by NEXUS ============ -->
 <div class="tutorial" id="tutorial" hidden>
   <p class="tut-count mono" id="tutCount"></p>
@@ -413,6 +430,7 @@
       <button type="button" data-sec="data" data-i18n="secData">Dados</button>
       <button type="button" data-sec="keys" data-i18n="secKeys">Atalhos</button>
       <button type="button" data-sec="beta" data-i18n="secBeta">Beta</button>
+      <button type="button" data-sec="legal" data-i18n="secLegal">Privacidade e termos</button>
     </nav>
     <div class="set-body">
       <!-- GENERAL -->
@@ -512,6 +530,16 @@
         <label><span data-i18n="bgRelease">Minimizado por quantos minutos para liberar a memória da voz</span><input name="bg_release_minutes" type="number" min="1" max="240"></label>
         <p class="sub mono" data-i18n="hwTitle">SEU COMPUTADOR</p>
         <div class="hw-box mono" id="hwBox"></div>
+        <div class="gpu-tune" id="gpuTune" hidden>
+          <p class="sub mono" data-i18n="gpuTitle">PLACA DE VÍDEO</p>
+          <p class="hint" id="gpuTuneText"></p>
+          <div class="row-btns"><button class="btn-ghost" type="button" id="btnGpuTune"></button></div>
+          <div class="opt-confirm" id="gpuConfirm" hidden>
+            <p id="gpuConfirmText"></p>
+            <div class="row-btns"><button class="btn-ghost" type="button" id="gpuNo" data-i18n="cancel">Cancelar</button>
+              <button class="btn-primary" type="button" id="gpuYes" data-i18n="gpuYes">Aplicar e reiniciar o Ollama</button></div>
+          </div>
+        </div>
         <p class="sub mono" data-i18n="optTitle">OTIMIZAR</p>
         <div class="opt-grid">
           <button class="btn-ghost" type="button" data-opt="ram"><b data-i18n="optRam">Liberar memória (RAM)</b><small data-i18n="optRamHint">voz parada e caches saem da memória; voltam sozinhos quando usados</small></button>
@@ -629,6 +657,16 @@
         <p class="hint" data-i18n="restartHint">Vale depois de reabrir o NEXUS.</p>
       </section>
 
+      <!-- PRIVACY & TERMS (v0.17.0) -->
+      <section class="set-sec" data-sec="legal" hidden>
+        <h2 data-i18n="secLegal">Privacidade e termos</h2>
+        <p class="hint" id="legalStatus"></p>
+        <div class="seg mono legal-tabs" data-legal-tabs="settings"><button type="button" data-doc="terms" class="on" data-i18n="legalTerms">TERMOS DE USO</button><button type="button" data-doc="privacy" data-i18n="legalPrivacy">PRIVACIDADE</button></div>
+        <div class="legal-doc" id="legalDocSettings"></div>
+        <div class="row-btns"><button class="btn-ghost danger" type="button" id="btnRevoke" data-i18n="legalRevoke">Revogar o aceite</button></div>
+        <p class="hint" data-i18n="legalRevokeHint">Ao revogar, o NEXUS fecha o microfone, para de acessar a internet e pede o aceite de novo; sem ele, não é possível continuar usando.</p>
+      </section>
+
       <!-- SHORTCUTS (v0.16.5) -->
       <section class="set-sec" data-sec="keys" hidden>
         <h2 data-i18n="secKeys">Atalhos</h2>
@@ -681,6 +719,7 @@
 
 <script src="mock.js"></script>
 <script src="i18n.js"></script>
+<script src="legal.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

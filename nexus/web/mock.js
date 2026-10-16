@@ -8,7 +8,7 @@ if (!window.pywebview && location.search.includes("mock")) {
   const profile = { name: "Alex Martins", profession: "Full-Stack Developer", routine: "Starts at 9 AM · deep focus in the afternoon",
     interests: ["AI", "games", "coffee"], goals: ["Ship NEXUS"], profile: "developer", tone: "técnico e direto",
     modules: ["código", "agenda", "foco/pomodoro"], language: "pt-BR" };
-  let mockFull = false;
+  let mockFull = false; let mockTerms = /terms=1/.test(location.search), mockGpu = false;
   const settings = { ui_layout: "computer", bar_top: "hover", bar_left: "hover", bar_right: "hover", bar_bottom: "hover", ring_wander: true, rest_minutes: 3, show_exchange: true, exchange_follow: false, exchange_hide_seconds: 45, cursor_style: "ring", cursor_size: "medium", shortcuts: {}, tutorial_done: true, speak_menus: true, beta_map: true, beta_hold_talk: false, app_mode: "user", beta_library: true, color_ring: "#cfe4ff", color_core: "#2f86ff", color_bg: "#0b1f5c", llm_base_url: "http://localhost:11434/v1", llm_model: "qwen3:8b", language: "auto", stt_model: "small",
     voice_gender: "male", voice_effect: "jarvis", tts_speed: 0, tts_volume: 100, llm_preset: "ollama", llm_api_key: "ollama",
     llm_temperature: 0.3, llm_context: 8192, history_turns: 12, auto_title: true, greet_on_start: true, start_fullscreen: true,
@@ -37,7 +37,8 @@ if (!window.pywebview && location.search.includes("mock")) {
     ui_ready: async () => {},
     boot: async () => {
       ["memory", "knowledge", "ai", "voice"].forEach((k, i) => emit("boot", { key: k, ok: true, detail: ["3", "198", "qwen3:8b", "small"][i] }, 600 + i * 200));
-      return { profile, lang: "pt", llm, settings, stt: "ready", version: "0.8.0", model_name: "NEX-1.0" };
+      return { profile, lang: "pt", llm, settings, stt: "ready", version: "0.17.0", model_name: "NEX-1.0",
+        terms: { accepted: mockTerms, version: "1.0", accepted_at: mockTerms ? new Date().toISOString() : "" } };
     },
     greet: async () => { speak(2.5, 200); return "Olá, Alex, o que teremos para hoje?"; },
     history: async () => [],
@@ -116,6 +117,10 @@ if (!window.pywebview && location.search.includes("mock")) {
     toggle_fullscreen: async () => (mockFull = !mockFull), minimize: async () => {}, quit: async () => {},
     llm_status: async () => llm, speak_help: async () => speak(4),
     hold_start: async () => ({ ok: true }), hold_stop: async () => {},
+    accept_terms: async () => { mockTerms = true; return { accepted: true, version: "1.0", accepted_at: new Date().toISOString() }; },
+    revoke_terms: async () => { mockTerms = false; return { accepted: false, version: "1.0" }; },
+    gpu_tune_status: async () => ({ amd: true, vulkan: true, applied: mockGpu, suggest: true, installed: true }),
+    gpu_tune: async (on) => { mockGpu = !!on; return { amd: true, vulkan: true, applied: mockGpu, suggest: true, installed: true, restarted: true }; },
     optimize: async (k) => (k === "data" ? { ok: true, backup: "C:/x/nexus-backup-test.zip", rss_mb: 120 } : { ok: true, freed_mb: 312.4, rss_mb: 188.1, freed_disk_mb: 1.2 }),
     concept_map: async () => ({ skills: ["organization", "finance", "programming", "study", "health", "knowledge", "research", "voice"].map((s, i) => ({ skill: s, rank: "EDCBA"[i % 5], level: 1 + i })),
       knowledge: [{ name: "Anatomia", items: ["Corpo humano"] }, { name: "Finanças", items: ["Juros compostos", "Reserva de emergência", "Inflação"] },

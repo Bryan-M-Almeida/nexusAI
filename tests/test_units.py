@@ -784,6 +784,23 @@ settings["app_mode"] = "user"
 check("beta: concept map and hold-to-talk start off for users",
       not features.enabled("map") and not features.enabled("hold_talk") and settings["speak_menus"] is True)
 check("i18n: map name spoken in the three languages", all("ui_n_map" in i18n.STRINGS[x] for x in ("pt", "en", "es")))
+# -- v0.17.0: terms & privacy, AMD tuning ------------------------------------------------------------------------
+from nexus import gpu_tune, legal  # noqa: E402
+
+check("terms: a new install starts without consent", not legal.accepted())
+legal.accept()
+_acc = legal.accepted() and settings["terms_accepted_at"]
+legal.revoke()
+check("terms: accept and revoke", bool(_acc) and not legal.accepted())
+_legal_js = (WEB / "legal.js").read_text("utf-8")
+check("terms: the interface asks for the same version as nexus/legal.py",
+      f'const LEGAL_VERSION = "{legal.VERSION}"' in (WEB / "app.js").read_text("utf-8") and f"Version {legal.VERSION}" in _legal_js)
+check("terms: Terms of Use and Privacy Policy in the three languages",
+      all(re.search(rf"\b{lng}: {{\s*terms: `", _legal_js) for lng in ("pt", "en", "es")) and _legal_js.count("privacy: `") == 3)
+check("privacy policy names every outside service NEXUS talks to",
+      all(_legal_js.count(x) >= 3 for x in ("Open-Meteo", "Frankfurter", "Wikip", "Hugging Face", "Google Fonts", "Cloudflare", "DPAPI")))
+_gs = gpu_tune.status()
+check("gpu tuning: status reports card, backend and setting", set(_gs) >= {"amd", "vulkan", "applied", "suggest", "installed"})
 check("colours: default ring/core/background are valid hex colours",
       all(re.fullmatch(r"#[0-9a-f]{6}", str(settings[k])) for k in ("color_ring", "color_core", "color_bg")))
 

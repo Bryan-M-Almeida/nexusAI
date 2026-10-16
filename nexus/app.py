@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 
 import webview
 
-from . import (MODEL_NAME, __version__, assistant, bridge, control, features, i18n, knowledge, llm, memory, notify, profile,
+from . import (MODEL_NAME, __version__, assistant, bridge, control, features, gpu_tune, i18n, knowledge, legal, llm, memory,
+               notify, profile,
                library, netprobe, performance, scheduler, skills, tools, workspace)
 from . import files as filereader
 from .logs import log, setup as setup_logs
@@ -154,7 +155,34 @@ class Api:
         self._sync_listening()
         return {"profile": db.get_profile(), "lang": lang(), "llm": st, "settings": dict(settings),
                 "stt": self._listener.model_state, "version": __version__, "model_name": MODEL_NAME,
-                "fullscreen": _fullscreen}
+                "fullscreen": _fullscreen, "terms": legal.state()}
+
+    # -- Terms of Use / Privacy Policy (v0.17.0) -----------------------------------------------------------------
+    def accept_terms(self):
+        st = legal.accept()
+        self._sync_listening()  # the microphone only opens after consent
+        threading.Thread(target=netprobe.refresh, daemon=True, name="netprobe").start()
+        return st
+
+    def revoke_terms(self):
+        st = legal.revoke()
+        self._listener.set_live(False)
+        return st
+
+    @staticmethod
+    def terms_state():
+        return legal.state()
+
+    # -- Settings > Performance > Ollama on AMD + Vulkan (v0.17.0) -------------------------------------------------
+    @staticmethod
+    def gpu_tune_status():
+        return gpu_tune.status()
+
+    def gpu_tune(self, on):
+        result = gpu_tune.apply(bool(on))
+        if result.get("restarted"):
+            threading.Thread(target=self._warm_up, daemon=True, name="warm-up").start()
+        return result
 
     def _warm_up(self):
         """Load the model and cache the fixed prompt while the boot animation plays (v0.6: 1st reply 30 s -> ~1 s)."""
@@ -178,8 +206,9 @@ class Api:
 
     # -- modes and dock buttons ------------------------------------------------
     def _sync_listening(self):
-        """Audio mode with the mic unmuted = continuous conversation; otherwise the mic is closed."""
-        self._listener.set_live(settings["ui_mode"] == "audio" and not settings["mic_muted"])
+        """Audio mode with the mic unmuted = continuous conversation; otherwise the mic is closed.
+        v0.17.0: never before the Terms of Use / Privacy Policy are accepted."""
+        self._listener.set_live(legal.accepted() and settings["ui_mode"] == "audio" and not settings["mic_muted"])
 
     def set_mode(self, mode):
         settings.apply({"ui_mode": "text" if mode == "text" else "audio"})
@@ -561,6 +590,8 @@ class Api:
 
     def hold_start(self):
         """Beta (v0.16.8): talk while the key is held."""
+        if not legal.accepted():
+            return {"ok": False, "error": "terms"}
         if not self._listener.ensure_model():
             return {"ok": False, "error": self._listener.model_error or "loading"}
         self._listener.hold_start()
@@ -627,6 +658,8 @@ class Api:
                 "freed_disk_mb": round(freed_disk / 1e6, 1)}
 
     def push_to_talk(self):
+        if not legal.accepted():
+            return {"ok": False, "error": "terms"}
         if not self._listener.ensure_model():  # first use downloads the Whisper model
             return {"ok": False, "error": self._listener.model_error or "loading"}
         self._listener.push_to_talk()
