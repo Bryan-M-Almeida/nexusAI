@@ -965,6 +965,10 @@
       <section class="set-sec" data-sec="updates" hidden>
         <h2 data-i18n="secUpdates">Atualizações</h2>
         <p class="hint" data-i18n="updatesHint">O que mudou e o que foi corrigido em cada versão (do arquivo CHANGELOG.md).</p>
+        <div class="row-btns"><button class="btn-ghost" type="button" id="btnUpdCheck" data-i18n="updCheck">Procurar atualizações</button>
+          <button class="btn-primary" type="button" id="btnUpdNow" hidden data-i18n="updNow2">Atualizar agora</button></div>
+        <p class="hint mono" id="updStatus"></p>
+        <label class="check"><input type="checkbox" name="update_check"><span data-i18n="updAuto">Procurar uma vez por dia (só avisa; nada é baixado sem você clicar)</span></label>
         <div class="updates" id="updatesList"></div>
       </section>
       <section class="set-sec" data-sec="issues" hidden>

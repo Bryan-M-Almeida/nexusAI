@@ -1352,3 +1352,4 @@ body.pet-mode .app.suspended .pet-eye img, body.pet-mode .app.dl .pet-eye { anim
 .iss-id { font-size: 10.5px; color: var(--c-ring-soft); }
 .iss-st { margin-left: auto; font-size: 9.5px; letter-spacing: .12em; color: var(--muted); }
 .issue[data-sev="CRÍTICA"] .iss-id, .issue[data-sev="CRITICAL"] .iss-id, .issue[data-sev="ALTA"] .iss-id, .issue[data-sev="HIGH"] .iss-id { color: #ff8a7a; }
+#updStatus { margin: 8px 0 10px; }

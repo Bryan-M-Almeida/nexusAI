@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 4.1  ·  Date: 2026-10-16  ·  App version: 0.20.0
+ Document version: 4.2  ·  Date: 2026-10-16  ·  App version: 0.20.5
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -181,6 +181,8 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-ENV-012  The API key is gone (another PC or Windows user)
       NX-ENV-013  Automatic mode picked the wrong mode (unstable internet)
       NX-ENV-014  ROCm forced on an unsupported card sends the AI to the processor
+      NX-ENV-015  The installer couldn't download Ollama
+      NX-ENV-016  "Check for updates" finds nothing or the update fails
 
 
 ================================================================================
@@ -1664,6 +1666,28 @@ QUICK DIAGNOSTICS (run these before investigating)
   Fix        : NEXUS reads the chip list from the installed Ollama and offers
                ROCm only where it works (Settings > AMD > AI backend). On other
                cards, Vulkan.
+
+[NX-ENV-015] The installer couldn't download Ollama
+  Severity   : MEDIUM           Status: KNOWN              Observed: PREDICTED
+  Symptom    : A download error during setup; NEXUS installs, but the ring shows
+               "AI UNAVAILABLE".
+  Cause      : No internet, an antivirus/firewall blocking ollama.com, or the site
+               down. The installer goes on without Ollama on purpose.
+  Solution   : Install it later: winget install Ollama.Ollama, or download it from
+               ollama.com/download. Open NEXUS again: it downloads the model chosen
+               in the installer (Settings > Downloads).
+
+[NX-ENV-016] "Check for updates" finds nothing or the update fails
+  Severity   : LOW              Status: KNOWN              Observed: YES
+  Symptom    : "Can't check yet: the repository is private", or "SHA-256 does not
+               match", or the new version asks for the full installer.
+  Cause      : (a) While the NEXUS repository on GitHub is private, the check
+               can't see the releases. (b) The download was cut or changed: NEXUS
+               checks the SHA-256 and refuses the file. (c) The new version changed
+               libraries (different BASE): only the full installer works.
+  Solution   : (a) Wait for the publication. (b) Try again. (c) Download the
+               installer from the release page (the button opens the browser) and
+               install over it: data, accounts and models stay.
 
 ================================================================================
  TEST HISTORY (2026-10-13)

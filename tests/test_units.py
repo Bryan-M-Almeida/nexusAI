@@ -1346,5 +1346,84 @@ _build = (_isolated.ROOT / "build.ps1").read_text("utf-8")
 check("build: the changelog, the error catalogues, LICENSE and NOTICE ship with the executable",
       all(f'--add-data "{f};."' in _build for f in ("CHANGELOG.md", "erros.txt", "errors.txt", "errores.txt", "LICENSE", "NOTICE")))
 
+# -- v0.20.5: installer choices, updates without downloading everything again ---------------------------------------
+import json as _json  # noqa: E402
+import zipfile as _zip  # noqa: E402
+from nexus import setup_preset as _sp  # noqa: E402
+from nexus import updater as _up  # noqa: E402
+
+_sp.PRESET.write_text(_json.dumps({"language": "es", "llm_model": "auto", "theme": "emerald", "center_style": "pet",
+                                   "voice_gender": "female"}), "utf-8")
+_sp.PROFILE.write_text(_json.dumps({"name": "Ana Teste", "profession": "Designer"}), "utf-8")
+_real_rec, _sp.models.recommended = _sp.models.recommended, (lambda *a, **k: "qwen3:4b-instruct-2507-q4_K_M")
+_done = _sp.apply()
+_sp.models.recommended = _real_rec
+check("installer: language, look, voice, model (auto = the one for this PC) and profile applied once",
+      settings["language"] == "es" and settings["theme"] == "emerald" and settings["center_style"] == "pet"
+      and settings["voice_gender"] == "female" and settings["llm_model"] == "qwen3:4b-instruct-2507-q4_K_M"
+      and settings["install_model_pull"] == settings["llm_model"] and _done.get("profile") == "Ana Teste"
+      and not _sp.PRESET.exists() and not _sp.PROFILE.exists() and _sp.apply() == {}, _done)
+settings.apply({"language": "pt", "theme": "nexus", "center_style": "ring", "voice_gender": "male", "llm_model": "qwen3:8b",
+                "install_model_pull": ""})
+check("updates: versions compare as numbers (0.20.10 > 0.20.5)", _up._v("v0.20.10") > _up._v("0.20.5") > _up._v("0.19.7"))
+
+
+class _UResp:
+    def __init__(self, code, data):
+        self.status_code, self._d = code, data
+
+    def json(self):
+        return self._d
+
+
+def _rel(tag, base):
+    return {"tag_name": tag, "html_url": "https://github.com/x/releases/" + tag, "body": "notas",
+            "assets": [{"name": f"NEXUS-Setup-{tag[1:]}.exe", "size": 560 * 2 ** 20, "browser_download_url": "https://x/setup"},
+                       {"name": f"NEXUS-update-{tag[1:]}-base{base}.zip", "size": 19 * 2 ** 20, "browser_download_url": "https://x/zip"},
+                       {"name": f"NEXUS-update-{tag[1:]}-base{base}.zip.sha256", "size": 90, "browser_download_url": "https://x/sha"}]}
+
+
+_real_uget, _real_frozen = _up.httpx.get, _up.frozen
+_up.frozen = lambda: True
+_up.httpx.get = lambda *a, **k: _UResp(200, _rel("v9.0.0", _up.BASE))
+_small = _up.check()
+_up.httpx.get = lambda *a, **k: _UResp(200, _rel("v9.0.0", _up.BASE + 1))
+_full = _up.check()
+_up.httpx.get = lambda *a, **k: _UResp(200, _rel("v0.0.1", _up.BASE))
+_old = _up.check()
+_up.httpx.get = lambda *a, **k: _UResp(404, {})
+_private = _up.check()
+_up.httpx.get, _up.frozen = _real_uget, _real_frozen
+check("updates: small package when only NEXUS changed, full installer when the libraries changed, nothing when older",
+      _small["kind"] == "small" and _small["size_mb"] == 19.0 and _small["sha_url"] and _full["kind"] == "full"
+      and _full["url"] == "https://x/setup" and not _old["newer"] and _private["error"] == "not_public")
+_src = _isolated.ROOT / "tests" / "_fake_dist"
+(_src / "_internal" / "nexus" / "web").mkdir(parents=True, exist_ok=True)
+(_src / "NEXUS.exe").write_bytes(b"MZ")
+(_src / "_internal" / "nexus" / "web" / "app.js").write_text("//", "utf-8")
+(_src / "_internal" / "CHANGELOG.md").write_text("#", "utf-8")
+(_src / "_internal" / "python314.dll").write_bytes(b"x")
+import build_update as _bu  # noqa: E402
+
+_zp = _bu.build(_src, _src / "out")
+_names = _zip.ZipFile(_zp).namelist()
+check("update package: the program, the interface and the documents - never the libraries",
+      sorted(_names) == ["NEXUS.exe", "_internal/CHANGELOG.md", "_internal/nexus/web/app.js"]
+      and (_src / "out" / (_zp.name + ".sha256")).exists() and _zp.name.endswith(f"-base{_up.BASE}.zip"))
+import shutil as _sh  # noqa: E402
+
+_sh.rmtree(_src, ignore_errors=True)
+_iss = (_isolated.ROOT / "installer" / "nexus.iss").read_text("utf-8-sig")
+_appsrc = (_isolated.ROOT / "nexus" / "app.py").read_text("utf-8")
+check("installer: 3 languages, per-user, shortcuts / start with Windows, profile, model, look, voice and Ollama pages",
+      all(x in _iss for x in ('Name: "pt"', 'Name: "en"', 'Name: "es"', "PrivilegesRequired=lowest", "TaskStartup",
+                              "CreateInputFilePage", "ModelPage", "LookPage", "OllamaPage", "install_preset.json",
+                              "install_profile.json", "LicenseFile=..\\LICENSE", "InfoBeforeFile=..\\NOTICE"))
+      and "AppMutex=Local\\NEXUS-Assistant-single-instance" in _iss and "Local\\\\NEXUS-Assistant-single-instance" in _appsrc)
+check("installer: the model rule matches the app (8 GB card -> NEX-1.0, 4 GB -> Lite... see ModelFor)",
+      _sp.models.recommended(8.0, 16.0) == "qwen3:8b" and _sp.models.recommended(6.0, 16.0) == "qwen3:4b-instruct-2507-q4_K_M"
+      and _sp.models.recommended(12.0, 32.0) == "qwen3:14b" and _sp.models.recommended(0.0, 8.0) == "qwen3:1.7b"
+      and "Need[2] := 6.6" in _iss and "Vram - 1.8" in _iss and "OnGpu >= 0.75" in _iss)
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

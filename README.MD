@@ -34,6 +34,31 @@ Medidos no PC de referência com `tests/bench_hardware.py` (Ryzen 5 5600G, 16 GB
 Espaço em disco: modelo qwen3:8b 5,2 GB, Ollama ~2,8 GB, NEXUS ~0,3 GB, voz Whisper small ~0,5 GB (medium ~1,5 GB).
 Também é preciso o WebView2 (já vem no Windows 11). O NEXUS mostra em *Configurações → Desempenho* se o seu PC atende.
 
+## Instalação
+
+Baixe **`NEXUS-Setup-<versão>.exe`** na página da versão e execute. Não precisa ser administrador: o programa vai para
+`%LOCALAPPDATA%\Programs\NEXUS` e os seus dados ficam em `%LOCALAPPDATA%\NEXUS`. O instalador (PT/EN/ES) pergunta:
+
+1. **Idioma** — vira o idioma do NEXUS.
+2. **Pasta, atalho na Área de Trabalho e abrir com o Windows**.
+3. **Seu perfil (JSON)**, opcional — o NEXUS já abre sabendo seu nome e interesses.
+4. **Modelo de IA** — detecta a placa de vídeo e a memória e recomenda o NEX-1.0 certo (Lite, Mini, NEX-1.0 ou Pro);
+   o NEXUS baixa o modelo no primeiro uso (Configurações → Downloads).
+5. **Aparência e voz** — aro ou PET, tema de cores, voz masculina ou feminina.
+6. **Ollama** — se não estiver instalado, oferece baixar e instalar (ollama.com).
+7. **Licença MIT e aviso de autoria** (NOTICE). Os Termos de Uso e a Privacidade são aceitos no primeiro início do app.
+
+A voz (Whisper) já vem no instalador. Ao desinstalar, o NEXUS pergunta se você quer apagar também os seus dados.
+
+### Atualizações sem baixar tudo de novo (v0.20.5)
+
+Cada versão publica dois arquivos: o **instalador completo** (~560 MB) e uma **atualização pequena** (~18 MB) com só o
+que muda — o programa, a interface e os documentos. Em *Configurações → Atualizações → Procurar atualizações* (ou
+sozinho, uma vez por dia) o NEXUS confere a versão nova; com a atualização pequena, ele baixa, confere o SHA-256, fecha
+e abre já atualizado. Quando uma versão troca bibliotecas ou o modelo de voz (BASE diferente), ela pede o instalador
+completo — instalado por cima, dados, contas e modelos continuam. Enquanto o repositório for privado, a verificação
+avisa que ainda não consegue ver as versões.
+
 ## Instalação (desenvolvimento)
 
 Requisitos: Windows 10/11, Python 3.12+ e microfone.
@@ -430,6 +455,14 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 Gera `dist\NEXUS\NEXUS.exe`. Basta copiar a pasta `dist\NEXUS` para outro PC (o Ollama é instalado separadamente).
 
+Instalador e atualização pequena (precisa do Inno Setup 6: `winget install JRSoftware.InnoSetup`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File release.ps1
+```
+
+Gera em `dist\release` o `NEXUS-Setup-<versão>.exe` e o `NEXUS-update-<versão>-base<N>.zip` (+ `.sha256`).
+
 Para validar uma release (voz, IA, base de conhecimento, microfone) sem abrir a janela:
 
 ```powershell
@@ -518,4 +551,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.20.0 (protótipo)**.
+Versão atual: **v0.20.5 (protótipo)**.

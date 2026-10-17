@@ -208,6 +208,8 @@ if (!window.pywebview && location.search.includes("mock")) {
     amd_open_ref: async () => ({ ok: true }),
     tutorial_begin: async () => { ["ai", "voice", "apps", "integrations"].forEach((k, i) => { emit("tutorial_bg", { task: k, state: "running" }, 300 + i * 900); emit("tutorial_bg", { task: k, state: "done" }, 1100 + i * 900); }); return { ok: true }; },
     tutorial_end: async () => ({ ok: true }),
+    update_check: async () => ({ ok: true, current: "0.20.5", latest: "0.20.6", newer: true, kind: "small", size_mb: 19.4 }),
+    update_now: async () => ({ ok: true, kind: "small" }),
     about_updates: async () => ({ version: "0.20.0", versions: [{ version: "v0.20.0", kind: "Protótipo", date: "2026-10-16", headline: "Tutorial roteirizado, abas Sobre, Atualizações e Possíveis erros.", html: "<h4>Novo</h4><ul><li><b>Tutorial</b> sem IA</li></ul>" }, { version: "v0.19.7", kind: "Protótipo", date: "2026-10-16", headline: "Correções.", html: "<ul><li>Fatos consultados</li></ul>" }] }),
     about_errors: async () => ({ errors: [{ id: "NX-VOZ-005", area: "VOZ", title: "NEXUS ouve a própria voz (eco)", severity: "ALTA", status: "MITIGADO", symptom: "Responde a si mesmo.", cause: "Caixas de som.", fix: "1. Use fone\n2. Baixe o volume", tips: "" }, { id: "NX-LLM-001", area: "LLM", title: "IA offline", severity: "CRÍTICA", status: "CONHECIDO", symptom: "Chip vermelho.", cause: "Ollama parado.", fix: "Abra o Ollama.", tips: "" }] }),
     speak_tutorial: async (text, step) => { emit("tutorial_spoken", { step }, window.mockSpeechMs || 5000); return { voice: true }; },

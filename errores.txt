@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 4.1  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.20.0
+ Versión del documento: 4.2  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.20.5
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -182,6 +182,8 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-ENV-012  La clave de API desapareció (otro PC u otro usuario de Windows)
       NX-ENV-013  El modo automático eligió mal (internet inestable)
       NX-ENV-014  ROCm forzado en una tarjeta sin soporte manda la IA al procesador
+      NX-ENV-015  El instalador no pudo descargar Ollama
+      NX-ENV-016  "Buscar actualizaciones" no encuentra nada o la actualización falla
 
 
 ================================================================================
@@ -1719,6 +1721,29 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
   Solución   : NEXUS lee la lista de chips de la propia instalación de Ollama y
                solo ofrece ROCm donde funciona (Configuración > AMD > Backend de
                la IA). En las demás, Vulkan.
+
+[NX-ENV-015] El instalador no pudo descargar Ollama
+  Gravedad   : MEDIA            Estado: CONOCIDO           Observado: PREVISTO
+  Síntoma    : Un error de descarga durante la instalación; NEXUS se instala, pero
+               el anillo muestra "IA NO DISPONIBLE".
+  Causa      : Sin internet, un antivirus/cortafuegos bloqueando ollama.com, o el
+               sitio caído. El instalador sigue sin Ollama a propósito.
+  Solución   : Instálalo después: winget install Ollama.Ollama, o descárgalo de
+               ollama.com/download. Abre NEXUS de nuevo: descarga el modelo elegido
+               en el instalador (Configuración > Descargas).
+
+[NX-ENV-016] "Buscar actualizaciones" no encuentra nada o la actualización falla
+  Gravedad   : BAJA             Estado: CONOCIDO           Observado: SÍ
+  Síntoma    : "Aún no se puede comprobar: el repositorio es privado", o "SHA-256
+               no coincide", o la nueva versión pide el instalador completo.
+  Causa      : (a) Mientras el repositorio de NEXUS en GitHub sea privado, la
+               comprobación no ve las versiones. (b) La descarga se cortó o fue
+               alterada: NEXUS comprueba el SHA-256 y rechaza el archivo. (c) La
+               nueva versión cambió bibliotecas (BASE distinta): solo sirve el
+               instalador completo.
+  Solución   : (a) Espera la publicación. (b) Inténtalo de nuevo. (c) Descarga el
+               instalador desde la página de la versión e instálalo encima: datos,
+               cuentas y modelos se conservan.
 
 ================================================================================
  HISTORIAL DE PRUEBAS (2026-10-13)

@@ -1393,3 +1393,71 @@ for (const [l, extra] of Object.entries({
   "betaAmdLab": "AMD: cambiar el backend a ROCm y usar la NPU Ryzen AI (Lemonade), no probados en todas las tarjetas"
  }
 })) Object.assign(window.I18N[l], extra);
+
+// v0.20.5: updates
+for (const [l, extra] of Object.entries({
+ "pt": {
+  "updCheck": "Procurar atualizações",
+  "updNow2": "Atualizar agora",
+  "updAuto": "Procurar uma vez por dia (só avisa; nada é baixado sem você clicar)",
+  "updChecking": "Procurando…",
+  "updLatest": "Você está na versão mais nova (v{v}).",
+  "updSmall": "Nova versão v{v}: atualização pequena ({mb} MB). Seus dados e modelos ficam como estão.",
+  "updFull": "Nova versão v{v}: precisa do instalador completo (bibliotecas novas). Seus dados ficam como estão.",
+  "updPrivate": "Ainda não dá para verificar: o repositório do NEXUS no GitHub está privado.",
+  "updOffline": "Não foi possível verificar agora (sem internet?).",
+  "updToast": "Nova versão do NEXUS: v{v}. Configurações → Atualizações.",
+  "updWorking": "Baixando e conferindo…",
+  "updRestarting": "Pronto: o NEXUS vai fechar e abrir já atualizado.",
+  "updOpened": "A página da nova versão foi aberta no navegador.",
+  "updFailed": "Não deu certo: {e}"
+ },
+ "en": {
+  "updCheck": "Check for updates",
+  "updNow2": "Update now",
+  "updAuto": "Check once a day (only a notice; nothing downloads without your click)",
+  "updChecking": "Checking…",
+  "updLatest": "You have the newest version (v{v}).",
+  "updSmall": "New version v{v}: small update ({mb} MB). Your data and models stay as they are.",
+  "updFull": "New version v{v}: needs the full installer (new libraries). Your data stays as it is.",
+  "updPrivate": "Can't check yet: the NEXUS repository on GitHub is private.",
+  "updOffline": "Couldn't check now (no internet?).",
+  "updToast": "New NEXUS version: v{v}. Settings → Updates.",
+  "updWorking": "Downloading and checking…",
+  "updRestarting": "Done: NEXUS will close and open again updated.",
+  "updOpened": "The new version's page opened in the browser.",
+  "updFailed": "It didn't work: {e}"
+ },
+ "es": {
+  "updCheck": "Buscar actualizaciones",
+  "updNow2": "Actualizar ahora",
+  "updAuto": "Buscar una vez al día (solo avisa; nada se descarga sin tu clic)",
+  "updChecking": "Buscando…",
+  "updLatest": "Tienes la versión más nueva (v{v}).",
+  "updSmall": "Nueva versión v{v}: actualización pequeña ({mb} MB). Tus datos y modelos quedan como están.",
+  "updFull": "Nueva versión v{v}: necesita el instalador completo (bibliotecas nuevas). Tus datos quedan como están.",
+  "updPrivate": "Aún no se puede comprobar: el repositorio de NEXUS en GitHub es privado.",
+  "updOffline": "No se pudo comprobar ahora (¿sin internet?).",
+  "updToast": "Nueva versión de NEXUS: v{v}. Configuración → Actualizaciones.",
+  "updWorking": "Descargando y comprobando…",
+  "updRestarting": "Listo: NEXUS se cerrará y abrirá actualizado.",
+  "updOpened": "La página de la nueva versión se abrió en el navegador.",
+  "updFailed": "No funcionó: {e}"
+ }
+})) Object.assign(window.I18N[l], extra);
+
+// v0.20.5: the installer and updates exist now
+for (const [l, extra] of Object.entries({
+ "pt": {
+  "aboutNotItems": "Atualizações automáticas: prontas, mas só encontram versões quando o repositório do NEXUS no GitHub ficar público|Voz em espanhol: depende de uma voz em espanhol instalada no Windows (NX-VOZ-006)|Formulário de cadastro na landing page (NX-INT-001)|Anexar arquivos RAR/ZIP: planejado para depois da versão final|Usar duas placas de vídeo (ou a integrada junto) ao mesmo tempo para a IA",
+  "aboutStableItems": "Instalador (PT/EN/ES) com perfil, modelo para a sua placa, aparência, voz e Ollama|Conversa por texto e voz com a IA local NEX-1.0 (Ollama na placa AMD, sem nuvem)|Memória, perfil, conversas e busca no histórico, com contexto entre as perguntas|Agenda, tarefas, lembretes e notificações|Base de conhecimento (PDF e textos) e consultas à Wikipédia|Integrações: clima, câmbio, cripto, horário no mundo, tradução, feriados, qualidade do ar, notícias, calculadora e unidades (com cache e cópia offline)|Personalização: temas, cores, aro ou PET, cursor, menus e atalhos; a IA abre menus e muda configurações quando você pede|Painel AMD: placa, driver, uso ao vivo, VRAM e o modelo NEX-1.0 recomendado para o seu PC|Contas locais com senha e modo convidado|Downloads, armazenamento e verificação de sistemas|Modo emergência, modo foco e modo estudo|Tutorial falado (sem IA) com voltar, avançar e pular"
+ },
+ "en": {
+  "aboutNotItems": "Automatic updates: ready, but they only find versions once the NEXUS repository on GitHub is public|Spanish voice: needs a Spanish voice installed in Windows (NX-VOZ-006)|Sign-up form on the landing page (NX-INT-001)|Attaching RAR/ZIP files: planned for after the final version|Using two graphics cards (or the integrated one too) at once for the AI",
+  "aboutStableItems": "Installer (PT/EN/ES) with profile, the model for your card, look, voice and Ollama|Text and voice conversation with the local NEX-1.0 AI (Ollama on the AMD card, no cloud)|Memory, profile, conversations and history search, with context between questions|Schedule, tasks, reminders and notifications|Knowledge base (PDF and text) and Wikipedia lookups|Integrations: weather, currency, crypto, world clock, translation, holidays, air quality, news, calculator and units (cached, with an offline copy)|Personalisation: themes, colours, ring or PET, pointer, menus and shortcuts; the AI opens menus and changes settings when you ask|AMD panel: card, driver, live usage, VRAM and the NEX-1.0 model recommended for your PC|Local accounts with a password and guest mode|Downloads, storage and system check|Emergency, focus and study modes|Spoken tutorial (no AI) with back, next and skip"
+ },
+ "es": {
+  "aboutNotItems": "Actualizaciones automáticas: listas, pero solo encuentran versiones cuando el repositorio de NEXUS en GitHub sea público|Voz en español: necesita una voz en español instalada en Windows (NX-VOZ-006)|Formulario de registro en la landing page (NX-INT-001)|Adjuntar archivos RAR/ZIP: previsto para después de la versión final|Usar dos tarjetas gráficas (o la integrada también) a la vez para la IA",
+  "aboutStableItems": "Instalador (PT/EN/ES) con perfil, el modelo para tu tarjeta, apariencia, voz y Ollama|Conversación por texto y voz con la IA local NEX-1.0 (Ollama en la tarjeta AMD, sin nube)|Memoria, perfil, conversaciones y búsqueda en el historial, con contexto entre preguntas|Agenda, tareas, recordatorios y notificaciones|Base de conocimiento (PDF y textos) y consultas a Wikipedia|Integraciones: clima, cambio, cripto, hora mundial, traducción, festivos, calidad del aire, noticias, calculadora y unidades (con caché y copia sin conexión)|Personalización: temas, colores, anillo o PET, puntero, menús y atajos; la IA abre menús y cambia ajustes cuando lo pides|Panel AMD: tarjeta, controlador, uso en vivo, VRAM y el modelo NEX-1.0 recomendado para tu PC|Cuentas locales con contraseña y modo invitado|Descargas, almacenamiento y verificación de sistemas|Modos emergencia, enfoque y estudio|Tutorial hablado (sin IA) con atrás, siguiente y saltar"
+ }
+})) Object.assign(window.I18N[l], extra);

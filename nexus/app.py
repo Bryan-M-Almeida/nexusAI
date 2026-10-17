@@ -13,7 +13,7 @@ import webview
 
 from . import (__version__, assistant, bridge, control, features, gpu_tune, i18n, knowledge, legal, llm, memory,
                memory_import, notify, profile, training, apps, connectors, media, amd, prefs, models, accounts,
-               downloads, docs, storage, tutorial,
+               downloads, docs, setup_preset, storage, tutorial, updater,
                library, netprobe, performance, scheduler, skills, tools, workspace)
 from . import files as filereader
 from .logs import log, setup as setup_logs
@@ -240,6 +240,39 @@ class Api:
     @staticmethod
     def about_errors():
         return {"version": __version__, "errors": docs.known_errors(lang())}
+
+    # -- updates (v0.20.5): the small package (~20 MB) when only NEXUS changed, else the full installer -----------
+    def _update_check(self):
+        """Once a day, quietly: a new version shows a notice (nothing is downloaded without a click)."""
+        today = time.strftime("%Y-%m-%d")
+        if settings.get("update_checked_at") == today or not legal.accepted():
+            return
+        time.sleep(20)  # after the start-up work
+        result = updater.check()
+        if result.get("ok") or result.get("error") == "not_public":
+            settings.apply({"update_checked_at": today})
+        if result.get("newer"):
+            emit("update_available", result)
+
+    @staticmethod
+    def update_check():
+        return updater.check()
+
+    def update_now(self):
+        """Small update: download, check, close and reopen updated. Full one: open the release page."""
+        info = updater.state() or updater.check()
+        if not info.get("newer"):
+            return {"ok": False, "error": "up_to_date"}
+        if info.get("kind") != "small":
+            os.startfile(info.get("url") or info.get("page") or f"https://github.com/{updater.REPO}/releases")
+            return {"ok": True, "kind": "full"}
+        got = updater.download(info)
+        if not got.get("ok"):
+            return got
+        result = updater.install(got["file"])
+        if result.get("ok") and _window:
+            threading.Timer(1.2, lambda: _window.destroy()).start()  # the script waits for NEXUS to close
+        return {**result, "kind": "small"}
 
     def tutorial_begin(self):
         """v0.20.0: the AI closes until tutorial_end; meanwhile NEXUS gets ready in the background (once)."""
@@ -549,6 +582,14 @@ class Api:
         step("knowledge", bool(kb), f"{sum(k['chunks'] for k in kb)}" + (f" +{len(learned)}" if learned or seeded else ""))
         st = llm.status()
         step("ai", st["online"] and st.get("model_ready", False), st["model"])
+        want = settings.get("install_model_pull")  # v0.20.5: the model picked in the installer
+        if want and st["online"]:
+            if st.get("model_ready") and st["model"] == want:
+                settings.apply({"install_model_pull": ""})
+            else:
+                models.pull_async(want, lambda pct: emit("model_progress", {"id": want, "pct": pct}))
+        if settings.get("update_check", True) and not accounts.GUEST:
+            threading.Thread(target=self._update_check, daemon=True, name="update-check").start()
         if st["online"] and st.get("model_ready"):
             threading.Thread(target=self._warm_up, daemon=True, name="warm-up").start()
         else:
@@ -1479,6 +1520,10 @@ def main():
         return
     log.info(f"NEXUS {__version__} starting ({'guest' if accounts.GUEST else 'account ' + accounts.ACTIVE})")
     _clean_old_guests()
+    try:  # v0.20.5: language, look, voice, model and profile chosen in the installer (once)
+        setup_preset.apply()
+    except Exception as exc:  # never block the start
+        log.warning(f"install preset failed: {exc}")
     if not accounts.GUEST:  # a guest leaves nothing behind: no backups either
         threading.Thread(target=_daily_backup, daemon=True, name="backup").start()
     api = Api()

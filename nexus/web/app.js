@@ -183,6 +183,7 @@ window.nexus = {
       case "suspended": return onSuspended(p);
       case "prefs": return onPrefs(p);
       case "model_progress": return onModelProgress(p);
+      case "update_available": return onUpdate(p, true);
       case "tutorial_spoken": return onTutorialSpoken(p);
       case "tutorial_cmd": return onTutorialCmd(p);
       case "tutorial_bg": return onTutorialBg(p);
@@ -1697,6 +1698,24 @@ async function renderUpdates() {
         ${x.version === "v" + updatesCache.version ? `<i class="upd-now mono">${esc(T("updNow"))}</i>` : ""}<small>${x.headline}</small></summary>
       <div class="upd-body">${x.html}</div></details>`).join("") : `<p class="hint">${esc(T("updatesNone"))}</p>`;
 }
+function onUpdate(r, toast) {
+  const st = $("#updStatus");
+  $("#btnUpdNow").hidden = !(r && r.newer && r.kind);
+  if (!r) return;
+  if (!r.ok) st.textContent = T(r.error === "not_public" ? "updPrivate" : "updOffline");
+  else if (!r.newer) st.textContent = T("updLatest", { v: r.current });
+  else {
+    st.textContent = T(r.kind === "small" ? "updSmall" : "updFull", { v: r.latest, mb: r.size_mb });
+    if (toast) notice(T("updToast", { v: r.latest }), "");
+  }
+}
+async function updateNow() {
+  $("#btnUpdNow").disabled = true;
+  $("#updStatus").textContent = T("updWorking");
+  const r = await api().update_now();
+  $("#btnUpdNow").disabled = false;
+  $("#updStatus").textContent = r.ok ? T(r.kind === "small" ? "updRestarting" : "updOpened") : T("updFailed", { e: r.error || "?" });
+}
 let issuesCache = null;
 async function renderIssues() {
   if (!issuesCache) {
@@ -2224,6 +2243,8 @@ function wire() {
   $("#tutSkip").onclick = () => tutorialSkip();
   $("#tutBack").onclick = () => tutorialGo(Math.max(0, tutorialStep - 1));
   $("#issuesFind").oninput = () => renderIssues();
+  $("#btnUpdCheck").onclick = async () => { $("#updStatus").textContent = T("updChecking"); onUpdate(await api().update_check(), false); };
+  $("#btnUpdNow").onclick = () => updateNow();
   $("#issuesArea").onchange = () => renderIssues();
   const cf = $("#settingsForm");
   ["cursor_style", "cursor_size"].forEach((n) => (cf.elements[n].onchange = () => setCursor(cf.elements.cursor_style.value, cf.elements.cursor_size.value)));

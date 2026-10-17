@@ -144,6 +144,9 @@ DEFAULTS = {
     "beta_lyrics": False,               # v0.20.0: these three moved to beta (see nexus/features.py)
     "beta_custom_integrations": False,
     "beta_amd_lab": False,
+    "install_model_pull": "",     # v0.20.5: model chosen in the installer, downloaded on the first start
+    "update_check": True,         # v0.20.5: look for a new version once a day (GitHub releases)
+    "update_checked_at": "",
     "apps_suspend": "games",      # games (suspend when NEXUS opens a game) | never
     "game_watch": False,          # also suspend when a game started elsewhere comes to the foreground
     "apps_games": [],             # app names the user marked as games

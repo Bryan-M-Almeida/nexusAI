@@ -8,6 +8,49 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.20.5 — Protótipo · 2026-10-16
+
+**Instalador do NEXUS (Inno Setup, PT/EN/ES) que já deixa tudo do seu jeito — perfil, modelo para a sua placa,
+aparência, voz e Ollama — e atualizações pequenas: as próximas versões não precisam baixar tudo de novo.**
+
+### Novo
+- **Instalador `NEXUS-Setup-<versão>.exe`** (494 MB, com a voz Whisper e o ícone), sem precisar de administrador:
+  o programa vai para `%LOCALAPPDATA%\Programs\NEXUS`, os dados continuam em `%LOCALAPPDATA%\NEXUS`.
+  - **Idioma** da instalação (português, inglês ou espanhol), que vira o idioma do NEXUS.
+  - **Atalho na Área de Trabalho** e **abrir o NEXUS quando o Windows iniciar** (opcional).
+  - **Licença MIT** e o **aviso de autoria** (NOTICE) antes de instalar.
+  - **Seu perfil (JSON)**, opcional: o NEXUS já abre sabendo seu nome, profissão e interesses.
+  - **Modelo de IA**: o instalador detecta a placa de vídeo e a memória (mesma regra do app) e recomenda o NEX-1.0
+    certo; dá para escolher Lite, Mini, NEX-1.0 ou Pro. O NEXUS baixa o modelo no primeiro uso, em Configurações →
+    Downloads.
+  - **Aparência e voz**: aro ou PET, tema de cores (7), voz masculina ou feminina.
+  - **Ollama**: se não estiver instalado, oferece baixar e instalar (ollama.com); se o download falhar, a instalação
+    segue e o NEXUS explica como resolver.
+  - Fecha o NEXUS aberto antes de atualizar; ao desinstalar, pergunta se você quer apagar também os seus dados
+    (o padrão é manter).
+- **As escolhas do instalador** são aplicadas uma vez no primeiro início, com a mesma validação das Configurações.
+- **Atualizações sem baixar tudo de novo**: cada versão publica o instalador completo e uma **atualização pequena de
+  18 MB** (o programa, a interface e os documentos — sem as bibliotecas e sem o modelo de voz).
+  *Configurações → Atualizações → Procurar atualizações* (e sozinho, uma vez por dia, só avisando): o NEXUS baixa,
+  **confere o SHA-256**, fecha e abre já atualizado; dados, contas e modelos não são tocados. Quando uma versão troca
+  bibliotecas (BASE diferente), ela pede o instalador completo, instalado por cima. Enquanto o repositório for
+  privado, a verificação avisa que ainda não consegue ver as versões.
+- **`release.ps1`**: gera o executável, a atualização pequena (+ `.sha256`) e o instalador de uma vez.
+
+### Desempenho
+- Uma versão nova custa **18 MB** para quem já tem o NEXUS, em vez de 494 MB (o instalador inteiro).
+- Primeiro uso mais rápido: o perfil, o idioma, a aparência e o modelo já vêm configurados — sem o passo de importar o
+  perfil e sem escolher modelo depois.
+
+### Testes desta versão
+- 357/357 testes unitários (10 novos: escolhas do instalador aplicadas uma vez, comparação de versões, atualização
+  pequena × completa × nenhuma × repositório privado, conteúdo do pacote pequeno, páginas e idiomas do instalador,
+  regra do modelo igual à do app).
+- Instalação silenciosa de teste numa pasta temporária: arquivos, atalho, preferências gravadas e desinstalação.
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.20.0 — Protótipo · 2026-10-16
 
 **Etapa final: tutorial roteirizado e falado sem IA (com voltar, avançar e pular) enquanto o NEXUS se prepara em segundo
