@@ -194,8 +194,11 @@ class Api:
         add("ai", st["online"] and st.get("model_ready"), models.display_name())
         gpus = hardware.gpus()
         add("gpu", bool(gpus), gpus[0]["name"] if gpus else "")
-        add("voice", self._listener.model_state in ("ready", "loading") or self._listener.released,
-            f"whisper {settings['stt_model']}")
+        from .voice import bundled_model
+
+        voice_ok = (self._listener.model_state in ("ready", "loading") or self._listener.released
+                    or bundled_model(settings["stt_model"]) is not None or _whisper_cached(settings["stt_model"]))
+        add("voice", voice_ok, f"whisper {settings['stt_model']}")
         try:
             voices = len(tts.Engine().voices)
         except Exception:
@@ -218,13 +221,25 @@ class Api:
         return {"ok": ok, "checks": checks, "said": said}
 
     def first_check(self):
-        """First start: check everything and say it (once)."""
+        """First start: check everything and say it (once). The tutorial waits for "check_spoken" so the two
+        never talk over each other (v0.19.6)."""
         result = self.system_check()
         if not settings.get("system_check_done"):
             settings.apply({"system_check_done": True})
-            self._speaker.say(result["said"], force=True)
+            self._speaker.say(result["said"], force=True, remember=False, on_done=lambda: emit("check_spoken", {}))
             result["spoken"] = True
         return result
+
+    def speak_tutorial(self, text, step):
+        """One tutorial step; "tutorial_spoken" tells the interface when it has been said to the end, so the next
+        step never starts while NEXUS is still talking (v0.19.6: a busy PC made the steps skip ahead)."""
+        from .voice import speech_allowed
+
+        self._speaker.stop()
+        if not speech_allowed():
+            return {"voice": False}
+        self._speaker.say(text, force=True, remember=False, on_done=lambda: emit("tutorial_spoken", {"step": step}))
+        return {"voice": True}
 
     # -- accounts (v0.19.0) -------------------------------------------------------------------------------------------
     def account_state(self):
@@ -1447,6 +1462,14 @@ def main():
         logging.shutdown()
         db.close() if hasattr(db, "close") else None
         shutil.rmtree(DATA_DIR, ignore_errors=True)
+
+
+def _whisper_cached(name: str) -> bool:
+    try:
+        from huggingface_hub.constants import HF_HUB_CACHE
+    except Exception:
+        return False
+    return any((Path(HF_HUB_CACHE) / f"models--Systran--faster-whisper-{name}").glob("snapshots/*/model.bin"))
 
 
 def _clean_old_guests():

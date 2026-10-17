@@ -183,6 +183,8 @@ window.nexus = {
       case "suspended": return onSuspended(p);
       case "prefs": return onPrefs(p);
       case "model_progress": return onModelProgress(p);
+      case "tutorial_spoken": return onTutorialSpoken(p);
+      case "check_spoken": return checkSpoken && checkSpoken();
       case "training_progress": return onTrainingProgress(p);
       case "training_done": return showTrainingResult(p);
       case "mic_level": ringMicTarget = Math.max(ringMicTarget, p); return wakeRing();
@@ -252,17 +254,22 @@ async function start() {
   const hello = await api().greet();
   addMsg("nexus", hello);
   caption(hello, 7000);
-  if (!profile) openOnboarding();
+  if (!profile && !state.guest) openOnboarding();  // v0.19.6: a guest has no profile to import
   setFull(!!st.fullscreen);
   api().training_state().then(onTrainingState);
   api().import_prompt(L).then((r) => (importSources = r.sources || {}));
+  // v0.19.6: the first start checks every system and says it BEFORE the tutorial (they used to talk over each other)
+  const checked = settings.system_check_done ? Promise.resolve() : new Promise((done) => {
+    checkSpoken = done;
+    setTimeout(done, 15000);  // never wait forever (voice off)
+    api().first_check().then((r) => { setExchange("nexus", r.said); if (!r.spoken) done(); });
+  });
   if (!settings.tutorial_done) {  // first run: narrated tutorial once the profile question is out of the way
-    const go = () => setTimeout(startTutorial, 1800);
+    const go = () => checked.then(() => setTimeout(startTutorial, 1200));
     if ($("#onboarding").hidden) go();
     else new MutationObserver((m, obs) => { if ($("#onboarding").hidden) { obs.disconnect(); go(); } })
       .observe($("#onboarding"), { attributes: true, attributeFilter: ["hidden"] });
   }
-  if (!settings.system_check_done) setTimeout(() => api().first_check().then((r) => setExchange("nexus", r.said)), 9000);
   if (!st.llm.online || !st.llm.model_ready) notice(aiHelp(st.llm), T("moreAi"));
   else if (state.ui_mode === "audio" && !state.mic_muted && st.stt === "missing") notice(T("voiceFirstUse"), T("moreVoice"));
 }
@@ -1168,7 +1175,7 @@ const TUTORIAL = [
   { text: "tut5", focus: "none" },
   { text: "tut6", focus: "none" },
 ];
-let tutorialStep = -1, tutorialTimer;
+let tutorialStep = -1, tutorialTimer, checkSpoken = null;
 function tutorialSteps() {
   const sc = settings.ui_layout === "shortcuts";
   return TUTORIAL.filter((x) => !(x.computer && sc) && !(x.shortcuts && !sc));
@@ -1192,8 +1199,16 @@ function tutorialGo(i) {
   $("#tutCount").textContent = `${i + 1} / ${steps.length}`;
   $("#tutNext").textContent = T(i === steps.length - 1 ? "tutDone" : "tutNext");
   setExchange("nexus", text);
-  api().speak_help(text);
-  tutorialTimer = setTimeout(() => tutorialGo(i + 1), Math.max(4500, text.length * 75));
+  // v0.19.6: the next step comes when NEXUS finishes saying this one (event "tutorial_spoken"); the timer is only a
+  // safety net (voice off, or the event lost) - before, a busy PC made the steps skip ahead of the voice
+  const fallback = Math.max(4500, text.length * 75);
+  tutorialTimer = setTimeout(() => tutorialGo(i + 1), fallback + 15000);
+  api().speak_tutorial(text, i).then((r) => {
+    if (tutorialStep === i && r && !r.voice) { clearTimeout(tutorialTimer); tutorialTimer = setTimeout(() => tutorialGo(i + 1), fallback); }
+  });
+}
+function onTutorialSpoken(p) {
+  if (!$("#tutorial").hidden && p.step === tutorialStep) { clearTimeout(tutorialTimer); tutorialTimer = setTimeout(() => tutorialGo(tutorialStep + 1), 900); }
 }
 async function endTutorial() {
   if (tutorialStep < 0) return;

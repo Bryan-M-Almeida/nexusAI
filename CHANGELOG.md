@@ -8,6 +8,46 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.19.7 — Protótipo · 2026-10-16
+
+**Correções do uso real no modo convidado: a IA não inventa mais fatos nem letras, letras com a fonte que você diz,
+tutorial no ritmo da voz e o convidado com a própria saudação.**
+
+### Corrigido
+- **NX-LLM-048 — fatos inventados** ("a abertura de Dragon Ball GT é The New Power", depois "KAT-TUN"): perguntas
+  sobre músicas, séries, filmes, livros e pessoas obrigam a consultar a Wikipédia; a busca usa as palavras importantes
+  (sem "quem canta a…"), lê os **3 melhores artigos** e devolve os **trechos sobre o detalhe** pedido (o resumo não
+  citava a música); a IA só pode responder com nomes do texto encontrado e, se a consulta falhar, diz que não
+  conseguiu verificar. Teste com o modelo real: Dragon Ball GT → Field of View, "Sorriso Resplandecente (Dan Dan Kokoro
+  Hikareteku)"; Cavaleiros do Zodíaco → "Pegasus Fantasy"; Ada Lovelace continua sem consulta (conhecimento geral).
+- **NX-LLM-049 — letras inventadas**: o NEXUS nunca escreve letras de memória. **Letras só de uma fonte que você diz**:
+  "cante X, letra do **LRCLIB**" (base aberta feita para apps de música, sem chave) ou "do **Vagalume**" (API oficial
+  com chave grátis em Configurações → Integrações; sem a chave — ou com a API fora do ar — a página abre no
+  navegador); **Letras.mus.br** e **Genius** abrem no navegador (não têm API pública, e copiar dos sites vai contra
+  os termos deles). A letra vem com a fonte e o link; "cante essa" usa a música da conversa; o contexto ("Dragon Ball
+  GT") escolhe a certa entre músicas de mesmo nome, e um título traduzido que não existe na fonte tenta o original.
+  Sem fonte, ele explica como pedir (e toca a música com o Navegador ligado).
+- **NX-LLM-050 — tutorial pulando**: cada passo avança **quando a fala dele termina** (+0,9 s) em vez de um tempo fixo;
+  a verificação de sistemas fala antes e o tutorial espera.
+- **Modo convidado**: saudação própria ("Você está no modo convidado: nada desta conversa será guardado") e sem pedir
+  para importar perfil; a verificação de sistemas não acusa mais a voz (o modelo embutido conta como pronto).
+
+### Desempenho
+- "Cante X": **0,4 s** com a letra real (LRCLIB) ou **0 s** perguntando a fonte — antes a IA levava ~15 s escrevendo uma
+  letra inventada.
+- O tutorial não acumula mais falas: com a voz levando 5 s por passo, cada passo dura 5,9 s (antes avançava em 4,5 s e
+  as falas se empilhavam).
+- Perguntas de fatos ficaram ~6 s mais lentas (consultam a Wikipédia) — em troca de respostas corretas.
+- Avaliação de conversa 37/37 (média 5,5 s, mesmas 27 perguntas).
+
+### Testes desta versão
+- 335/335 testes unitários (6 novos: detalhe lido do artigo, consulta obrigatória para fatos de músicas/séries, fonte e
+  música entendidas em PT/EN/ES, a música certa entre homônimas, sem fonte ele pergunta, saudação do convidado).
+- Avaliação de conversa **37/37** com o modelo real; tutorial conferido na prévia com voz lenta.
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.19.6 — Protótipo · 2026-10-16
 
 **Ícone do programa e o PET: a esfera do NEXUS no lugar do aro, com o olho seguindo o mouse.**

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 3.9  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.19.6
+ Versión del documento: 4.0  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.19.7
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -98,6 +98,9 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-LLM-045  "Eso es magenta, no rosa chicle": la IA decía "Listo" sin cambiar el color
       NX-LLM-046  "Pon una canción" abría Spotify sin que el usuario lo pidiera
       NX-LLM-047  No se podía arrastrar la ventana de Configuración en algunas secciones
+      NX-LLM-048  La IA inventaba datos de canciones/series ("The New Power", "KAT-TUN")
+      NX-LLM-049  "Canta X": la IA escribía letras inventadas
+      NX-LLM-050  El tutorial se adelantaba a la voz (y hablaba junto con la verificación)
  VOZ  NX-VOZ-001  El micrófono no responde en el primer uso (descarga Whisper)
       NX-VOZ-002  Micrófono equivocado seleccionado (p. ej. DroidCam)
       NX-VOZ-003  Palabra de activación "Nexus" no reconocida / falsos disparos
@@ -809,6 +812,36 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                Personalización) no dejaban dónde agarrar.
   Corrección : Una franja fija de 30 px arriba de cada ventana y el título de la
                sección siempre arrastran (botones y campos siguen funcionando).
+
+[NX-LLM-048] La IA inventaba datos de canciones/series ("The New Power", "KAT-TUN")
+  Gravedad   : ALTA             Estado: CORREGIDO (v0.19.7) Observado: SÍ
+  Síntoma    : "La canción de apertura de Dragon Ball GT" -> "The New Power, de
+               Takeshi Kusakabe" (falso); corregida, la IA insistía. Incluso
+               consultando Wikipedia inventó "KAT-TUN".
+  Causa      : El modelo respondía de memoria; y la búsqueda de Wikipedia traía
+               solo el resumen del artículo, que no nombra la canción.
+  Corrección : Las preguntas sobre canciones, series, películas, libros y
+               personas obligan a consultar Wikipedia; la búsqueda usa las
+               palabras clave, lee los 3 mejores artículos y devuelve los tramos
+               sobre el detalle pedido; la IA solo puede responder con nombres de
+               ese texto; si la consulta falla, dice que no pudo comprobarlo.
+
+[NX-LLM-049] "Canta X": la IA escribía letras inventadas
+  Gravedad   : MEDIA            Estado: CORREGIDO (v0.19.7) Observado: SÍ
+  Corrección : NEXUS nunca escribe letras de memoria. Muestra (y lee) una letra
+               solo de una fuente que el usuario nombra: "canta X, letra de
+               LRCLIB" (base abierta) o "de Vagalume" (API oficial con clave
+               gratuita; sin ella la página se abre en el navegador);
+               Letras.mus.br y Genius se abren en el navegador. La fuente aparece
+               con la letra.
+
+[NX-LLM-050] El tutorial se adelantaba a la voz (y hablaba junto con la verificación)
+  Gravedad   : MEDIA            Estado: CORREGIDO (v0.19.7) Observado: SÍ
+  Causa      : Cada paso avanzaba por tiempo (75 ms por letra) sin esperar la
+               voz; con el PC ocupado la voz se retrasaba. La verificación de
+               sistemas también hablaba durante el tutorial.
+  Corrección : Cada paso avanza cuando termina su voz (+0,9 s); la verificación
+               habla antes y el tutorial la espera.
 
 ================================================================================
  VOZ — RECONOCIMIENTO Y SÍNTESIS

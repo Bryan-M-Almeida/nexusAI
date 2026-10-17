@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 3.9  ·  Date: 2026-10-16  ·  App version: 0.19.6
+ Document version: 4.0  ·  Date: 2026-10-16  ·  App version: 0.19.7
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -97,6 +97,9 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-045  "That's magenta, not hot pink": the AI said "Done" without changing the colour
       NX-LLM-046  "Play a song" opened Spotify without the user asking
       NX-LLM-047  The Settings window couldn't be dragged in some sections
+      NX-LLM-048  The AI invented facts about songs/series ("The New Power", "KAT-TUN")
+      NX-LLM-049  "Sing X": the AI wrote made-up lyrics
+      NX-LLM-050  The tutorial skipped ahead of the voice (and talked over the system check)
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -776,6 +779,39 @@ QUICK DIAGNOSTICS (run these before investigating)
                to grab.
   Fix        : A fixed 30 px strip on top of every window and the section title
                always drag (buttons and fields keep working).
+
+[NX-LLM-048] The AI invented facts about songs/series ("The New Power", "KAT-TUN")
+  Severity   : HIGH             Status: FIXED (v0.19.7)    Observed: YES
+  Symptom    : "The opening song of Dragon Ball GT" -> "The New Power by Takeshi
+               Kusakabe" (false); corrected, the AI insisted. Even after looking
+               it up on Wikipedia it invented "KAT-TUN".
+  Cause      : The model answered from memory; and the Wikipedia lookup returned
+               only the article's summary, which doesn't name the song.
+  Fix        : Questions about songs, series, films, books and people (who sings,
+               opening, author...) must be looked up; the search uses the key
+               words, reads the 3 best articles and returns the lines about the
+               detail asked; the AI may only answer with names in that text; if
+               the lookup fails it says it couldn't check. Test: Dragon Ball GT ->
+               Field of View, "Dan Dan Kokoro Hikareteku"; Saint Seiya -> "Pegasus
+               Fantasy".
+
+[NX-LLM-049] "Sing X": the AI wrote made-up lyrics
+  Severity   : MEDIUM           Status: FIXED (v0.19.7)    Observed: YES
+  Fix        : NEXUS never writes lyrics from memory. It shows (and reads) lyrics
+               only from a source the user names: "sing X, lyrics from LRCLIB"
+               (open database) or "from Vagalume" (official API with a free key;
+               without it the page opens in the browser); Letras.mus.br and
+               Genius open in the browser. The source is shown with the lyrics;
+               the conversation picks the right song among those with the same
+               name.
+
+[NX-LLM-050] The tutorial skipped ahead of the voice (and talked over the system check)
+  Severity   : MEDIUM           Status: FIXED (v0.19.7)    Observed: YES
+  Cause      : Each step advanced on a timer (75 ms per letter) without waiting
+               for the voice; on a busy PC the voice lagged and phrases piled up.
+               The system check also spoke during the tutorial.
+  Fix        : Each step advances when its speech ends (+0.9 s); the check speaks
+               first and the tutorial waits for it.
 
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS

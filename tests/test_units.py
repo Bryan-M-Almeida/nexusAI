@@ -1226,5 +1226,67 @@ check("PET: its two layers and the program icon are in place",
       all((WEB / "pet" / f).stat().st_size > 10_000 for f in ("body.webp", "eye.webp"))
       and (_isolated.ROOT / "assets" / "nexus.ico").exists() and "pet/eye.webp" in (WEB / "app.js").read_text("utf-8"))
 
+# -- v0.19.7: facts looked up (not invented), lyrics only from a named source, guest greeting ---------------------------
+from nexus import integrations as _integ  # noqa: E402
+from nexus import lyrics as _lyr  # noqa: E402
+
+
+class _Resp:
+    def __init__(self, data):
+        self._d = data
+
+    def json(self):
+        return self._d
+
+
+_ARTICLE = ("Dragon Ball GT é uma série de anime.\n== Música ==\nA música da série foi composta por Akihito Tokunaga.\n"
+            "Field of View realiza o tema de abertura da série, \"Sorriso Resplandecente (Dan Dan Kokoro Hikareteku)\".\n"
+            "== Outros ==\nA série tem 64 episódios.")
+_real_get = _integ._get
+_integ._get = lambda url, **k: _Resp({"query": {"pages": {"1": {"extract": _ARTICLE}}}})
+_det = _integ._article_details("pt", "Dragon Ball GT", "música de abertura de Dragon Ball GT")
+_integ._get = _real_get
+check("wikipedia: a detail beyond the summary is read from the article (the opening song)",
+      "Field of View" in _det and "Dan Dan" in _det and "64 episódios" not in _det, _det)
+check("trivia: questions about songs/series must be looked up (the model invented a title before)",
+      bool(assistant._needs_tool("A abertura é The New Power.", False, "A música de abertura de Dragon Ball GT", set()))
+      and assistant._needs_tool("ok", False, "A música de abertura de Dragon Ball GT", {"wikipedia"}) is None)
+check("lyrics: the source and the song are understood in PT/EN/ES",
+      [(_lyr.source_in(q), _lyr.song_in(q)) for q in ("cante Dan Dan Kokoro Hikareteku, letra do LRCLIB",
+                                                      'cante "Sorriso Resplandecente" pega a letra do vagalume',
+                                                      "sing Yesterday, lyrics from lrclib", "canta Despacito usando el vagalume",
+                                                      "cante uma música")]
+      == [("lrclib", "Dan Dan Kokoro Hikareteku"), ("vagalume", "Sorriso Resplandecente"), ("lrclib", "Yesterday"),
+          ("vagalume", "Despacito"), (None, "uma música")])
+_cands = [{"trackName": "Sorriso Resplandecente", "artistName": "Outra Banda", "albumName": "Outro", "plainLyrics": "x" * 900},
+          {"trackName": "Sorriso Resplandecente", "artistName": "Ricardo", "albumName": "Sorriso Resplandecente (Dragon Ball GT)",
+           "plainLyrics": "y" * 800}]
+_real_httpx_get = _lyr.httpx.get
+
+
+class _LResp:
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return _cands
+
+
+_lyr.httpx.get = lambda *a, **k: _LResp()
+_pick = _lyr._lrclib("Sorriso Resplandecente", "a abertura de Dragon Ball GT")
+_lyr.httpx.get = _real_httpx_get
+check("lyrics: among songs with the same name, the conversation picks the right one (Dragon Ball GT)",
+      _pick["artist"] == "Ricardo" and _pick["source"] == "LRCLIB")
+memory.new_conversation()
+_ev = []
+_bot3 = assistant.Assistant(lambda e, p: _ev.append((e, p)))
+_bot3.ask('cante "Sorriso Resplandecente"')
+check("lyrics: without a source NEXUS never invents them - it asks where to take them from",
+      "LRCLIB" in [p["text"] for e, p in _ev if e == "done"][-1])
+_acc_guest, _acc.GUEST = _acc.GUEST, True
+check("guest: its own greeting (no profile to import)", assistant.greeting() == i18n.STRINGS["pt"]["guest_hello"]
+      or assistant.greeting().startswith("Olá! Você está no modo convidado"))
+_acc.GUEST = _acc_guest
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

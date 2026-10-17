@@ -1232,3 +1232,19 @@ for (const [l, extra] of Object.entries({
   "centerPetHint": "La esfera de NEXUS: el ojo sigue al ratón y reacciona como el anillo."
  }
 })) Object.assign(window.I18N[l], extra);
+
+// v0.19.6: lyrics source
+for (const [l, extra] of Object.entries({
+ "pt": {
+  "vagalumeKey": "Chave da API do Vagalume (opcional, para letras)",
+  "lyricsHint": "Letras só de uma fonte que você diz: \"cante X, letra do LRCLIB\" (aberto, sem chave) ou \"do Vagalume\" (com chave; sem ela a página abre no navegador). Letras.mus.br e Genius abrem no navegador."
+ },
+ "en": {
+  "vagalumeKey": "Vagalume API key (optional, for lyrics)",
+  "lyricsHint": "Lyrics only from a source you name: \"sing X, lyrics from LRCLIB\" (open, no key) or \"from Vagalume\" (with a key; without it the page opens in the browser). Letras.mus.br and Genius open in the browser."
+ },
+ "es": {
+  "vagalumeKey": "Clave de la API de Vagalume (opcional, para letras)",
+  "lyricsHint": "Letras solo de una fuente que nombres: \"canta X, letra de LRCLIB\" (abierta, sin clave) o \"de Vagalume\" (con clave; sin ella la página se abre en el navegador). Letras.mus.br y Genius se abren en el navegador."
+ }
+})) Object.assign(window.I18N[l], extra);

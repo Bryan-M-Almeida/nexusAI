@@ -127,18 +127,81 @@ def convert_currency(amount: float = 1, from_currency: str = "USD", to_currency:
 
 # ---------------------------------------------------------------- wikipedia
 def wikipedia(query: str):
+    """Summary of the best article; for questions about a detail ("quem canta a abertura de X") also the lines of the
+    3 best articles that mention it (v0.19.6: the lead of "Dragon Ball GT" never names its opening song, and for
+    "Cavaleiros do Zodíaco" the answer is in "Trilha Sonora de Cavaleiros do Zodíaco" - the model invented both)."""
     code = lang()
+    words = re.findall(r"\w+", query.lower())
+    keywords = " ".join(w for w in words if w not in _STOP and w not in _QUESTION) or query
     try:
-        found = _get(f"https://{code}.wikipedia.org/w/api.php", action="opensearch", search=query, limit=1,
-                     namespace=0, format="json").json()
-        if not found[1]:
+        titles = []
+        if len(words) <= 3:  # a name: title search
+            found = _get(f"https://{code}.wikipedia.org/w/api.php", action="opensearch", search=query, limit=1,
+                         namespace=0, format="json").json()
+            titles = found[1][:1]
+        if not titles:  # a sentence -> full-text search with the meaningful words
+            hits = _get(f"https://{code}.wikipedia.org/w/api.php", action="query", list="search", srsearch=keywords,
+                        srlimit=3, format="json").json().get("query", {}).get("search", [])
+            titles = [h["title"] for h in hits]
+        if not titles:
             return {"error": f"no Wikipedia article for: {query}"}
-        title = found[1][0]
-        page = _get(f"https://{code}.wikipedia.org/api/rest_v1/page/summary/{quote(title.replace(' ', '_'))}").json()
+        page = _get(f"https://{code}.wikipedia.org/api/rest_v1/page/summary/{quote(titles[0].replace(' ', '_'))}").json()
     except httpx.HTTPError as exc:
         return _offline(exc)
-    return {"title": page.get("title", title), "summary": (page.get("extract") or "")[:900],
-            "url": page.get("content_urls", {}).get("desktop", {}).get("page", ""), "source": "Wikipedia"}
+    out = {"title": page.get("title", titles[0]), "summary": (page.get("extract") or "")[:900],
+           "url": page.get("content_urls", {}).get("desktop", {}).get("page", ""), "source": "Wikipedia"}
+    details = []
+    for title in titles:
+        found = _article_details(code, title, keywords)
+        if found:
+            details.append(f"[{title}] {found}")
+    if details:
+        out["details"] = "\n".join(details)[:1500]
+    return out
+
+
+_STOP = {"de", "do", "da", "dos", "das", "o", "a", "os", "as", "e", "the", "of", "and", "el", "la", "los", "las", "del",
+         "um", "uma", "é", "is", "es", "em", "in", "en", "no", "na", "que", "se", "por", "para", "com", "to"}
+_QUESTION = {"qual", "quais", "quem", "what", "who", "which", "cual", "cuál", "quien", "quién", "canta", "cantou",
+             "sings", "sang", "chama", "called", "llama", "foi", "was", "fue", "me", "diga", "tell", "sabe", "know"}
+_SYNONYMS = {"abertura": ["abertura", "opening", "tema de abertura"], "opening": ["opening", "abertura"],
+             "encerramento": ["encerramento", "ending", "tema de encerramento"], "ending": ["ending", "encerramento"],
+             "musica": ["música", "music", "canção"], "música": ["música", "music", "canção"],
+             "trilha": ["trilha sonora", "soundtrack"], "elenco": ["elenco", "cast", "dublagem", "voz"],
+             "cast": ["cast", "elenco"], "autor": ["autor", "criado por", "escrito por", "author"],
+             "dublagem": ["dublagem", "dublado", "voz"]}
+
+
+def _article_details(code: str, title: str, query: str) -> str:
+    """The lines of an article that mention what the question asks beyond the article's own name (with the next
+    lines after a short match: lists such as "Abertura:" put the value there)."""
+    title_words = set(re.findall(r"\w+", title.lower()))
+    wanted = [w for w in re.findall(r"\w+", query.lower()) if w not in _STOP and w not in title_words and len(w) > 2]
+    if not wanted:
+        return ""
+    terms = {t for w in wanted for t in _SYNONYMS.get(w, [w])}
+    try:
+        pages = _get(f"https://{code}.wikipedia.org/w/api.php", action="query", prop="extracts", explaintext=1,
+                     titles=title, redirects=1, format="json").json()["query"]["pages"]
+        text = next(iter(pages.values())).get("extract", "")
+    except (httpx.HTTPError, KeyError, ValueError, StopIteration):
+        return ""
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    scored = []
+    for i, ln in enumerate(lines):
+        low = ln.lower()
+        score = sum(t in low for t in terms)
+        if score:
+            chunk = " ".join(lines[i:i + (3 if len(ln) < 60 else 1)])
+            scored.append((score, i, chunk[:420]))
+    best, seen = [], []
+    for score, i, chunk in sorted(scored, key=lambda x: (-x[0], x[1])):
+        if not any(chunk[:120] in other or other[:120] in chunk for other in seen):
+            best.append((i, chunk))
+            seen.append(chunk)
+        if len(best) == 2:
+            break
+    return " / ".join(chunk for _, chunk in sorted(best))
 
 
 # ---------------------------------------------------------------- calendar (ICS feed, read-only)

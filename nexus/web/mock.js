@@ -206,6 +206,7 @@ if (!window.pywebview && location.search.includes("mock")) {
     model_pull: async (id) => { [10, 35, 62, 88, 100].forEach((pct, i) => emit("model_progress", { id, pct }, 400 * (i + 1))); return { ok: true }; },
     model_use: async (id) => { mockActive = id; return { ok: true, id, name: id }; },
     amd_open_ref: async () => ({ ok: true }),
+    speak_tutorial: async (text, step) => { emit("tutorial_spoken", { step }, window.mockSpeechMs || 5000); return { voice: true }; },
     amd_compute: async () => ({ backend: "auto", vulkan: true, card: "AMD Radeon RX 6600 XT", npus: [], using_lemonade: false,
       rocm: { gfx: "gfx1032", supported: false, installed: true, targets: ["gfx1030", "gfx1100", "gfx1101", "gfx1102", "gfx1150", "gfx1151", "gfx1200", "gfx1201", "gfx906"] },
       lemonade: { running: false, url: "http://127.0.0.1:8000/api/v1", models: [] } }),

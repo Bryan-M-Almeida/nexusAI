@@ -130,6 +130,14 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Fatos verificados e letras com fonte (v0.19.7)
+
+- Perguntas sobre músicas, séries, filmes, livros e pessoas ("quem canta a abertura de X") são **consultadas na
+  Wikipédia** — inclusive os detalhes que não estão no resumo — e a IA só responde com o que encontrou.
+- **Letras só de uma fonte que você diz**: "cante X, letra do LRCLIB" (base aberta) ou "do Vagalume" (com a chave grátis
+  da API em Configurações → Integrações; sem ela a página abre no navegador). Sem fonte, o NEXUS pergunta — nunca
+  inventa.
+
 ### Ícone e PET (v0.19.6)
 
 - **Ícone do programa**: a esfera do NEXUS (`assets/nexus.ico`, 16–256 px; em 16 e 24 px só o olho, para continuar
@@ -488,4 +496,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.19.6 (protótipo)**.
+Versão atual: **v0.19.7 (protótipo)**.

@@ -5,8 +5,8 @@ import threading
 import uuid
 from datetime import datetime, timedelta
 
-from . import (apps, connectors, emergency, features, knowledge, llm, media, memory, netprobe, prefs, profile, skills,
-               tools, training, ui_nav, workspace)
+from . import (apps, connectors, emergency, features, knowledge, llm, lyrics, media, memory, netprobe, prefs, profile,
+               skills, tools, training, ui_nav, workspace)
 from .config import settings
 from .db import db
 from .i18n import WEEKDAYS, detect, lang, t
@@ -51,6 +51,11 @@ Rules:
 - For factual questions (first aid, philosophy, finance, programming, health, productivity...) prefer the knowledge base;
   cite the source name briefly. In medical emergencies always tell them to call emergency services first (Brazil: SAMU 192 / Bombeiros 193; US: 911; Spain/EU: 112).
 - Never invent stored data: read it with tools.
+- Facts about specific songs, albums, films, series, anime, games, books or people (who sings, opening theme, author,
+  release year, cast) -> call `wikipedia` first unless you are certain; never guess names or titles. If the user
+  corrects you, check before insisting.
+- NEVER write song lyrics from memory (you don't know them reliably): NEXUS shows lyrics only from a source the user
+  names ("letra do LRCLIB / Vagalume"). Otherwise offer to play the song (`play_music`) and ask which source to use.
 - QUIZZES / mock exams: after each answer, grade it IMMEDIATELY (correct or not, the right answer and one
   short reason), then ask the next question. Keep answers in the conversation: never store them with
   `record_data`. Only call an answer correct after checking the fact; never invent explanations. Ask
@@ -304,6 +309,10 @@ LIVE = [
                 r"weather|rain\w*|forecast|temperature|umbrella|llov\w*|lluvia|pron[oó]stico|hace (fr[ií]o|calor))\b", re.I),
      {"get_weather"}, "get_weather"),
     (re.compile(r"\b(not[ií]cias?|manchetes?|news|headlines?|noticias?|titulares)\b", re.I), {"get_news"}, "get_news"),
+    # v0.19.6: "a música de abertura de Dragon Ball GT" was answered from memory with an invented title
+    (re.compile(r"\b(m[uú]sica|can[cç][aã]o|tema|trilha sonora|abertura|encerramento|opening|ending|soundtrack|theme song|"
+                r"quem canta|quem cantou|who sings|who sang|qui[eé]n canta|compositor|composer|cantor|singer|cantante)\b"
+                r".{0,60}\b(de|do|da|of|del)\b", re.I), {"wikipedia", "web_search"}, "wikipedia"),
     (re.compile(r"\b(c[aâ]mbio|cota[cç][aã]o|d[oó]lar(es)?|euros?|libras?|exchange rate|currency|tipo de cambio|"
                 r"em reais|in dollars|en pesos)\b", re.I), {"convert_currency"}, "convert_currency"),
 ]
@@ -532,6 +541,38 @@ class Assistant:
         self.emit("tool", {"name": tool, "args": args})
         self.emit("done", {"text": reply, "speak": speak, "interrupted": False})
 
+    SING_RX = re.compile(r"^\W*(?:nexus\W+)?(?:pode\s+|por favor\s+)?(?:cant[ae]r?|canta pra mim|sing|canta)\s+"
+                         r"(?:a música\s+|a canção\s+|the song\s+|la canción\s+|pra mim\s+|para mim\s+)?"
+                         r"[\"“'«]?(.+?)[\"”'»]?\W*$", re.I)
+
+    def _sing_request(self, text: str, code: str) -> str | None:
+        """'cante "Sorriso Resplandecente"' / 'cante essa então' -> play it (browser on) or explain why not."""
+        m = self.SING_RX.match(text.strip())
+        if not m:
+            return None
+        title = m.group(1).strip()
+        if re.fullmatch(r"(essa|esta|ela|isso|isto|ent[aã]o|essa ent[aã]o|it|that|this|that one|esa|esta|eso)", title, re.I):
+            titles = self._recent_titles()  # the song we were talking about: the last title in quotes
+            if not titles:
+                return None
+            title = titles[-1]
+        if features.tool_allowed("play_music"):
+            tools.current_text = text
+            tools.play_music(title)
+            return t("sing_play", title=title)
+        return t("sing_cant", title=title)
+
+    @staticmethod
+    def _recent_titles() -> list[str]:
+        """Titles in quotes in the last messages (oldest first), e.g. "Dan Dan Kokoro Hikareteku" and its Brazilian
+        name - "cante essa" uses the last one, the lyrics search falls back to the others."""
+        found = []
+        for msg in memory.history(8):
+            for title in re.findall(r"[\"“]([^\"”]{3,60})[\"”]", msg["content"]):
+                if title not in found:
+                    found.append(title)
+        return found
+
     def _local_command(self, text: str) -> bool:
         """v0.18.0: things that don't need the model. Media keys and volume, opening an installed app (a game also
         suspends NEXUS), and integrations whose answer is a fact ("quanto está o dólar?" 7.4 s -> ~0.6 s; from the
@@ -546,6 +587,15 @@ class Assistant:
             if changed and tools.prefs_hook:
                 tools.prefs_hook(changed)
             self._instant(text, reply, "set_preference", changed)
+            return True
+        song_lyrics = lyrics.handle(text, self._recent_titles(), code,
+                                    " ".join(m["content"][:300] for m in memory.history(6)))  # v0.19.6: lyrics from the source the user named
+        if song_lyrics:
+            self._instant(text, song_lyrics, "lyrics", {})
+            return True
+        sung = self._sing_request(text, code)  # v0.19.6: "cante X" without a source: play it / ask for the source
+        if sung:
+            self._instant(text, sung, "play_music" if features.tool_allowed("play_music") else "lyrics", {})
             return True
         if features.enabled("media"):
             hit = media.handle(text, code)
@@ -840,6 +890,10 @@ def greeting() -> str:
     - otherwise               -> "Hello <name>, what do we have for today?"
     Greetings that the user may answer ("yes") are stored in the history so the model has context."""
     prof = db.get_profile()
+    from . import accounts
+
+    if accounts.GUEST:  # v0.19.6: a guest has no profile to import and nothing is kept
+        return t("guest_hello")
     if not prof:
         return t("intro_anon")
     name = prof["name"].split()[0]

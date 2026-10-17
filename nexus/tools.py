@@ -333,7 +333,14 @@ def convert_currency(amount=1, from_currency="USD", to_currency="BRL"):
 
 
 def wikipedia(query):
-    return connectors.call("wikipedia", {"query": query})
+    result = connectors.call("wikipedia", {"query": query})
+    if isinstance(result, dict) and "error" in result:  # v0.19.6: the model answered from memory after a failed lookup
+        result["instruction"] = ("The lookup failed: tell the user you couldn't check it right now. Do NOT answer "
+                                 "from memory with names, titles or dates.")
+    elif isinstance(result, dict) and result.get("details"):
+        result["instruction"] = ("Answer ONLY with names and titles written in summary/details (quote them exactly). "
+                                 "If the answer isn't there, say Wikipedia doesn't say it.")
+    return result
 
 
 def sync_calendar(days=30):
