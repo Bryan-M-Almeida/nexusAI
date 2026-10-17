@@ -8,6 +8,34 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.19.6 — Protótipo · 2026-10-16
+
+**Ícone do programa e o PET: a esfera do NEXUS no lugar do aro, com o olho seguindo o mouse.**
+
+### Novo
+- **Ícone do programa**: a esfera do NEXUS no executável (e na interface). `assets/nexus.ico` traz 16, 24, 32, 48, 64,
+  128 e 256 px; em 16 e 24 px usa só o olho, recortado redondo, para continuar reconhecível na bandeja.
+- **PET** (Configurações → Personalização → **No centro da tela: Aro ou PET**; também por voz: "modo pet", "volta pro
+  aro"): a esfera fica no mesmo lugar do aro e tem **as mesmas animações**, exceto o aro em volta:
+  - passeia pela tela, repousa, encaixa acima dos menus (e a miniatura também é o PET), cresce com a voz e brilha com o
+    microfone;
+  - o núcleo do aro fica sobre o olho e **respira** no mesmo ritmo de cada estado (mais rápido ao ouvir e ao pensar);
+  - o olho **gira** como o anel segmentado interno do aro (6x mais rápido ao ouvir, 9x ao pensar, parado em pausa) e
+    **segue o cursor do mouse** (volta ao centro depois de 4 s parado);
+  - o olho **muda de cor com o tema** (vermelho no tema AMD, verde na Esmeralda...); com o microfone mudo ele apaga;
+  - ondas no download e no modo suspenso, como o aro.
+
+### Desempenho
+- O PET roda a **60 fps estáveis**, igual ao aro (medido no estado "pensando", o mais animado).
+- Camadas do PET em WebP sem perda: **442 KB → 322 KB (-27%)**.
+- A frase da verificação de sistemas aparecia duas vezes (legenda e conversa); agora uma.
+
+### Testes desta versão
+- 329/329 testes unitários (2 novos: "modo pet" / "volta pro aro" sem a IA; as camadas do PET e o ícone no lugar).
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.19.5 — Protótipo · 2026-10-16
 
 **Suporte a ROCm (onde a placa permite, com comparação na sua máquina) e à NPU dos Ryzen AI pelo AMD Lemonade Server.**

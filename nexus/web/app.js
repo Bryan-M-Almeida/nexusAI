@@ -49,6 +49,47 @@ const T = (key, vars = {}) => {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 /* ------------------------------------------------------------------ visuals */
+/* PET (v0.19.6): the NEXUS orb instead of the ring. It lives in the same slot as the ring, so it wanders, rests,
+   docks over menus, grows with the voice and glows with the microphone exactly like the ring. Of the ring only the
+   halo and the breathing core stay (on top of the eye: same rhythm per state, theme colour); the eye spins like the
+   ring's inner segmented circle (faster while listening / thinking) and looks at the mouse pointer. */
+const PET_HTML = `<div class="pet" aria-hidden="true"><img class="pet-body" src="pet/body.webp" alt="" draggable="false">
+  <div class="pet-eye-wrap"><div class="pet-eye ring-spin" style="--dur:26s;--dir:reverse"><img src="pet/eye.webp" alt="" draggable="false"></div></div></div>`;
+let petRaf = 0, petPointer = null, petIdleTimer;
+function petLook(e) {  // the eye moves towards the pointer (at most 6% of its size), back to the centre when idle
+  petPointer = e ? [e.clientX, e.clientY] : null;
+  if (!document.body.classList.contains("pet-mode") || petRaf) return;
+  petRaf = requestAnimationFrame(() => {
+    petRaf = 0;
+    for (const wrap of document.querySelectorAll(".pet-eye-wrap")) {
+      const r = wrap.getBoundingClientRect();
+      if (!r.width) continue;
+      let dx = 0, dy = 0;
+      if (petPointer) {
+        const vx = petPointer[0] - (r.left + r.width / 2), vy = petPointer[1] - (r.top + r.height / 2);
+        const dist = Math.hypot(vx, vy) || 1, reach = Math.min(1, dist / (r.width * 3)) * r.width * 0.06;
+        dx = (vx / dist) * reach; dy = (vy / dist) * reach;
+      }
+      wrap.style.translate = `${dx.toFixed(1)}px ${dy.toFixed(1)}px`;
+    }
+  });
+  clearTimeout(petIdleTimer);
+  if (e) petIdleTimer = setTimeout(() => petLook(null), 4000);
+}
+document.addEventListener("mousemove", petLook, { passive: true });
+function petHue(hex) {  // the eye takes the theme's core colour: hue-rotate from the original blue (~214°)
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = (h * 60 + 360) % 360;
+  const sat = max ? d / max : 0;
+  document.documentElement.style.setProperty("--pet-hue", `${Math.round(h - 214)}deg`);
+  document.documentElement.style.setProperty("--pet-sat", Math.min(1.2, sat / 0.8).toFixed(2));
+}
+
 function ringsSVG(id) {
   // v0.16 ring: thin light arcs with tick marks, a dotted ring, a segmented ring and a glowing core.
   // Colours come from CSS variables (--c-ring, --c-core), so Settings > Interface can change them.
@@ -221,7 +262,7 @@ async function start() {
     else new MutationObserver((m, obs) => { if ($("#onboarding").hidden) { obs.disconnect(); go(); } })
       .observe($("#onboarding"), { attributes: true, attributeFilter: ["hidden"] });
   }
-  if (!settings.system_check_done) setTimeout(() => api().first_check().then((r) => { caption(r.said, 9000); setExchange("nexus", r.said); }), 9000);
+  if (!settings.system_check_done) setTimeout(() => api().first_check().then((r) => setExchange("nexus", r.said)), 9000);
   if (!st.llm.online || !st.llm.model_ready) notice(aiHelp(st.llm), T("moreAi"));
   else if (state.ui_mode === "audio" && !state.mic_muted && st.stt === "missing") notice(T("voiceFirstUse"), T("moreVoice"));
 }
@@ -1376,6 +1417,7 @@ function fillSettings() {
   $$("output[data-for]", f).forEach(syncOutput);
   renderThemes();
   $$("#bgCards [data-bg]").forEach((b) => b.classList.toggle("on", b.dataset.bg === (settings.bg_style || "glow")));
+  $$("#centerCards [data-center]").forEach((b) => b.classList.toggle("on", b.dataset.center === (settings.center_style || "ring")));
   renderVoiceInfo();
 }
 
@@ -1596,6 +1638,8 @@ function applyLook(src) {
   document.body.classList.toggle("bg-solid", src.bg_style === "solid");
   document.body.classList.toggle("bg-grid", src.bg_style === "grid");
   document.body.classList.toggle("font-clean", src.font_brand === "clean");
+  document.body.classList.toggle("pet-mode", src.center_style === "pet");  // v0.19.6: ring or PET in the centre
+  petHue(src.color_core || "#2f86ff");
 }
 function renderThemes() {
   const f = $("#settingsForm"), cur = f.elements.theme.value || settings.theme || "nexus";
@@ -1612,7 +1656,8 @@ function pickTheme(id) {
 function previewLook() {
   const f = $("#settingsForm");
   applyLook({ ring_scale: f.elements.ring_scale.value, ring_speed: f.elements.ring_speed.value, exchange_size: f.elements.exchange_size.value,
-    bg_style: f.elements.bg_style.value, font_brand: f.elements.font_brand.value });
+    bg_style: f.elements.bg_style.value, font_brand: f.elements.font_brand.value, center_style: f.elements.center_style.value,
+    color_core: f.elements.color_core.value });
 }
 function onPrefs(changed) {  // NEXUS changed its own look or voice ("muda o aro para vermelho")
   Object.assign(settings, changed);
@@ -2162,6 +2207,11 @@ function wire() {
   ["color_ring", "color_core", "color_bg"].forEach((n) => colorForm.elements[n].addEventListener("input", () => {
     colorForm.elements.theme.value = "custom"; renderThemes(); }));
   $("#themeGrid").addEventListener("click", (e) => { const b = e.target.closest("[data-theme]"); if (b) pickTheme(b.dataset.theme); });
+  $$("#centerCards [data-center]").forEach((b) => (b.onclick = () => {
+    colorForm.elements.center_style.value = b.dataset.center;
+    $$("#centerCards [data-center]").forEach((x) => x.classList.toggle("on", x === b));
+    previewLook();
+  }));
   $$("#bgCards [data-bg]").forEach((b) => (b.onclick = () => {
     colorForm.elements.bg_style.value = b.dataset.bg;
     $$("#bgCards [data-bg]").forEach((x) => x.classList.toggle("on", x === b));
@@ -2772,7 +2822,7 @@ function wireLibrary() {
 /* ------------------------------------------------------------------ init */
 const api = () => window.pywebview.api;
 
-document.querySelectorAll("[data-rings]").forEach((el) => (el.innerHTML = ringsSVG(el.dataset.rings)));
+document.querySelectorAll("[data-rings]").forEach((el) => (el.innerHTML = ringsSVG(el.dataset.rings) + PET_HTML));
 $$(".wordmark").forEach((el) => (el.innerHTML = wordmarkHTML()));
 requestAnimationFrame(() => $("#boot .wordmark").classList.add("is-on"));
 applyLang("pt");

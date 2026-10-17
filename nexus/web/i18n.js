@@ -1207,3 +1207,28 @@ for (const [l, extra] of Object.entries({
   "refd_lemonade": "Servidor local de AMD que ejecuta modelos en la NPU de los Ryzen AI (compatible con OpenAI)."
  }
 })) Object.assign(window.I18N[l], extra);
+
+// v0.19.6: PET
+for (const [l, extra] of Object.entries({
+ "pt": {
+  "centerTitle": "NO CENTRO DA TELA",
+  "centerRing": "Aro",
+  "centerRingHint": "Os anéis de luz com o núcleo.",
+  "centerPet": "PET",
+  "centerPetHint": "A esfera do NEXUS: o olho segue o mouse e reage como o aro."
+ },
+ "en": {
+  "centerTitle": "IN THE CENTRE OF THE SCREEN",
+  "centerRing": "Ring",
+  "centerRingHint": "The light rings with the core.",
+  "centerPet": "PET",
+  "centerPetHint": "The NEXUS orb: the eye follows the mouse and reacts like the ring."
+ },
+ "es": {
+  "centerTitle": "EN EL CENTRO DE LA PANTALLA",
+  "centerRing": "Anillo",
+  "centerRingHint": "Los anillos de luz con el núcleo.",
+  "centerPet": "MASCOTA",
+  "centerPetHint": "La esfera de NEXUS: el ojo sigue al ratón y reacciona como el anillo."
+ }
+})) Object.assign(window.I18N[l], extra);

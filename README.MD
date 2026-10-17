@@ -130,6 +130,15 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Ícone e PET (v0.19.6)
+
+- **Ícone do programa**: a esfera do NEXUS (`assets/nexus.ico`, 16–256 px; em 16 e 24 px só o olho, para continuar
+  legível na bandeja).
+- **PET** (Configurações → Personalização → No centro da tela, ou diga "modo pet" / "volta pro aro"): a esfera no lugar
+  do aro, com as mesmas animações — passeia, repousa, encaixa nos menus, cresce com a voz, brilha com o microfone, o
+  núcleo respira mais rápido ao ouvir e pensar —, o olho gira como o anel interno e **segue o mouse**, e muda de cor com
+  o tema.
+
 ### ROCm e NPU (v0.19.5)
 
 - **ROCm**: o NEXUS descobre o chip da sua Radeon e lê, da própria instalação do Ollama, para quais chips o ROCm tem
@@ -479,4 +488,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.19.5 (protótipo)**.
+Versão atual: **v0.19.6 (protótipo)**.

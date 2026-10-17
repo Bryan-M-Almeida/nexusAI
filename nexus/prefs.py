@@ -75,6 +75,7 @@ PREFS = {  # name: (kind, allowed) - what NEXUS may change by itself
     "show_hud": ("bool", None), "reduce_motion": ("bool", None), "ring_wander": ("bool", None),
     "show_exchange": ("bool", None), "show_captions": ("bool", None), "speak_menus": ("bool", None),
     "require_wake_word": ("bool", None), "ai_mode": ("choice", ("assistant", "direct")),
+    "center_style": ("choice", ("ring", "pet")),
 }
 _undo: list[dict] = []
 
@@ -217,6 +218,12 @@ def detect(text: str) -> dict | None:
             changes["exchange_size"] = int(settings.get("exchange_size", 14)) + 2
         elif re.search(r"\b(letra|texto|fonte|text|font|letras)\s+(menor|smaller|mas pequena|mas pequeno)\b", n):
             changes["exchange_size"] = int(settings.get("exchange_size", 14)) - 2
+        elif re.search(r"\b(modo pet|usa o pet|mostra o pet|ativa o pet|liga o pet|pet mode|use the pet|show the pet|"
+                       r"modo mascota|usa la mascota)\b", n):
+            changes["center_style"] = "pet"
+        elif re.search(r"\b(volta (pro|para o|ao) aro|usa o aro|mostra o aro|modo aro|back to the ring|use the ring|"
+                       r"tira o pet|desliga o pet|vuelve al anillo|usa el anillo)\b", n):
+            changes["center_style"] = "ring"
         elif re.search(r"\b(desliga|tira|para|remove|turn off|stop|quita|apaga)\s+(as |the |las )?(animacoes|animations|animaciones)\b", n):
             changes["reduce_motion"] = True
         elif re.search(r"\b(liga|ativa|volta|turn on|enable|activa|pon)\s+(as |the |las )?(animacoes|animations|animaciones)\b", n):
@@ -235,17 +242,20 @@ TEXTS = {
            "color_bg": "Pronto: fundo na nova cor.", "colors": "Pronto: cores trocadas.", "voice_gender": "Pronto, voz trocada.",
            "tts_speed": "Pronto, velocidade da fala ajustada.", "ring_scale": "Pronto: aro em {v}%.",
            "exchange_size": "Pronto: texto em {v} pixels.", "reduce_motion": "Pronto: animações {v}.",
+           "center_style": "Pronto: {v} no centro da tela.",
            "on": "desligadas", "off": "ligadas", "undo": "Desfeito: voltei como estava.", "nothing": "Não há nada para desfazer.",
            "generic": "Pronto."},
     "en": {"theme": "Done: {v} theme.", "color_ring": "Done: new ring colour.", "color_core": "Done: new core colour.",
            "color_bg": "Done: new background colour.", "colors": "Done: colours changed.", "voice_gender": "Done, voice changed.",
            "tts_speed": "Done, speech speed adjusted.", "ring_scale": "Done: ring at {v}%.",
            "exchange_size": "Done: text at {v} pixels.", "reduce_motion": "Done: animations {v}.",
+           "center_style": "Done: {v} in the centre of the screen.",
            "on": "off", "off": "on", "undo": "Undone: back as it was.", "nothing": "There's nothing to undo.", "generic": "Done."},
     "es": {"theme": "Listo: tema {v}.", "color_ring": "Listo: anillo con el nuevo color.", "color_core": "Listo: núcleo con el nuevo color.",
            "color_bg": "Listo: fondo con el nuevo color.", "colors": "Listo: colores cambiados.", "voice_gender": "Listo, voz cambiada.",
            "tts_speed": "Listo, velocidad del habla ajustada.", "ring_scale": "Listo: anillo al {v}%.",
            "exchange_size": "Listo: texto a {v} píxeles.", "reduce_motion": "Listo: animaciones {v}.",
+           "center_style": "Listo: {v} en el centro de la pantalla.",
            "on": "desactivadas", "off": "activadas", "undo": "Deshecho: volví como estaba.", "nothing": "No hay nada que deshacer.",
            "generic": "Listo."},
 }
@@ -259,6 +269,10 @@ def reply(changes: dict, code: str) -> str:
     if len(keys) > 1:
         return T["colors"] if all(k.startswith("color_") for k in keys) else T["generic"]
     k = keys[0]
+    if k == "center_style":
+        names = {"pt": {"pet": "o PET", "ring": "o aro"}, "en": {"pet": "the PET", "ring": "the ring"},
+                 "es": {"pet": "la mascota", "ring": "el anillo"}}
+        return T[k].format(v=names.get(code, names["pt"])[changes[k]])
     if k == "reduce_motion":
         return T[k].format(v=T["on" if changes[k] else "off"])
     return T.get(k, T["generic"]).format(v=changes[k])

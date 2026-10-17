@@ -1217,5 +1217,14 @@ check("NPU: AMD Lemonade preset (OpenAI-compatible, local) and its reference",
 check("NPU: detection never fails (a list) and Lemonade reports running or not",
       isinstance(_amd.npus(), list) and set(_amd.lemonade()) >= {"running", "url", "models"})
 
+# -- v0.19.6: PET and program icon ----------------------------------------------------------------------------------
+check("PET: 'modo pet' / 'volta pro aro' switch the centre of the screen without the AI",
+      (_prefs.detect("ativa o modo pet") or {}).get("changes") == {"center_style": "pet"}
+      and (_prefs.detect("volta pro aro") or {}).get("changes") == {"center_style": "ring"}
+      and _prefs.validate("center_style", "pet") == "pet")
+check("PET: its two layers and the program icon are in place",
+      all((WEB / "pet" / f).stat().st_size > 10_000 for f in ("body.webp", "eye.webp"))
+      and (_isolated.ROOT / "assets" / "nexus.ico").exists() and "pet/eye.webp" in (WEB / "app.js").read_text("utf-8"))
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

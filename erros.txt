@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 3.9  ·  Data: 2026-10-16  ·  Versão do app: 0.19.5
+ Versão do documento: 3.9  ·  Data: 2026-10-16  ·  Versão do app: 0.19.6
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 

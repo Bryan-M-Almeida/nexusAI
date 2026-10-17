@@ -1297,3 +1297,27 @@ body.font-clean { --f-brand: "Bahnschrift", "Segoe UI", "Arial", sans-serif; }
 .amd-compute .pill { padding: 1px 7px; border: 1px solid rgba(237, 28, 36, .5); font-size: 10px; letter-spacing: .08em; color: #fff; }
 .amd-compute small { color: var(--silver); font-size: 12px; line-height: 1.4; }
 .amd-compute .ac-result { font-size: 11px; color: #9fe8b8; min-height: 1em; }
+
+/* ================================================================ v0.19.6 PET: the NEXUS orb instead of the ring
+   The orb image fills the ring's slot. Eye centre in the image: 62.68% / 53.27%, eye size 42.74%. The ring's SVG stays
+   for its halo and breathing core, moved onto the eye; every other ring layer is hidden. */
+.pet { display: none; position: absolute; inset: 0; pointer-events: none; }
+body.pet-mode .pet { display: block; animation: petBoot 1.4s var(--ease-out) both; }
+.pet-body { position: absolute; inset: 0; width: 100%; height: 100%; user-select: none;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .55)); }
+.pet-eye-wrap { position: absolute; left: calc(62.68% - 21.37%); top: calc(53.27% - 21.37%); width: 42.74%; height: 42.74%;
+  transition: translate .18s ease-out; }
+.pet-eye { position: absolute; inset: 0; }
+.pet .ring-spin { transform-box: border-box; transform-origin: 50% 50%; }
+.pet-eye img { width: 100%; height: 100%; display: block; user-select: none;
+  filter: hue-rotate(var(--pet-hue, 0deg)) saturate(var(--pet-sat, 1)); }
+body.pet-mode .hud-rings .ring-boot:not(:has(.ring-core)) { display: none; }
+body.pet-mode .hud-rings { translate: 12.68% 3.27%; mix-blend-mode: screen; }
+body.pet-mode .hud-rings .ring-halo { opacity: .55; }
+body.pet-mode .ring .pet { filter: drop-shadow(0 0 calc(var(--ai, 0) * 26px) color-mix(in srgb, var(--c-core) calc(var(--ai, 0) * 85%), transparent))
+  drop-shadow(0 0 calc(var(--mic, 0) * 22px) color-mix(in srgb, var(--c-ring) calc(var(--mic, 0) * 80%), transparent)); }
+body.pet-mode .core[data-state="muted"] .pet-eye img { filter: hue-rotate(var(--pet-hue, 0deg)) saturate(.2) brightness(.6); }
+body.pet-mode .app.suspended .pet-eye img, body.pet-mode .app.dl .pet-eye { animation: petWave 1.6s ease-in-out infinite; }
+.app.reduce-motion .pet, body.pet-mode .app.reduce-motion .pet { animation: none; }
+@keyframes petBoot { from { opacity: 0; transform: scale(.82) translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes petWave { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
