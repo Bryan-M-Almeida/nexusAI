@@ -1636,9 +1636,44 @@ async function renderAmd() {
       <span class="pill mono">${esc(T("techStatus_" + t.status))}</span><small>${esc(T("techd_" + t.id, { d: t.detail }))}</small></div>`).join("");
   $("#amdRefs").innerHTML = (r.refs || []).map((id) => `<button type="button" class="amd-ref" data-ref="${id}"><b>${esc(T("ref_" + id))}</b><small>${esc(T("refd_" + id))}</small></button>`).join("");
   amdCard = card;
+  renderCompute();
   amdTick();
 }
-let amdCard = null;
+let amdCard = null, amdPending = null;
+async function renderCompute() {  // v0.19.5: Vulkan / ROCm and the NPU
+  const c = await api().amd_compute(), r = c.rocm;
+  const backend = c.backend === "rocm" ? "ROCm" : c.vulkan ? "Vulkan" : "Auto";
+  $("#amdBackend").innerHTML = `<div class="ac-line"><b>${esc(T("acNow"))}</b><span class="pill mono">${esc(backend)}</span>
+      <span class="mono">${esc(c.card || "—")} · ${esc(r.gfx || "?")}</span></div>
+    <small>${esc(r.supported ? T("acRocmYes", { gfx: r.gfx }) : r.installed ? T("acRocmNo", { gfx: r.gfx || "?", list: r.targets.join(", ") }) : T("acRocmNoOllama"))}</small>
+    <div class="row-btns">${r.supported ? `<button type="button" class="btn-ghost" data-backend="${c.backend === "rocm" ? "auto" : "rocm"}">${esc(T(c.backend === "rocm" ? "acUseAuto" : "acUseRocm"))}</button>
+      <button type="button" class="btn-ghost" id="btnAmdCompare">${esc(T("acCompare"))}</button>` : `<button type="button" class="btn-ghost" disabled>${esc(T("acUseRocm"))}</button>`}</div>
+    <div class="ac-result mono" id="amdCompareResult"></div>`;
+  const lem = c.lemonade || {};
+  $("#amdNpu").innerHTML = `<div class="ac-line"><b>${esc(T("acNpu"))}</b><span class="pill mono">${esc(c.npus.length ? T("acNpuFound") : T("acNpuNone"))}</span>
+      <span class="mono">${esc(c.npus.join(", ") || "—")}</span></div>
+    <div class="ac-line"><b>Lemonade</b><span class="pill mono">${esc(lem.running ? T("acLemOn") : T("acLemOff"))}</span>
+      <span class="mono">${esc(lem.running ? lem.url + " · " + (lem.models || []).slice(0, 3).join(", ") : "")}</span></div>
+    <small>${esc(T(c.npus.length ? "acNpuHint" : "acNpuNoHint"))}</small>
+    <div class="row-btns">${lem.running ? `<button type="button" class="btn-ghost" data-lemonade="${c.using_lemonade ? 0 : 1}">${esc(T(c.using_lemonade ? "acLemStop" : "acLemUse"))}</button>` : ""}
+      <button type="button" class="btn-ghost" data-ref-open="lemonade">${esc(T("acLemGet"))}</button></div>`;
+}
+async function onComputeClick(e) {
+  const b = e.target.closest("[data-backend]"), lem = e.target.closest("[data-lemonade]"), ref = e.target.closest("[data-ref-open]");
+  if (ref) return api().amd_open_ref(ref.dataset.refOpen);
+  if (lem) { const r = await api().amd_use_lemonade(lem.dataset.lemonade === "1"); notice(T(r.ok ? "acLemDone" : "acLemNotRunning")); return renderCompute(); }
+  if (e.target.id === "btnAmdCompare") {
+    e.target.disabled = true; $("#amdCompareResult").textContent = T("acComparing");
+    const r = await api().amd_compare();
+    $("#amdCompareResult").textContent = r.ok ? `ROCm ${r.rocm.tok_s} tok/s (${r.rocm.on_gpu_pct}%) · Vulkan ${r.vulkan.tok_s} tok/s (${r.vulkan.on_gpu_pct}%) → ${T("acBest", { b: r.best === "rocm" ? "ROCm" : "Vulkan" })}` : T("acCompareFail");
+    e.target.disabled = false;
+    return;
+  }
+  if (!b) return;
+  amdPending = b.dataset.backend;
+  $("#amdBackendConfirmText").textContent = T(amdPending === "rocm" ? "acConfirmRocm" : "acConfirmAuto");
+  $("#amdBackendConfirm").hidden = false;
+}
 async function amdTick() {
   const r = await api().amd_live();
   if (r.error) { $("#amdTiles").innerHTML = `<p class="muted small">${esc(r.error)}</p>`; return; }
@@ -2133,6 +2168,14 @@ function wire() {
     previewLook();
   }));
   ["ring_scale", "exchange_size", "ring_speed", "font_brand"].forEach((n) => colorForm.elements[n].addEventListener("input", previewLook));
+  $("#amdBackend").addEventListener("click", onComputeClick);
+  $("#amdNpu").addEventListener("click", onComputeClick);
+  $("#amdBackendNo").onclick = () => ($("#amdBackendConfirm").hidden = true);
+  $("#amdBackendYes").onclick = async () => {
+    $("#amdBackendConfirm").hidden = true; notice(T("acApplying"));
+    const r = await api().amd_backend_set(amdPending);
+    notice(T(r.ok ? "acApplied" : "acUnsupported")); renderCompute();
+  };
   $("#amdRefs").addEventListener("click", (e) => { const b = e.target.closest("[data-ref]"); if (b) api().amd_open_ref(b.dataset.ref); });
   $("#btnAmdFree").onclick = async () => { const r = await api().amd_free(); notice(T("amdFreed", { gb: gb(r.freed_mb || 0) })); amdTick(); };
   $("#btnAmdWarm").onclick = async () => { await api().amd_warm(); notice(T("amdWarming")); };

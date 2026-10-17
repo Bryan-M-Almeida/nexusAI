@@ -168,6 +168,77 @@ def live() -> dict:
     }
 
 
+# ---------------------------------------------------------------- ROCm and NPU (v0.19.5)
+# Radeon name -> chip (LLVM target). ROCm needs libraries built for each chip; Ollama ships them for some only.
+GFX = [(r"RX 9070", "gfx1201"), (r"RX 9060", "gfx1200"), (r"RX 79\d0|RX 7900|PRO W7900|PRO W7800", "gfx1100"),
+       (r"RX 7800|RX 7700|PRO W7700", "gfx1101"), (r"RX 7600|PRO W7600|PRO W7500", "gfx1102"),
+       (r"Radeon 8\d0M|880M|890M", "gfx1150"), (r"Radeon 8060S|8050S", "gfx1151"), (r"780M|760M|740M", "gfx1103"),
+       (r"RX 69\d0|RX 6800|PRO W6800", "gfx1030"), (r"RX 6700|RX 6750", "gfx1031"),
+       (r"RX 66\d0|RX 6600|PRO W6600", "gfx1032"), (r"RX 65\d0|RX 6400|RX 6500", "gfx1034"),
+       (r"Radeon VII|Instinct MI50|MI60", "gfx906"), (r"Instinct MI100", "gfx908"), (r"Instinct MI2\d0", "gfx90a"),
+       (r"Instinct MI3\d0", "gfx942")]
+
+
+def gfx(card_name: str) -> str:
+    return next((g for rx, g in GFX if re.search(rx, card_name, re.I)), "")
+
+
+def rocm_targets() -> set[str]:
+    """Chips the ROCm bundled with Ollama has libraries for - read from the installation itself, so a newer Ollama
+    with more chips is recognised without changing NEXUS."""
+    from . import gpu_tune
+
+    found = set()
+    for lib in gpu_tune.OLLAMA_DIR.glob("lib/ollama/rocm*/rocblas/library/*"):
+        found.update(re.findall(r"gfx[0-9a-f]{3,4}", lib.name))
+    return found
+
+
+def rocm_support(card_name: str) -> dict:
+    """{"gfx", "supported", "targets"} for this card with the Ollama installed here."""
+    chip, targets = gfx(card_name), rocm_targets()
+    return {"gfx": chip, "supported": bool(chip and chip in targets), "targets": sorted(targets),
+            "installed": bool(targets)}
+
+
+_npu_cache: list | None = None
+
+
+def npus() -> list[str]:
+    """Neural processors Windows knows (AMD Ryzen AI "NPU Compute Accelerator", Intel AI Boost, Snapdragon...)."""
+    global _npu_cache
+    if _npu_cache is None:
+        import subprocess
+
+        try:
+            out = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                                  "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-PnpDevice -PresentOnly | "
+                                  "Where-Object { $_.FriendlyName -match 'NPU|IPU|AI Boost|Neural|XDNA' } | "
+                                  "ForEach-Object { $_.FriendlyName }"],
+                                 capture_output=True, text=True, timeout=15, creationflags=0x08000000, encoding="utf-8",
+                                 errors="replace").stdout
+            _npu_cache = [line.strip() for line in out.splitlines() if line.strip()]
+        except Exception:
+            _npu_cache = []
+    return _npu_cache
+
+
+LEMONADE_URLS = ("http://127.0.0.1:8000/api/v1", "http://127.0.0.1:13305/api/v1")
+
+
+def lemonade() -> dict:
+    """AMD Lemonade Server (runs models on the Ryzen AI NPU / iGPU, OpenAI-compatible): running here? which models?"""
+    import httpx
+
+    for url in LEMONADE_URLS:
+        try:
+            data = httpx.get(f"{url}/models", timeout=1.5).json()
+            return {"running": True, "url": url, "models": [m.get("id", "") for m in data.get("data", [])][:30]}
+        except Exception:
+            continue
+    return {"running": False, "url": LEMONADE_URLS[0], "models": []}
+
+
 def technologies() -> list[dict]:
     """AMD technologies in NEXUS on this PC: "active", "available" (would work here) or "unsupported" (with why)."""
     from . import gpu_tune, hardware
@@ -176,20 +247,30 @@ def technologies() -> list[dict]:
     tune = gpu_tune.status()
     cpu = hardware.cpu_name()
     name = cards[0]["name"] if cards else ""
-    rocm_cards = re.search(r"RX 7\d{3}|RX 9\d{3}|RX 6[89]\d0|Radeon PRO W7|Radeon PRO W6[89]|Instinct", name, re.I)
+    rocm = rocm_support(name)
+    npu_list = npus()
+    lem = lemonade() if npu_list or re.search(r"ryzen ai", cpu, re.I) else {"running": False}
     out = [
         {"id": "radeon_vulkan", "status": "active" if cards and tune["vulkan"] else ("available" if cards else "unsupported"),
          "detail": name},
-        {"id": "rocm", "status": "active" if cards and not tune["vulkan"] else ("available" if rocm_cards else "unsupported"),
-         "detail": name},
+        {"id": "rocm", "status": "active" if cards and not tune["vulkan"] and rocm["supported"]
+         else ("available" if rocm["supported"] else "unsupported"),
+         "detail": f"{name} ({rocm['gfx'] or '?'})", "gfx": rocm["gfx"], "targets": rocm["targets"]},
         {"id": "adrenalin", "status": "active" if cards and cards[0]["adrenalin"] else "unsupported",
          "detail": cards[0]["adrenalin"] if cards else ""},
         {"id": "ryzen_cpu", "status": "active" if "ryzen" in cpu.lower() else "unsupported", "detail": cpu},
-        {"id": "ryzen_ai", "status": "available" if re.search(r"ryzen ai|\bAI (9|7|5) ", cpu, re.I) else "unsupported",
-         "detail": cpu},
+        {"id": "ryzen_ai", "status": "active" if lem.get("running") and settings_llm_is_lemonade()
+         else ("available" if npu_list or re.search(r"ryzen ai", cpu, re.I) else "unsupported"),
+         "detail": ", ".join(npu_list) or cpu, "lemonade": lem},
         {"id": "amd_counters", "status": "active" if cards else "unsupported", "detail": ""},
     ]
     return out
+
+
+def settings_llm_is_lemonade() -> bool:
+    from .config import settings
+
+    return settings.get("llm_preset") == "lemonade"
 
 
 REFERENCES = [  # shown in the AMD tab; only these addresses can be opened from it
@@ -199,6 +280,7 @@ REFERENCES = [  # shown in the AMD tab; only these addresses can be opened from 
     ("developer", "https://www.amd.com/en/developer.html"),
     ("ryzen_ai", "https://www.amd.com/en/products/processors/consumer/ryzen-ai.html"),
     ("ollama_amd", "https://ollama.com/blog/amd-preview"),
+    ("lemonade", "https://lemonade-server.ai/"),
     ("hackathon", "https://lablab.ai/"),
 ]
 

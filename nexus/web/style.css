@@ -1288,3 +1288,12 @@ body.font-clean { --f-brand: "Bahnschrift", "Segoe UI", "Arial", sans-serif; }
 @media (max-width: 900px) { .amd-tech-row { grid-template-columns: 1fr auto; } .amd-tech-row small { grid-column: 1 / -1; } }
 .syscheck { padding: 8px 10px; border: 1px solid var(--line); background: #04070b; font-size: 11.5px; line-height: 1.7; margin: 6px 0; }
 .syscheck .ok { color: #7be0a5; } .syscheck .warn { color: #ffd28a; } .syscheck .said { margin-top: 6px; color: #fff; }
+
+/* ================================================================ v0.19.5 AMD compute: backend and NPU */
+.amd-compute { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; margin-bottom: 8px; background: rgba(8, 10, 15, .6);
+  border: 1px solid var(--line); border-left: 2px solid #ed1c24; }
+.amd-compute .ac-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.amd-compute .ac-line .mono { font-size: 11px; color: var(--muted); }
+.amd-compute .pill { padding: 1px 7px; border: 1px solid rgba(237, 28, 36, .5); font-size: 10px; letter-spacing: .08em; color: #fff; }
+.amd-compute small { color: var(--silver); font-size: 12px; line-height: 1.4; }
+.amd-compute .ac-result { font-size: 11px; color: #9fe8b8; min-height: 1em; }

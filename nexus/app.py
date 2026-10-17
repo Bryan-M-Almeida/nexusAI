@@ -313,6 +313,33 @@ class Api:
     def amd_live(self):
         return {**amd.live(), "ai": llm.perf_summary(), "model": llm.loaded()}
 
+    def amd_compute(self):
+        """Backend of the AI on this card (Vulkan / ROCm) and the NPU (Ryzen AI + Lemonade) - v0.19.5."""
+        card = (amd.info()["cards"] or [{}])[0].get("name", "")
+        return {"backend": gpu_tune.backend(), "vulkan": gpu_tune.uses_vulkan(), "rocm": amd.rocm_support(card),
+                "card": card, "npus": amd.npus(), "lemonade": amd.lemonade(),
+                "using_lemonade": settings.get("llm_preset") == "lemonade"}
+
+    def amd_backend_set(self, choice):
+        """The user confirmed: save the choice for Ollama (user variable OLLAMA_VULKAN) and restart it."""
+        return gpu_tune.set_backend("rocm" if choice == "rocm" else "auto")
+
+    def amd_compare(self):
+        return gpu_tune.compare_backends(settings.get("llm_model", "qwen3:8b"))
+
+    def amd_use_lemonade(self, on=True):
+        """Run the AI through AMD Lemonade Server (Ryzen AI NPU) - or back to Ollama."""
+        if not on:
+            settings.apply({"llm_preset": "ollama", "llm_base_url": "http://127.0.0.1:11434/v1", "llm_provider": "auto"})
+            return {"ok": True, "llm": llm.status()}
+        lem = amd.lemonade()
+        if not lem["running"]:
+            return {"ok": False, "error": "not_running"}
+        settings.apply({"llm_preset": "lemonade", "llm_base_url": lem["url"], "llm_provider": "openai",
+                        "llm_api_key": "lemonade", "llm_model": (lem["models"] or [settings.get("llm_model")])[0]})
+        threading.Thread(target=self._warm_up, daemon=True, name="warm").start()
+        return {"ok": True, "llm": llm.status()}
+
     def amd_open_ref(self, ref_id):
         return {"ok": amd.open_reference(ref_id)}
 

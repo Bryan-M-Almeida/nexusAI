@@ -1197,5 +1197,25 @@ check("navigation replies are kept in the history (the next question knows what 
       [m["role"] for m in memory.history(2)] == ["user", "assistant"])
 tools.ui_hook = None
 
+# -- v0.19.5: ROCm and NPU -------------------------------------------------------------------------------------------
+from nexus import gpu_tune as _gt  # noqa: E402
+
+check("ROCm: each Radeon's chip", [_amd.gfx(n) for n in ("AMD Radeon RX 6600 XT", "AMD Radeon RX 7900 XTX", "AMD Radeon RX 6800",
+                                                         "AMD Radeon RX 9070 XT", "AMD Radeon 780M", "NVIDIA RTX 4070")]
+      == ["gfx1032", "gfx1100", "gfx1030", "gfx1201", "gfx1103", ""])
+_real_targets = _amd.rocm_targets
+_amd.rocm_targets = lambda: {"gfx1030", "gfx1100", "gfx1101", "gfx1102", "gfx1150", "gfx1151", "gfx1200", "gfx1201", "gfx906"}
+check("ROCm: offered only for chips Ollama ships ROCm libraries for (an RX 6600 XT falls back to the CPU)",
+      not _amd.rocm_support("AMD Radeon RX 6600 XT")["supported"] and _amd.rocm_support("AMD Radeon RX 7800 XT")["supported"])
+_real_info = _amd.info
+_amd.info = lambda: {"cards": [{"name": "AMD Radeon RX 6600 XT", "vram_gb": 8, "driver": "", "adrenalin": ""}]}
+check("ROCm: choosing it on an unsupported card is refused (nothing changes)",
+      _gt.set_backend("rocm") == {"ok": False, "error": "unsupported"} and _gt.compare_backends("qwen3:8b")["ok"] is False)
+_amd.info, _amd.rocm_targets = _real_info, _real_targets
+check("NPU: AMD Lemonade preset (OpenAI-compatible, local) and its reference",
+      any(pr["id"] == "lemonade" and pr["local"] for pr in _llm.PRESETS) and "lemonade" in dict(_amd.REFERENCES))
+check("NPU: detection never fails (a list) and Lemonade reports running or not",
+      isinstance(_amd.npus(), list) and set(_amd.lemonade()) >= {"running", "url", "models"})
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

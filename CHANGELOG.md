@@ -8,6 +8,43 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.19.5 — Protótipo · 2026-10-16
+
+**Suporte a ROCm (onde a placa permite, com comparação na sua máquina) e à NPU dos Ryzen AI pelo AMD Lemonade Server.**
+
+### Novo
+- **Backend da IA: Vulkan ou ROCm** (Configurações → AMD): o NEXUS identifica o chip da Radeon (gfx1032, gfx1100,
+  gfx1201...) e lê **da instalação do Ollama** para quais chips o ROCm dele tem bibliotecas (hoje: gfx906, gfx1030,
+  gfx1100/1101/1102, gfx1150/1151, gfx1200/1201) — um Ollama mais novo com mais chips é reconhecido sozinho.
+  - Placa com suporte: **Usar ROCm** / **Voltar ao automático** (com confirmação; cria/remove a variável de usuário
+    `OLLAMA_VULKAN=0` e reinicia o Ollama) e **Comparar Vulkan × ROCm**: a mesma pergunta nos dois, mostrando tokens/s e
+    quanto ficou na placa, e volta à sua escolha.
+  - Placa sem suporte: o botão fica desligado e o NEXUS explica por quê (com o teste abaixo).
+- **NPU (Ryzen AI)**: detecção das NPUs que o Windows conhece (AMD "NPU Compute Accelerator", Intel AI Boost...) e do
+  **AMD Lemonade Server** (servidor local da AMD que roda modelos na NPU, compatível com OpenAI) — com ele rodando, **Usar
+  a NPU (Lemonade)** troca o provedor da IA com um clique (e volta ao Ollama). Lemonade também entrou na lista de
+  provedores e nas referências AMD.
+- Tecnologias AMD: o estado do ROCm e do Ryzen AI agora vem desses testes reais (chip suportado, NPU encontrada,
+  Lemonade rodando).
+
+### Medido (RX 6600 XT, gfx1032)
+- **ROCm forçado** (`OLLAMA_VULKAN=0` + `HSA_OVERRIDE_GFX_VERSION=10.3.0`, o truque do Linux): o Ollama diz "no
+  ROCm-capable device is detected" e roda no processador — **9,1 tokens/s, 0% na placa**, contra **35,6 tokens/s no
+  Vulkan** (92% na placa). Por isso o NEXUS só oferece ROCm onde ele funciona: escolher errado custaria 3,9x de
+  velocidade.
+- O NPU não pôde ser medido neste PC (o Ryzen 5 5600G não tem NPU).
+
+### Corrigido
+- Reiniciar o Ollama (otimização da placa) agora também fecha o `llama-server.exe` das versões novas e leva as
+  variáveis gravadas para o usuário ao Ollama reiniciado.
+
+### Testes desta versão
+- 327/327 testes unitários (5 novos: chip de cada Radeon, ROCm só onde há bibliotecas, ROCm recusado em placa sem
+  suporte, preset do Lemonade, detecção da NPU e do Lemonade).
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.19.0 — Protótipo · 2026-10-16
 
 **Contas locais e modo convidado, monitor de downloads, armazenamento ao vivo, verificação de sistemas na primeira

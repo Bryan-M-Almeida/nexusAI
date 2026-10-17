@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 3.8  ·  Date: 2026-10-16  ·  App version: 0.19.0
+ Document version: 3.9  ·  Date: 2026-10-16  ·  App version: 0.19.5
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -174,6 +174,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-ENV-011  "NEXUS is already open" when starting the program
       NX-ENV-012  The API key is gone (another PC or Windows user)
       NX-ENV-013  Automatic mode picked the wrong mode (unstable internet)
+      NX-ENV-014  ROCm forced on an unsupported card sends the AI to the processor
 
 
 ================================================================================
@@ -1574,6 +1575,20 @@ QUICK DIAGNOSTICS (run these before investigating)
   Solution   : Hover the chip on the top bar to see the last measurement
                (latency and speed). To fix the behaviour, choose Offline,
                Hybrid or Online in Settings > Performance.
+
+[NX-ENV-014] ROCm forced on an unsupported card sends the AI to the processor
+  Severity   : MEDIUM           Status: KNOWN              Observed: YES
+  Symptom    : With OLLAMA_VULKAN=0 (and even HSA_OVERRIDE_GFX_VERSION=10.3.0,
+               the Linux trick) on an RX 6600 XT, Ollama logs "no ROCm-capable
+               device is detected" and runs on the processor: 9.1 tokens/s with
+               0% on the card, against 35.6 tokens/s on Vulkan.
+  Cause      : The ROCm shipped with Ollama for Windows has libraries for some
+               chips only (gfx906, gfx1030, gfx1100-1102, gfx1150/1151,
+               gfx1200/1201); the RX 6600 XT is gfx1032, and Windows ignores
+               HSA_OVERRIDE_GFX_VERSION.
+  Fix        : NEXUS reads the chip list from the installed Ollama and offers
+               ROCm only where it works (Settings > AMD > AI backend). On other
+               cards, Vulkan.
 
 ================================================================================
  TEST HISTORY (2026-10-13)

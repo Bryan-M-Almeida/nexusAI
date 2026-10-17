@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 3.8  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.19.0
+ Versión del documento: 3.9  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.19.5
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -175,6 +175,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-ENV-011  "NEXUS ya está abierto" al abrir el programa
       NX-ENV-012  La clave de API desapareció (otro PC u otro usuario de Windows)
       NX-ENV-013  El modo automático eligió mal (internet inestable)
+      NX-ENV-014  ROCm forzado en una tarjeta sin soporte manda la IA al procesador
 
 
 ================================================================================
@@ -1632,6 +1633,20 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                última medición (latencia y velocidad). Para fijar el
                comportamiento, elige Sin conexión, Híbrido o En línea en
                Configuración > Rendimiento.
+
+[NX-ENV-014] ROCm forzado en una tarjeta sin soporte manda la IA al procesador
+  Gravedad   : MEDIA            Estado: CONOCIDO           Observado: SÍ
+  Síntoma    : Con OLLAMA_VULKAN=0 (e incluso HSA_OVERRIDE_GFX_VERSION=10.3.0, el
+               truco de Linux) en una RX 6600 XT, Ollama registra "no
+               ROCm-capable device is detected" y funciona en el procesador:
+               9,1 tokens/s con 0% en la tarjeta, frente a 35,6 con Vulkan.
+  Causa      : El ROCm que trae Ollama para Windows solo tiene bibliotecas para
+               algunos chips (gfx906, gfx1030, gfx1100-1102, gfx1150/1151,
+               gfx1200/1201); la RX 6600 XT es gfx1032 y Windows ignora
+               HSA_OVERRIDE_GFX_VERSION.
+  Solución   : NEXUS lee la lista de chips de la propia instalación de Ollama y
+               solo ofrece ROCm donde funciona (Configuración > AMD > Backend de
+               la IA). En las demás, Vulkan.
 
 ================================================================================
  HISTORIAL DE PRUEBAS (2026-10-13)

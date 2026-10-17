@@ -130,6 +130,15 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### ROCm e NPU (v0.19.5)
+
+- **ROCm**: o NEXUS descobre o chip da sua Radeon e lê, da própria instalação do Ollama, para quais chips o ROCm tem
+  bibliotecas. Onde funciona (RX 7000, RX 9000, RX 6800/6900, Radeon PRO, iGPUs 880M/890M/8060S…), Configurações → AMD →
+  **Backend da IA** troca entre Vulkan e ROCm e **compara os dois** na sua máquina. Onde não funciona (ex.: RX 6600 XT,
+  gfx1032), ele explica: testado, o ROCm forçado manda a IA para o processador (9,1 contra 35,6 tokens/s no Vulkan).
+- **NPU (Ryzen AI)**: o NEXUS detecta a NPU e o **AMD Lemonade Server** (servidor local da AMD que roda modelos na NPU)
+  e passa a usá-lo com um clique; também está na lista de provedores.
+
 ### Contas locais, convidado, downloads e armazenamento (v0.19.0)
 
 - **Contas locais**: cada pessoa que usa o PC tem as próprias memórias, conversas, agenda e configurações (pastas
@@ -470,4 +479,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.19.0 (protótipo)**.
+Versão atual: **v0.19.5 (protótipo)**.

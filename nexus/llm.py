@@ -73,6 +73,9 @@ def classify(status: int | None, detail: str = "") -> str:
 PRESETS = [
     {"id": "ollama", "name": "Ollama", "url": "http://127.0.0.1:11434/v1", "local": True, "key": False},
     {"id": "lmstudio", "name": "LM Studio", "url": "http://127.0.0.1:1234/v1", "local": True, "key": False},
+    # v0.19.5: AMD Lemonade Server - runs models on the Ryzen AI NPU (and iGPU), OpenAI-compatible, on this PC
+    {"id": "lemonade", "name": "AMD Lemonade (Ryzen AI · NPU)", "url": "http://127.0.0.1:8000/api/v1", "local": True,
+     "key": False},
     {"id": "openai", "name": "OpenAI", "url": "https://api.openai.com/v1", "local": False, "key": True},
     {"id": "anthropic", "name": "Anthropic (Claude)", "url": "https://api.anthropic.com/v1", "local": False, "key": True},
     {"id": "gemini", "name": "Google Gemini", "url": "https://generativelanguage.googleapis.com/v1beta/openai",
