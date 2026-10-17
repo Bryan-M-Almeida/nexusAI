@@ -10,6 +10,7 @@ Set-Location $PSScriptRoot
 .\.venv\Scripts\python build_whisper.py small
 if ($LASTEXITCODE -ne 0) { throw "build_whisper.py falhou" }
 .\.venv\Scripts\python -m PyInstaller --noconfirm --windowed --name NEXUS --distpath $DistPath `
+    --icon "assets\nexus.ico" `
     --add-data "nexus\web;nexus\web" `
     --add-data "nexus\seed;nexus\seed" `
     --add-data "whisper;whisper" `
