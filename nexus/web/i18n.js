@@ -1461,3 +1461,28 @@ for (const [l, extra] of Object.entries({
   "aboutStableItems": "Instalador (PT/EN/ES) con perfil, el modelo para tu tarjeta, apariencia, voz y Ollama|Conversación por texto y voz con la IA local NEX-1.0 (Ollama en la tarjeta AMD, sin nube)|Memoria, perfil, conversaciones y búsqueda en el historial, con contexto entre preguntas|Agenda, tareas, recordatorios y notificaciones|Base de conocimiento (PDF y textos) y consultas a Wikipedia|Integraciones: clima, cambio, cripto, hora mundial, traducción, festivos, calidad del aire, noticias, calculadora y unidades (con caché y copia sin conexión)|Personalización: temas, colores, anillo o PET, puntero, menús y atajos; la IA abre menús y cambia ajustes cuando lo pides|Panel AMD: tarjeta, controlador, uso en vivo, VRAM y el modelo NEX-1.0 recomendado para tu PC|Cuentas locales con contraseña y modo invitado|Descargas, almacenamiento y verificación de sistemas|Modos emergencia, enfoque y estudio|Tutorial hablado (sin IA) con atrás, siguiente y saltar"
  }
 })) Object.assign(window.I18N[l], extra);
+
+// v1.0.0: no longer a prototype; the AI can still make mistakes
+for (const [l, extra] of Object.entries({
+ "pt": {
+  "tut1": "Olá{name}! Eu sou o N.E.X.U.S. Em um minuto eu te mostro como tudo funciona. Eu posso cometer erros, então confira o que for importante. Enquanto falo, preparo tudo em segundo plano.",
+  "protoNote": "A IA pode cometer erros. Confira informações importantes.",
+  "protoBadge": "NEXUS 1.0 · a IA pode errar",
+  "protoWord": "versão 1.0",
+  "protoWarn": "A IA pode cometer erros: confira informações importantes (datas, valores, saúde, dinheiro) antes de confiar nelas. As funções em Beta ainda podem ter falhas."
+ },
+ "en": {
+  "tut1": "Hello{name}! I am N.E.X.U.S. In one minute I will show you how everything works. I can make mistakes, so check anything important. While I talk, I get everything ready in the background.",
+  "protoNote": "The AI can make mistakes. Check important information.",
+  "protoBadge": "NEXUS 1.0 · the AI can make mistakes",
+  "protoWord": "version 1.0",
+  "protoWarn": "The AI can make mistakes: check important information (dates, amounts, health, money) before relying on it. Beta features may still have bugs."
+ },
+ "es": {
+  "tut1": "¡Hola{name}! Soy N.E.X.U.S. En un minuto te muestro cómo funciona todo. Puedo cometer errores, así que revisa lo importante. Mientras hablo, preparo todo en segundo plano.",
+  "protoNote": "La IA puede cometer errores. Revisa la información importante.",
+  "protoBadge": "NEXUS 1.0 · la IA puede equivocarse",
+  "protoWord": "versión 1.0",
+  "protoWarn": "La IA puede cometer errores: revisa la información importante (fechas, importes, salud, dinero) antes de confiar en ella. Las funciones Beta aún pueden fallar."
+ }
+})) Object.assign(window.I18N[l], extra);

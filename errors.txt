@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 4.2  ·  Date: 2026-10-16  ·  App version: 0.20.5
+ Document version: 5.0  ·  Date: 2026-10-17  ·  App version: 1.0.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 

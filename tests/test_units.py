@@ -1325,7 +1325,7 @@ check("help: questions about NEXUS get the real instructions in the context",
       and "How NEXUS works" not in assistant.build_context("como eu faço um bolo?"))
 _ups = _docs.changelog()
 check("updates tab: every version of CHANGELOG.md, newest first, with headline and body",
-      len(_ups) >= 30 and _ups[0]["version"].startswith("v0.") and _ups[-1]["version"] == "v0.1.0"
+      len(_ups) >= 30 and _ups[0]["version"] == "v" + __import__("nexus").__version__ and _ups[-1]["version"] == "v0.1.0"
       and all(u["html"] for u in _ups[:5]) and "<script" not in "".join(u["html"] for u in _ups))
 _errs = {c: _docs.known_errors(c) for c in ("pt", "en", "es")}
 check("possible errors tab: the not-fixed catalogue entries, the same ones in the three languages",
@@ -1385,17 +1385,17 @@ def _rel(tag, base):
 
 _real_uget, _real_frozen = _up.httpx.get, _up.frozen
 _up.frozen = lambda: True
-_up.httpx.get = lambda *a, **k: _UResp(200, _rel("v9.0.0", _up.BASE))
+_up.httpx.get = lambda *a, **k: _UResp(200, [_rel("v0.19.7", _up.BASE), _rel("v9.0.0", _up.BASE), _rel("v1.0.0", _up.BASE)])
 _small = _up.check()
-_up.httpx.get = lambda *a, **k: _UResp(200, _rel("v9.0.0", _up.BASE + 1))
+_up.httpx.get = lambda *a, **k: _UResp(200, [_rel("v9.0.0", _up.BASE + 1)])
 _full = _up.check()
-_up.httpx.get = lambda *a, **k: _UResp(200, _rel("v0.0.1", _up.BASE))
+_up.httpx.get = lambda *a, **k: _UResp(200, [_rel("v0.0.1", _up.BASE)])
 _old = _up.check()
 _up.httpx.get = lambda *a, **k: _UResp(404, {})
 _private = _up.check()
 _up.httpx.get, _up.frozen = _real_uget, _real_frozen
-check("updates: small package when only NEXUS changed, full installer when the libraries changed, nothing when older",
-      _small["kind"] == "small" and _small["size_mb"] == 19.0 and _small["sha_url"] and _full["kind"] == "full"
+check("updates: the highest release (pre-releases too), small package when only NEXUS changed, full installer when "
+      "the libraries changed, nothing when older", _small["latest"] == "9.0.0" and _small["kind"] == "small" and _small["size_mb"] == 19.0 and _small["sha_url"] and _full["kind"] == "full"
       and _full["url"] == "https://x/setup" and not _old["newer"] and _private["error"] == "not_public")
 _src = _isolated.ROOT / "tests" / "_fake_dist"
 (_src / "_internal" / "nexus" / "web").mkdir(parents=True, exist_ok=True)

@@ -4,6 +4,8 @@
 
 Landing page: https://nexus-landing-dun.vercel.app
 
+> English: [README.md](README.md) · Instalador: [última versão](https://github.com/Bryan-M-Almeida/nexusAI/releases/latest)
+
 ## O que ele faz
 
 | Recurso | Como |
@@ -551,4 +553,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.20.5 (protótipo)**.
+Versão atual: **v1.0.0**.

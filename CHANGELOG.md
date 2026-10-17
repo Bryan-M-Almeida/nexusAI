@@ -1,10 +1,46 @@
 # Changelog — N.E.X.U.S
 
 O NEXUS é desenvolvido em **releases funcionais**: cada versão é testada e funciona sozinha.
-Durante o hackathon, todas as versões são **protótipos** (`0.x`). O esquema de versões muda quando
-começarmos a versão definitiva.
+Durante o hackathon, as versões foram **protótipos** (`0.1.0` a `0.20.5`); a **v1.0.0** é a primeira versão estável.
+Daqui em diante: correções sobem o último número (1.0.1), funções novas o do meio (1.1.0).
 
 Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt) · [errores.txt](errores.txt)
+
+---
+
+## v1.0.0 — Versão final · 2026-10-17
+
+**A primeira versão estável do N.E.X.U.S: tudo o que foi construído nas 36 versões de protótipo, revisado, testado com o
+modelo real, com instalador e atualizações pequenas funcionando de verdade agora que o repositório é público.**
+
+### O que é o NEXUS 1.0
+- Assistente pessoal que roda **100% no seu computador**, com a IA **NEX-1.0** (Qwen3) na **placa de vídeo AMD** via
+  Ollama/Vulkan: conversa por texto e voz em português, inglês e espanhol, memória, agenda, tarefas, lembretes, dados,
+  base de conhecimento, integrações (clima, câmbio, cripto, horário, tradução, feriados, ar, notícias, Wikipédia),
+  painel AMD, modelos para cada placa, contas locais e convidado, modo emergência, tutorial falado, instalador e
+  atualizações. O que ainda tem erros continua em **Beta** (Configurações → Beta e → Sobre).
+
+### Corrigido
+- **Atualizações não encontravam as versões novas**: o GitHub deixa os pré-lançamentos fora de "latest", e todas as
+  0.x eram pré-lançamentos — o NEXUS via a v0.19.7 como a mais nova. Agora ele lê a lista de versões e escolhe a maior.
+  A v1.0.0 é publicada como versão estável, então quem tem a v0.20.5 também a encontra.
+- O selo "Protótipo" saiu da tela e do tutorial; o aviso **"a IA pode cometer erros"** continua (embaixo da conversa,
+  no canto da tela, no tutorial e em Configurações → Sobre).
+
+### Documentação
+- **README em inglês** (para quem avalia o projeto e para o público): início rápido pelo instalador, onde a AMD entra,
+  recursos, requisitos medidos, modelos por placa, testes, build, licença e autoria. O README em português continua em
+  `README.pt-BR.md`.
+
+### Desempenho e qualidade (medidos na versão final)
+- Avaliação de conversa com o modelo real: **37/37**, média **5,0 s** por resposta.
+- Atualização de uma versão para a outra: **18 MB** em vez dos 494 MB do instalador.
+
+### Testes desta versão
+- 353/353 testes unitários (o teste de atualizações agora confere a escolha da maior versão entre estáveis e pré-lançamentos).
+- **Atualização de ponta a ponta**: v0.20.5 instalada numa pasta de teste → pacote pequeno da v1.0.0 baixado do GitHub,
+  conferido (SHA-256) e aplicado → o executável atualizado passa no autoteste como 1.0.0.
+- Instalação e desinstalação silenciosas; autoteste do executável (`--selftest`).
 
 ---
 
@@ -43,7 +79,7 @@ aparência, voz e Ollama — e atualizações pequenas: as próximas versões n�
   perfil e sem escolher modelo depois.
 
 ### Testes desta versão
-- 357/357 testes unitários (10 novos: escolhas do instalador aplicadas uma vez, comparação de versões, atualização
+- 353/353 testes unitários (6 novos: escolhas do instalador aplicadas uma vez, comparação de versões, atualização
   pequena × completa × nenhuma × repositório privado, conteúdo do pacote pequeno, páginas e idiomas do instalador,
   regra do modelo igual à do app).
 - Instalação silenciosa de teste numa pasta temporária: arquivos, atalho, preferências gravadas e desinstalação.

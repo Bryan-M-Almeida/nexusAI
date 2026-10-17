@@ -28,7 +28,8 @@ from .config import DATA_DIR
 from .logs import log
 
 REPO = "Bryan-M-Almeida/nexusAI"
-API = f"https://api.github.com/repos/{REPO}/releases/latest"
+# not /releases/latest: GitHub leaves pre-releases out of it, and every 0.x was one (v1.0.0 check saw 0.19.7)
+API = f"https://api.github.com/repos/{REPO}/releases?per_page=20"
 BASE = 1  # bump when the libraries / bundled models change (the small update can't carry them)
 UPDATE_RX = re.compile(r"^NEXUS-update-(\d+\.\d+\.\d+)-base(\d+)\.zip$")
 SETUP_RX = re.compile(r"^NEXUS-Setup-(\d+\.\d+\.\d+)\.exe$")
@@ -56,7 +57,10 @@ def check(timeout: float = 8) -> dict:
         return {**out, "error": "not_public"}  # private repository (or no release yet)
     if r.status_code != 200:
         return {**out, "error": f"http {r.status_code}"}
-    rel = r.json()
+    releases = [x for x in r.json() if not x.get("draft") and re.match(r"^v?\d+\.\d+\.\d+$", x.get("tag_name", ""))]
+    if not releases:
+        return {**out, "error": "not_public"}
+    rel = max(releases, key=lambda x: _v(x["tag_name"]))  # the highest version, published or pre-release
     latest = rel.get("tag_name", "").lstrip("v")
     assets = {a["name"]: a for a in rel.get("assets", [])}
     newer = _v(latest) > _v(__version__)

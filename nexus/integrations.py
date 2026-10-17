@@ -15,7 +15,7 @@ from .db import db, now
 from .i18n import lang
 
 TIMEOUT = httpx.Timeout(10, connect=5)
-HEADERS = {"User-Agent": "NEXUS-assistant/0.6 (hackathon prototype)"}
+HEADERS = {"User-Agent": "NEXUS-assistant/1.0 (+https://github.com/Bryan-M-Almeida/nexusAI)"}
 
 
 _client: httpx.Client | None = None
