@@ -57,7 +57,7 @@ if (!window.pywebview && location.search.includes("mock")) {
     boot: async () => {
       ["memory", "knowledge", "ai", "voice"].forEach((k, i) => emit("boot", { key: k, ok: true, detail: ["3", "198", "qwen3:8b", "small"][i] }, 600 + i * 200));
       return { profile, lang: "pt", llm, settings, stt: "ready", version: "0.17.0", model_name: "NEX-1.0",
-        terms: { accepted: mockTerms, version: "1.2", accepted_at: mockTerms ? new Date().toISOString() : "" } };
+        terms: { accepted: mockTerms, version: "1.3", accepted_at: mockTerms ? new Date().toISOString() : "" } };
     },
     greet: async () => { speak(2.5, 200); return "Olá, Alex, o que teremos para hoje?"; },
     history: async () => [],
@@ -206,6 +206,10 @@ if (!window.pywebview && location.search.includes("mock")) {
     model_pull: async (id) => { [10, 35, 62, 88, 100].forEach((pct, i) => emit("model_progress", { id, pct }, 400 * (i + 1))); return { ok: true }; },
     model_use: async (id) => { mockActive = id; return { ok: true, id, name: id }; },
     amd_open_ref: async () => ({ ok: true }),
+    tutorial_begin: async () => { ["ai", "voice", "apps", "integrations"].forEach((k, i) => { emit("tutorial_bg", { task: k, state: "running" }, 300 + i * 900); emit("tutorial_bg", { task: k, state: "done" }, 1100 + i * 900); }); return { ok: true }; },
+    tutorial_end: async () => ({ ok: true }),
+    about_updates: async () => ({ version: "0.20.0", versions: [{ version: "v0.20.0", kind: "Protótipo", date: "2026-10-16", headline: "Tutorial roteirizado, abas Sobre, Atualizações e Possíveis erros.", html: "<h4>Novo</h4><ul><li><b>Tutorial</b> sem IA</li></ul>" }, { version: "v0.19.7", kind: "Protótipo", date: "2026-10-16", headline: "Correções.", html: "<ul><li>Fatos consultados</li></ul>" }] }),
+    about_errors: async () => ({ errors: [{ id: "NX-VOZ-005", area: "VOZ", title: "NEXUS ouve a própria voz (eco)", severity: "ALTA", status: "MITIGADO", symptom: "Responde a si mesmo.", cause: "Caixas de som.", fix: "1. Use fone\n2. Baixe o volume", tips: "" }, { id: "NX-LLM-001", area: "LLM", title: "IA offline", severity: "CRÍTICA", status: "CONHECIDO", symptom: "Chip vermelho.", cause: "Ollama parado.", fix: "Abra o Ollama.", tips: "" }] }),
     speak_tutorial: async (text, step) => { emit("tutorial_spoken", { step }, window.mockSpeechMs || 5000); return { voice: true }; },
     amd_compute: async () => ({ backend: "auto", vulkan: true, card: "AMD Radeon RX 6600 XT", npus: [], using_lemonade: false,
       rocm: { gfx: "gfx1032", supported: false, installed: true, targets: ["gfx1030", "gfx1100", "gfx1101", "gfx1102", "gfx1150", "gfx1151", "gfx1200", "gfx1201", "gfx906"] },
@@ -218,8 +222,8 @@ if (!window.pywebview && location.search.includes("mock")) {
     media_state: async () => ({ sessions: [], current: { app: "LiMusic", title: "Midnight City", artist: "M83", status: "playing" }, volume: 38, muted: false }),
     media_action: async () => ({ ok: true }),
     suspend: async () => { emit("suspended", { on: true, reason: "manual", app: "", vram_freed_mb: 5630 }, 300); emit("suspended", { on: false, source: "window" }, 3500); return { ok: true }; },
-    accept_terms: async () => { mockTerms = true; return { accepted: true, version: "1.2", accepted_at: new Date().toISOString() }; },
-    revoke_terms: async () => { mockTerms = false; return { accepted: false, version: "1.2" }; },
+    accept_terms: async () => { mockTerms = true; return { accepted: true, version: "1.3", accepted_at: new Date().toISOString() }; },
+    revoke_terms: async () => { mockTerms = false; return { accepted: false, version: "1.3" }; },
     gpu_tune_status: async () => ({ amd: true, vulkan: true, applied: mockGpu, suggest: true, installed: true }),
     gpu_tune: async (on) => { mockGpu = !!on; return { amd: true, vulkan: true, applied: mockGpu, suggest: true, installed: true, restarted: true }; },
     optimize: async (k) => (k === "data" ? { ok: true, backup: "C:/x/nexus-backup-test.zip", rss_mb: 120 } : { ok: true, freed_mb: 312.4, rss_mb: 188.1, freed_disk_mb: 1.2 }),

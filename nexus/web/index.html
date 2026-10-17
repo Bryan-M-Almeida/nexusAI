@@ -144,6 +144,7 @@
       <p class="ex-line nexus" id="exNexus"></p>
     </div>
     <div class="caption" id="caption" aria-live="polite"></div>
+    <p class="proto-badge mono" id="protoBadge" data-i18n="protoBadge">PROTÓTIPO · a IA pode errar</p>
   </section>
 
   <section class="chatview" id="chatView">
@@ -154,6 +155,7 @@
       <input id="prompt" autocomplete="off" data-i18n-ph="ask">
       <button type="submit" class="btn-send" data-i18n="send">ENVIAR</button>
     </form>
+    <p class="proto-note mono" data-i18n="protoNote">PROTÓTIPO · a IA pode cometer erros. Confira informações importantes.</p>
   </section>
 
   <nav class="dock edge-bar" id="dock">
@@ -282,8 +284,10 @@
 <div class="tutorial" id="tutorial" hidden>
   <p class="tut-count mono" id="tutCount"></p>
   <p class="tut-text" id="tutText"></p>
+  <p class="tut-bg mono" id="tutBg" hidden></p>
   <div class="tut-btns">
     <button class="btn-ghost" type="button" id="tutSkip" data-i18n="tutSkip">Pular</button>
+    <button class="btn-ghost" type="button" id="tutBack" data-i18n="tutBack" hidden>Voltar</button>
     <button class="btn-primary" type="button" id="tutNext" data-i18n="tutNext">Próximo</button>
   </div>
 </div>
@@ -519,6 +523,10 @@
       <button type="button" data-sec="data" data-i18n="secData">Dados</button>
       <button type="button" data-sec="legal" data-i18n="secLegal">Privacidade e termos</button>
       <button type="button" data-sec="beta" data-i18n="secBeta">Beta</button>
+      <p class="set-group" data-i18n="grpAbout">SOBRE O NEXUS</p>
+      <button type="button" data-sec="about" data-i18n="secAbout">Sobre</button>
+      <button type="button" data-sec="updates" data-i18n="secUpdates">Atualizações</button>
+      <button type="button" data-sec="issues" data-i18n="secIssues">Possíveis erros</button>
     </nav>
     <div class="set-body">
       <!-- GENERAL -->
@@ -785,6 +793,7 @@
               <button class="btn-primary" type="button" id="gpuYes" data-i18n="gpuYes">Aplicar e reiniciar o Ollama</button></div>
           </div>
         </div>
+        <div data-feature="amd_lab">
         <p class="sub mono" data-i18n="amdBackendTitle">BACKEND DA IA: VULKAN OU ROCm</p>
         <div class="amd-compute" id="amdBackend"></div>
         <div class="opt-confirm" id="amdBackendConfirm" hidden>
@@ -794,6 +803,7 @@
         </div>
         <p class="sub mono" data-i18n="amdNpuTitle">NPU (RYZEN AI)</p>
         <div class="amd-compute" id="amdNpu"></div>
+        </div>
         <p class="sub mono" data-i18n="amdTechTitle">TECNOLOGIAS AMD NO NEXUS</p>
         <div class="amd-tech" id="amdTech"></div>
         <p class="sub mono" data-i18n="amdRefTitle">REFERÊNCIAS AMD</p>
@@ -816,8 +826,9 @@
         </div>
         <label><span data-i18n="calendarIcs">Link do calendário (ICS)</span><input name="calendar_ics_url" spellcheck="false" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics"></label>
         <p class="hint" data-i18n="calendarHelp">Google Agenda: Configurações da agenda → Integrar agenda → "Endereço secreto no formato iCal". Outlook: Calendário → Compartilhar → Publicar (ICS). Somente leitura.</p>
-        <label><span data-i18n="vagalumeKey">Chave da API do Vagalume (opcional, para letras)</span><input name="vagalume_key" spellcheck="false" autocomplete="off"></label>
-        <p class="hint" data-i18n="lyricsHint">Letras só de uma fonte que você diz: "cante X, letra do LRCLIB" (aberto, sem chave) ou "do Vagalume" (com chave; sem ela a página abre no navegador). Letras.mus.br e Genius abrem no navegador.</p>
+        <div data-feature="lyrics"><label><span data-i18n="vagalumeKey">Chave da API do Vagalume (opcional, para letras)</span><input name="vagalume_key" spellcheck="false" autocomplete="off"></label>
+        <p class="hint" data-i18n="lyricsHint">Letras só de uma fonte que você diz: "cante X, letra do LRCLIB" (aberto, sem chave) ou "do Vagalume" (com chave; sem ela a página abre no navegador). Letras.mus.br e Genius abrem no navegador.</p></div>
+        <div data-feature="custom_integrations">
         <p class="sub mono" data-i18n="integCustomTitle">SUAS INTEGRAÇÕES</p>
         <p class="hint" data-i18n="integCustomHint">Qualquer serviço com um endereço que devolva dados (JSON ou texto). Quando uma mensagem tiver uma das palavras-chave, o NEXUS consulta o endereço trocando {query} pelo que você pediu e usa a resposta.</p>
         <div id="integCustomList"></div>
@@ -829,6 +840,7 @@
           <button class="btn-ghost" type="button" id="btnIcAdd" data-i18n="icAdd">Adicionar</button>
         </div>
         <p class="hint warn-cloud" data-i18n="icWarn">Só endereços https. O que você pedir é enviado a esse serviço; não coloque senhas no endereço.</p>
+        </div>
       </section>
 
       <!-- APPS AND MEDIA (v0.18.0, beta) -->
@@ -936,6 +948,34 @@
         <div class="row-btns"><button class="btn-ghost" type="button" id="btnKeysReset" data-i18n="keysReset">Restaurar os atalhos originais</button></div>
       </section>
 
+      <!-- ABOUT / UPDATES / POSSIBLE ERRORS (v0.20.0) -->
+      <section class="set-sec" data-sec="about" hidden>
+        <h2 data-i18n="secAbout">Sobre</h2>
+        <div class="about-head"><b class="mono">N.E.X.U.S</b> <span class="mono" id="aboutVersion"></span></div>
+        <p class="hint warn-cloud" data-i18n="protoWarn">Este é um protótipo. A IA pode cometer erros: confira informações importantes (datas, valores, saúde, dinheiro) antes de confiar nelas.</p>
+        <p class="sub mono" data-i18n="aboutStable">FUNCIONANDO</p>
+        <ul class="about-list ok" id="aboutStableList"></ul>
+        <p class="sub mono" data-i18n="aboutBeta">EM BETA (PODEM TER ERROS)</p>
+        <ul class="about-list beta" id="aboutBetaList"></ul>
+        <p class="sub mono" data-i18n="aboutNot">AINDA NÃO FUNCIONA</p>
+        <ul class="about-list no" id="aboutNotList"></ul>
+        <p class="sub mono" data-i18n="aboutAuthor">AUTORIA</p>
+        <p class="hint" data-i18n="aboutAuthorText">Criado por Bryan Maciel de Almeida. Código sob a Licença MIT; o nome N.E.X.U.S, os nomes NEX-1.0, o logo, o ícone, o PET e a identidade visual não fazem parte da licença (arquivo NOTICE).</p>
+      </section>
+      <section class="set-sec" data-sec="updates" hidden>
+        <h2 data-i18n="secUpdates">Atualizações</h2>
+        <p class="hint" data-i18n="updatesHint">O que mudou e o que foi corrigido em cada versão (do arquivo CHANGELOG.md).</p>
+        <div class="updates" id="updatesList"></div>
+      </section>
+      <section class="set-sec" data-sec="issues" hidden>
+        <h2 data-i18n="secIssues">Possíveis erros</h2>
+        <p class="hint" data-i18n="issuesHint">Problemas que ainda podem acontecer nesta versão e como resolver. Os já corrigidos ficam em Atualizações. Para relatar um novo, diga: "Nexus, relata um problema".</p>
+        <div class="issues-tools"><input id="issuesFind" data-i18n-ph="issuesFind" placeholder="Buscar (ex.: microfone, lenta, NX-VOZ-005)">
+          <select id="issuesArea"><option value="" data-i18n="issuesAll">Todas as áreas</option></select></div>
+        <p class="hint mono" id="issuesCount"></p>
+        <div class="issues" id="issuesList"></div>
+      </section>
+
       <!-- BETA & APP MODE (v0.15.5) -->
       <section class="set-sec" data-sec="beta" hidden>
         <h2 data-i18n="secBeta">Beta</h2>
@@ -957,6 +997,9 @@
           <label class="check"><input type="checkbox" name="beta_memory_import"><span data-i18n="betaMemoryImport">Importar memórias de outras IAs (ChatGPT, Claude, Gemini, Copilot…)</span></label>
           <label class="check"><input type="checkbox" name="beta_media"><span data-i18n="betaMedia">Controle de mídia: tocar, pausar, próxima, volume e "o que está tocando" (Spotify, LiMusic, navegador…)</span></label>
           <label class="check"><input type="checkbox" name="beta_apps"><span data-i18n="betaApps">Abrir aplicativos pelo nome; jogos suspendem o NEXUS para liberar a placa de vídeo</span></label>
+          <label class="check"><input type="checkbox" name="beta_lyrics"><span data-i18n="betaLyrics">Letras de músicas de uma fonte que você diz (LRCLIB, Vagalume)</span></label>
+          <label class="check"><input type="checkbox" name="beta_custom_integrations"><span data-i18n="betaCustomInteg">Suas integrações: serviços da web por palavra-chave (Configurações → Integrações)</span></label>
+          <label class="check"><input type="checkbox" name="beta_amd_lab"><span data-i18n="betaAmdLab">AMD: trocar o backend para ROCm e usar a NPU Ryzen AI (Lemonade), não testados em todas as placas</span></label>
           <label class="check"><input type="checkbox" name="beta_hold_talk"><span data-i18n="betaHoldTalk">Segurar para falar: o microfone fica ligado enquanto a tecla de falar estiver apertada e envia ao soltar</span></label>
         </div>
         <p class="hint" id="betaDevHint" hidden data-i18n="betaDevOn">No modo desenvolvedor todas ficam ligadas.</p>

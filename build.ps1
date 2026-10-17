@@ -14,6 +14,12 @@ if ($LASTEXITCODE -ne 0) { throw "build_whisper.py falhou" }
     --add-data "nexus\web;nexus\web" `
     --add-data "nexus\seed;nexus\seed" `
     --add-data "whisper;whisper" `
+    --add-data "CHANGELOG.md;." `
+    --add-data "erros.txt;." `
+    --add-data "errors.txt;." `
+    --add-data "errores.txt;." `
+    --add-data "LICENSE;." `
+    --add-data "NOTICE;." `
     --collect-all faster_whisper `
     --collect-all ctranslate2 `
     --collect-all onnxruntime `

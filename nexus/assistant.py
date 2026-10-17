@@ -56,6 +56,12 @@ Rules:
   corrects you, check before insisting.
 - NEVER write song lyrics from memory (you don't know them reliably): NEXUS shows lyrics only from a source the user
   names ("letra do LRCLIB / Vagalume"). Otherwise offer to play the song (`play_music`) and ask which source to use.
+- Recommendations (books, films, series, music, games): only well-known works that really belong to the genre or type
+  asked; never present a work of another genre as if it were the one asked.
+- Help with NEXUS itself / the user didn't understand the tutorial: to talk, say "Nexus" and the request or hold
+  Ctrl+Space; menus hide at the screen edges (top: notifications and settings; left: AI modes; right: panel and
+  conversations; bottom: voice and text); F1 shows every shortcut; you can open any menu when asked; "mostra o
+  tutorial" plays the tutorial again (`open_interface` target "tutorial"). Explain step by step, briefly.
 - QUIZZES / mock exams: after each answer, grade it IMMEDIATELY (correct or not, the right answer and one
   short reason), then ask the next question. Keep answers in the conversation: never store them with
   `record_data`. Only call an answer correct after checking the fact; never invent explanations. Ask
@@ -64,7 +70,8 @@ Rules:
   words (for a joke: the wordplay and why it is funny). Never just repeat the same sentence.
 - The user wants to report a NEXUS error/bug or "save this conversation to report errors" -> `report_issue`.
 - The user wants to open, see or change something of NEXUS itself (settings, colours, pointer, shortcuts, voice, menus,
-  conversations, guide) -> call `open_interface` (never just say you opened it)."""
+  conversations, guide) -> call `open_interface` (never just say you opened it). A question about HOW to do something
+  ("como eu abro os menus?", "how do I...?") is answered with the explanation; don't open anything unasked."""
 
 
 def _upcoming(days=7):
@@ -184,6 +191,22 @@ def turn_tools() -> list:
     return out
 
 
+NEXUS_TOPIC = re.compile(r"\b(menus?|configura\w*|settings|ajustes|tutorial|aro|ring|anillo|pet|cursor|ponteiro|puntero|"
+                         r"cor(es)?|colou?rs?|tema|theme|atalhos?|shortcuts?|atajos?|voz|voice|microfone|microphone|"
+                         r"micr[oó]fono|falar? com voc[eê]|falo com voc[eê]|talk to you|hablar? contigo|hablo contigo|nexus|"
+                         r"painel|panel|conversas)\b", re.I)
+NEXUS_HELP = """## How NEXUS works (answer the user's question from this, in their language; never mention tool names)
+- Talk: say "Nexus" and the request, or hold Ctrl+Space and speak; in text mode just type. The voice and text buttons
+  are in the bar at the bottom of the screen.
+- Menus hide at the screen edges: move the mouse to an edge. Top: notifications and settings. Left: AI modes.
+  Right: panel and conversations. Bottom: voice and text controls. F1 shows the guide with every shortcut.
+  The user can also ask: "abre as configurações", "abre as conversas" and NEXUS opens it.
+- Colours of the ring, theme, ring or PET, pointer (cursor): Settings > Personalização, or just ask
+  ("muda a cor do aro para azul", "usa o PET") and NEXUS changes it.
+- Shortcuts: Settings > Atalhos (click one and press the new keys).
+- Watch the tutorial again: say "mostra o tutorial" or Settings > Geral > Ver o tutorial."""
+
+
 def build_context(user_text: str, emergency_topic: str | None = None) -> str:
     """Per-message context, sent right before the user's message. Only what this message needs."""
     if workspace.active and not emergency_topic:
@@ -197,6 +220,8 @@ def build_context(user_text: str, emergency_topic: str | None = None) -> str:
 
     timely = bool(TIME_WORDS.search(user_text))
     parts = [f"## Now\n{day(now)} {now.strftime('%H:%M')}"]
+    if tools.HOW_TO.search(user_text) and NEXUS_TOPIC.search(user_text):
+        parts.append(NEXUS_HELP)  # v0.20.0: "como eu abro os menus?" - the model guessed (Ctrl+Space "shows the menus")
     if timely:
         # v0.15.5: labelled - after a long conversation the model took the 2nd entry of a bare list as "tomorrow"
         parts.append(f"Tomorrow = {day(now + timedelta(days=1))}; day after tomorrow = {day(now + timedelta(days=2))}\n"
@@ -313,6 +338,15 @@ LIVE = [
     (re.compile(r"\b(m[uú]sica|can[cç][aã]o|tema|trilha sonora|abertura|encerramento|opening|ending|soundtrack|theme song|"
                 r"quem canta|quem cantou|who sings|who sang|qui[eé]n canta|compositor|composer|cantor|singer|cantante)\b"
                 r".{0,60}\b(de|do|da|of|del)\b", re.I), {"wikipedia", "web_search"}, "wikipedia"),
+    # v0.20.0: lists and recommendations of works were invented ("Iracema" by Machado de Assis, "A Estrela de Mar"
+    # by Asimov): any question about books / films / albums of someone or of a genre is checked first
+    (re.compile(r"^(?!.*\b(l[eê]|leia|ler|read|lee|leer)\b).*(\b(outros?|outras?|mais|other|another|otros?|otras?)\b.{0,20}"
+                r"\b(livros?|obras?|romances?|filmes?|[aá]lbu(m|ns)|discos?|books?|novels?|films?|movies?|albums?|libros?|"
+                r"novelas?|pel[ií]culas?)\b|\b(livros?|obras?|romances?|filmes?|s[eé]ries|books?|novels?|films?|movies?|"
+                r"libros?|pel[ií]culas?)\b.{0,15}\b(dele|dela|deles|de|do|da|by|of|del)\b|"
+                r"\b(mesm[oa] (autor|autora|diretor|banda|artista)|same (author|director|band|artist)|"
+                r"mism[oa] (autor|autora|director|banda|artista))\b)", re.I | re.S),
+     {"wikipedia", "web_search"}, "wikipedia"),
     (re.compile(r"\b(c[aâ]mbio|cota[cç][aã]o|d[oó]lar(es)?|euros?|libras?|exchange rate|currency|tipo de cambio|"
                 r"em reais|in dollars|en pesos)\b", re.I), {"convert_currency"}, "convert_currency"),
 ]
@@ -588,12 +622,12 @@ class Assistant:
                 tools.prefs_hook(changed)
             self._instant(text, reply, "set_preference", changed)
             return True
-        song_lyrics = lyrics.handle(text, self._recent_titles(), code,
-                                    " ".join(m["content"][:300] for m in memory.history(6)))  # v0.19.6: lyrics from the source the user named
+        song_lyrics = features.enabled("lyrics") and lyrics.handle(
+            text, self._recent_titles(), code, " ".join(m["content"][:300] for m in memory.history(6)))  # v0.19.6: lyrics from the source the user named
         if song_lyrics:
             self._instant(text, song_lyrics, "lyrics", {})
             return True
-        sung = self._sing_request(text, code)  # v0.19.6: "cante X" without a source: play it / ask for the source
+        sung = features.enabled("lyrics") and self._sing_request(text, code)  # v0.19.6: "cante X" without a source: play it / ask for the source
         if sung:
             self._instant(text, sung, "play_music" if features.tool_allowed("play_music") else "lyrics", {})
             return True
@@ -610,7 +644,8 @@ class Assistant:
             if app and (not nav or words >= 2 and apps._norm(app["name"]) in apps._norm(text)):
                 self._instant(text, *tools.open_app_reply(app, code))
                 return True
-        self._hub = connectors.prepare(text)
+        previous = [m["content"] for m in reversed(memory.history(4)) if m["role"] == "user"]  # newest first
+        self._hub = connectors.prepare(text, previous)
         if self._hub.get("instant"):
             self._instant(text, self._hub["instant"], self._hub["used"][0], {})
             return True

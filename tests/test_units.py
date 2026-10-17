@@ -931,6 +931,7 @@ cx.toggle("currency", True)
 check("lookup tool lists only the integrations that are on", "lookup" in {x["function"]["name"] for x in assistant.turn_tools()}
       and next(x for x in assistant.turn_tools() if x["function"]["name"] == "lookup")["function"]["parameters"]
       ["properties"]["service"]["enum"] == ["crypto", "clock", "translate", "holidays", "air"])
+settings["beta_custom_integrations"] = True  # v0.20.0: beta
 _c1 = cx.add_custom("Gasolina", "gasolina, combustível", "https://api.exemplo.com/gas?q={query}", 60)
 _c2 = cx.add_custom("Ruim", "x", "http://inseguro.com/x")
 check("custom integrations: https only, routed by keyword, removable",
@@ -975,7 +976,7 @@ _apps.launch, tools.app_hook = _real_launch, _real_hook
 settings["app_mode"] = "user"
 check("beta: media and apps start off for users", not features.enabled("media") and not features.enabled("apps")
       and "open_app" not in {x["function"]["name"] for x in assistant.turn_tools()})
-check("terms 1.2: new services are listed (and accepted again)", _legal.VERSION == "1.2" and all(
+check("terms 1.3: new services are listed (and accepted again)", _legal.VERSION == "1.3" and all(
     w in (_isolated.ROOT / "nexus" / "web" / "legal.js").read_text("utf-8") for w in ("CoinGecko", "MyMemory", "Nager.Date")))
 
 # -- v0.18.1: the microphone hearing NEXUS itself or noise ----------------------------------------------------------
@@ -1280,6 +1281,7 @@ check("lyrics: among songs with the same name, the conversation picks the right 
 memory.new_conversation()
 _ev = []
 _bot3 = assistant.Assistant(lambda e, p: _ev.append((e, p)))
+settings["beta_lyrics"] = True  # v0.20.0: beta
 _bot3.ask('cante "Sorriso Resplandecente"')
 check("lyrics: without a source NEXUS never invents them - it asks where to take them from",
       "LRCLIB" in [p["text"] for e, p in _ev if e == "done"][-1])
@@ -1287,6 +1289,62 @@ _acc_guest, _acc.GUEST = _acc.GUEST, True
 check("guest: its own greeting (no profile to import)", assistant.greeting() == i18n.STRINGS["pt"]["guest_hello"]
       or assistant.greeting().startswith("Olá! Você está no modo convidado"))
 _acc.GUEST = _acc_guest
+
+# -- v0.20.0: scripted tutorial (no AI), follow-ups, About / Updates / Possible errors, new beta features ----------------
+from nexus import docs as _docs  # noqa: E402
+from nexus import features as _feat  # noqa: E402
+from nexus import tutorial as _tut  # noqa: E402
+
+check("tutorial: next / back / skip understood in PT/EN/ES, questions are not commands",
+      [_tut.detect(q) for q in ("próximo", "Nexus, volta", "pula o tutorial", "next", "go back", "skip", "siguiente",
+                                "atrás", "saltar", "entendi", "como eu abro as configurações do NEXUS agora?",
+                                "qual a previsão do tempo para amanhã")]
+      == ["next", "back", "skip", "next", "back", "skip", "next", "back", "skip", "next", None, None])
+_cx.toggle("currency", True)
+_fu = _cx._follow_up("e 50 desses em reais?", ["e o euro?", "quanto está o dólar?"])
+check("follow-up: '50 desses' uses the currency of the previous question (it answered 1 real in dollars)",
+      _fu[1] == [("currency", {"amount": 50.0, "from_currency": "EUR", "to_currency": "BRL"})], _fu)
+check("follow-up: 'lá' is the last place the user named, even two questions back (it answered São Paulo)",
+      _cx._follow_up("que horas são lá?", ["e lá, vai chover amanhã?", "Como está o tempo em Paris?"])[0].endswith("em Paris")
+      and _cx._follow_up("vai chover lá?", [])[0] == "vai chover lá?")
+_works = assistant.LIVE[3][0]
+check("works lists and recommendations are looked up (Iracema was given as Machado de Assis's)",
+      all(_works.search(q) for q in ("e qual outro livro famoso dele?", "Me recomenda um livro de ficção científica",
+                                     "tem outro do mesmo autor?", "quais filmes do Nolan?"))
+      and not any(_works.search(q) for q in ("lê o livro de receitas", "Quem escreveu Dom Casmurro?", "Como está o tempo?")))
+tools.ui_hook, _hook = (lambda x: None), tools.ui_hook
+tools.current_text = "Não entendi o tutorial, como eu abro os menus?"
+_how = tools.open_interface("settings")
+tools.current_text = "como eu mudo a cor? abre as configurações"
+_open = tools.open_interface("settings")
+tools.ui_hook, tools.current_text = _hook, ""
+check("help: 'como eu abro os menus?' is explained, not opened; an explicit 'abre' still opens",
+      _how.get("not_opened") and _open.get("opened") == "settings")
+check("help: questions about NEXUS get the real instructions in the context",
+      "Ctrl+Space" in assistant.build_context("como eu falo com você?")
+      and "How NEXUS works" not in assistant.build_context("como eu faço um bolo?"))
+_ups = _docs.changelog()
+check("updates tab: every version of CHANGELOG.md, newest first, with headline and body",
+      len(_ups) >= 30 and _ups[0]["version"].startswith("v0.") and _ups[-1]["version"] == "v0.1.0"
+      and all(u["html"] for u in _ups[:5]) and "<script" not in "".join(u["html"] for u in _ups))
+_errs = {c: _docs.known_errors(c) for c in ("pt", "en", "es")}
+check("possible errors tab: the not-fixed catalogue entries, the same ones in the three languages",
+      len(_errs["pt"]) >= 50 and [e["id"] for e in _errs["pt"]] == [e["id"] for e in _errs["en"]] == [e["id"] for e in _errs["es"]]
+      and not any(e["status"] in _docs.FIXED for e in _errs["pt"]) and all(e["fix"] or e["tips"] or e["cause"] for e in _errs["pt"]))
+settings["app_mode"] = "user"
+for _k in ("beta_lyrics", "beta_custom_integrations", "beta_amd_lab"):
+    settings[_k] = False
+check("beta: lyrics, your integrations and ROCm/NPU start off for users (they still have errors or untested parts)",
+      not any(_feat.enabled(f) for f in ("lyrics", "custom_integrations", "amd_lab")))
+_bot4 = assistant.Assistant(lambda e, p: None)
+check("beta off: 'cante X, letra do LRCLIB' is not answered by the lyrics path", not _bot4._local_command("cante Yesterday, letra do LRCLIB"))
+_html = (_isolated.ROOT / "nexus" / "web" / "index.html").read_text("utf-8")
+check("interface: prototype notice, About / Updates / Possible errors sections and the tutorial Back button",
+      all(x in _html for x in ('data-i18n="protoNote"', 'data-sec="about"', 'data-sec="updates"', 'data-sec="issues"',
+                               'id="tutBack"', 'name="beta_lyrics"', 'name="beta_amd_lab"')))
+_build = (_isolated.ROOT / "build.ps1").read_text("utf-8")
+check("build: the changelog, the error catalogues, LICENSE and NOTICE ship with the executable",
+      all(f'--add-data "{f};."' in _build for f in ("CHANGELOG.md", "erros.txt", "errors.txt", "errores.txt", "LICENSE", "NOTICE")))
 
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

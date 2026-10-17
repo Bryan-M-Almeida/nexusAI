@@ -130,6 +130,20 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Tutorial roteirizado, Sobre, Atualizações e Possíveis erros (v0.20.0)
+
+- **Tutorial falado sem IA**: um roteiro fixo, com **Voltar**, **Próximo** e **Pular** (pular leva ao último passo, que
+  explica como rever o tutorial e que a IA pode ajudar). Durante o tutorial a IA fica fechada — falar ou escrever só
+  move o tutorial ("próximo", "voltar", "pular") — e o NEXUS se prepara em segundo plano: carrega a IA e a voz, lê a
+  lista de apps e busca o clima e a cotação da sua cidade. Depois do tutorial essas respostas saem na hora.
+- **Aviso de protótipo**: na tela, embaixo da conversa e no tutorial — a IA pode cometer erros.
+- **Configurações → Sobre o NEXUS**: **Sobre** (o que funciona, o que está em beta, o que ainda não funciona, autoria),
+  **Atualizações** (o que mudou e foi corrigido em cada versão, do CHANGELOG) e **Possíveis erros** (os problemas que
+  ainda podem acontecer, com busca, área e como resolver, do catálogo de erros).
+- **Novas funções em Beta**: letras de músicas, suas integrações e AMD ROCm/NPU (desligadas no modo usuário).
+- **Contexto entre perguntas**: "e 50 desses em reais?" e "que horas são lá?" usam a moeda e a cidade das perguntas
+  anteriores.
+
 ### Fatos verificados e letras com fonte (v0.19.7)
 
 - Perguntas sobre músicas, séries, filmes, livros e pessoas ("quem canta a abertura de X") são **consultadas na
@@ -472,9 +486,17 @@ nexus/
 
 ## Licença
 
-O NEXUS é software livre sob a **Licença MIT** — veja [LICENSE](LICENSE). © 2026 Bryan Maciel de Almeida.
-Você pode usar, copiar, modificar e distribuir o código (inclusive comercialmente), mantendo o aviso de direitos autorais
-e a licença. Os Termos de Uso e a Política de Privacidade do aplicativo ficam em Configurações → Privacidade e termos.
+**Criado por Bryan Maciel de Almeida.** © 2026 Bryan Maciel de Almeida.
+
+O **código** do NEXUS é software livre sob a **Licença MIT**, veja [LICENSE](LICENSE). Você pode usar, copiar,
+modificar e distribuir o código, mantendo o aviso de direitos autorais e a licença.
+
+**Nome e identidade visual não fazem parte da licença** (veja [NOTICE](NOTICE)). O nome "N.E.X.U.S"/"NEXUS", os
+nomes de modelo "NEX-1.0" (Lite, Mini, Pro, Max), o logo, o ícone, o PET (orbe e olho) e a identidade visual do aro/HUD
+são de propriedade exclusiva do autor. Versões modificadas ou redistribuídas devem usar outro nome e arte própria, e
+não podem se apresentar como o NEXUS original. Citar o projeto ("baseado no N.E.X.U.S") é permitido.
+
+Os Termos de Uso e a Política de Privacidade do aplicativo ficam em Configurações → Privacidade e termos.
 
 Componentes de terceiros e suas licenças:
 
@@ -496,4 +518,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.19.7 (protótipo)**.
+Versão atual: **v0.20.0 (protótipo)**.

@@ -16,6 +16,10 @@ BETA = {
     "memory_import": set(),  # v0.17.5: import memories from other AIs
     "media": {"media_control"},  # v0.18.0: play/pause, next, volume, what's playing (Spotify, LiMusic, browser...)
     "apps": {"open_app"},        # v0.18.0: open installed apps; games suspend NEXUS
+    # v0.20.0: moved to beta - they work, but depend on outside services or hardware that was not fully tested
+    "lyrics": set(),               # lyrics from LRCLIB / Vagalume (Vagalume's API was down in the tests)
+    "custom_integrations": set(),  # the user's own web services by keyword
+    "amd_lab": set(),              # ROCm backend switch and the Ryzen AI NPU (Lemonade) - not testable on gfx1032
 }
 TOOL_FEATURE = {tool: feat for feat, tools in BETA.items() for tool in tools}
 

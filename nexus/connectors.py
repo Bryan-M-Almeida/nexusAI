@@ -820,6 +820,10 @@ def _custom_connector(cid: str) -> Connector | None:
 
 
 def _custom_route(norm: str, raw: str):
+    from . import features
+
+    if not features.enabled("custom_integrations"):  # v0.20.0: beta
+        return None
     for spec in _custom_list():
         if not spec.get("on", True):
             continue
@@ -908,12 +912,51 @@ def route(text: str, limit: int = 2) -> list[tuple[str, dict]]:
 
 
 INSTANT_MAX_WORDS = 14
+# v0.20.0: follow-ups that point at the previous question ("e 50 desses em reais?", "e lá, vai chover?")
+THERE_RX = re.compile(r"(?<![\wÀ-ÿ])(lá|ali|allí|allá|there|nessa cidade|naquela cidade|in that city|en esa ciudad)(?![\wÀ-ÿ])",
+                      re.I)
+THOSE_RX = re.compile(r"(\d+(?:[.,]\d+)*)?\s*(mil\s+)?\b(desses|destes|dessas|destas|deles|delas|disso|of those|of these|"
+                      r"of them|those|these|de esos|de estos|de esas|de estas|esos|estos)\b")
 
 
-def prepare(text: str) -> dict:
-    """{"instant": reply or None, "block": context for the model, "used": [ids], "data": {id: result}}."""
+def _follow_up(text: str, previous) -> tuple[str, list]:
+    """Fill what a follow-up leaves out from the previous questions (newest first). Returns (text to route, hits)."""
+    earlier = [previous] if isinstance(previous, str) else list(previous or [])
+    earlier = [x for x in earlier if x]
+    if not earlier:
+        return text, []
+    previous = earlier[0]
+    norm = _norm(text)
+    there = THERE_RX.search(text) and not _city(text)
+    those = THOSE_RX.search(norm)
+    if not there and not those:
+        return text, []
+    before = route(previous)
+    if there:  # the last place the user NAMED ("e lá?" twice in a row still means Paris)
+        city = next((_city(x) for x in earlier if _city(x)), "")
+        if city:
+            return f"{text} em {city}", []
+    if those:
+        prev = next((a for cid, a in before if cid == "currency"), None)
+        if prev and enabled("currency"):
+            m = those
+            amount = 1.0
+            if m.group(1):
+                n = m.group(1)
+                amount = float(n.replace(".", "").replace(",", ".") if "," in n else n.replace(",", ""))
+                amount *= 1000 if m.group(2) else 1
+            named = [c for _, c, _ in _currency_hits(norm) if c != prev["from_currency"]]
+            dst = named[0] if named else prev["to_currency"]
+            return text, [("currency", {"amount": amount, "from_currency": prev["from_currency"], "to_currency": dst})]
+    return text, []
+
+
+def prepare(text: str, previous=()) -> dict:
+    """{"instant": reply or None, "block": context for the model, "used": [ids], "data": {id: result}}.
+    `previous`: the user's earlier messages in this conversation, newest first (follow-ups like "e 50 desses?")."""
     out = {"instant": None, "block": "", "used": [], "data": {}}
-    hits = route(text)
+    text, extra = _follow_up(text, previous)
+    hits = extra or route(text)
     if not hits:
         return out
     code = i18n.detect(text) or i18n.lang()

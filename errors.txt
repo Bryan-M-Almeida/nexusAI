@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 4.0  ·  Date: 2026-10-16  ·  App version: 0.19.7
+ Document version: 4.1  ·  Date: 2026-10-16  ·  App version: 0.20.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -100,6 +100,9 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-048  The AI invented facts about songs/series ("The New Power", "KAT-TUN")
       NX-LLM-049  "Sing X": the AI wrote made-up lyrics
       NX-LLM-050  The tutorial skipped ahead of the voice (and talked over the system check)
+      NX-LLM-051  A follow-up question lost the context ("and 50 of those?", "what time is it there?")
+      NX-LLM-052  The AI made up works in recommendations and lists ("Iracema" by Machado de Assis)
+      NX-LLM-053  "How do I open the menus?" opened a menu and explained it wrong
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -812,6 +815,42 @@ QUICK DIAGNOSTICS (run these before investigating)
                The system check also spoke during the tutorial.
   Fix        : Each step advances when its speech ends (+0.9 s); the check speaks
                first and the tutorial waits for it.
+
+[NX-LLM-051] A follow-up question lost the context ("and 50 of those?", "what time is it there?")
+  Severity   : MEDIUM           Status: FIXED (v0.20.0)    Observed: YES
+  Symptom    : "How much is the dollar?" -> "and the euro?" -> "and 50 of those in
+               reais?" answered "1 real = US$ 0.19". "Weather in Paris?" -> "and
+               will it rain there?" -> "what time is it there?" gave São Paulo.
+  Cause      : The instant integration answers only looked at the current
+               message; "those" and "there" didn't say the currency or the city.
+  Fix        : NEXUS completes the follow-up with the earlier questions of the
+               same conversation: "those" uses the previous currency (with the
+               amount said), "there" uses the last place you named, even two
+               questions back. Test: 50 euros = R$ 285.98; "what time is it
+               there?" -> Paris.
+
+[NX-LLM-052] The AI made up works in recommendations and lists ("Iracema" by Machado de Assis)
+  Severity   : MEDIUM           Status: MITIGATED (v0.20.0) Observed: YES
+  Symptom    : "Recommend a science fiction book" -> "The Da Vinci Code" or a
+               non-existent Asimov book; "another famous book by Machado de
+               Assis" -> "Iracema" and "O Guarani" (by José de Alencar).
+  Cause      : The 8B model remembers lists of works poorly and mixes authors.
+  Fix        : Recommendations and lists of books, films, series and albums (by
+               an author, of a genre, "by the same author") are looked up on
+               Wikipedia first; the AI only names what it found. Test: science
+               fiction -> "Dune" by Frank Herbert; Machado de Assis -> "Memórias
+               Póstumas de Brás Cubas". Takes ~6-10 s more on these questions.
+  Tips       : Answers about works may still be incomplete; check what matters.
+
+[NX-LLM-053] "How do I open the menus?" opened a menu and explained it wrong
+  Severity   : LOW              Status: FIXED (v0.20.0)    Observed: YES
+  Symptom    : "I didn't understand the tutorial, how do I open the menus?"
+               opened Settings and said Ctrl+Space shows the menus (Ctrl+Space is
+               for talking). It also named internal tools ("set_preference").
+  Fix        : "How do I" questions about NEXUS get the real instructions in the
+               context (screen edges, F1, Ctrl+Space to talk, Personalisation,
+               Shortcuts, "show the tutorial"); the open-menu tool refuses when
+               the user only asked how (an explicit "open..." still opens).
 
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS

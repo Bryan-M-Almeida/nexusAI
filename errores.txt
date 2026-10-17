@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 4.0  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.19.7
+ Versión del documento: 4.1  ·  Fecha: 2026-10-16  ·  Versión de la app: 0.20.0
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -101,6 +101,9 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-LLM-048  La IA inventaba datos de canciones/series ("The New Power", "KAT-TUN")
       NX-LLM-049  "Canta X": la IA escribía letras inventadas
       NX-LLM-050  El tutorial se adelantaba a la voz (y hablaba junto con la verificación)
+      NX-LLM-051  Una pregunta de continuación perdía el contexto ("¿y 50 de esos?", "¿qué hora es allí?")
+      NX-LLM-052  La IA inventaba obras en recomendaciones y listas ("Iracema" de Machado de Assis)
+      NX-LLM-053  "¿Cómo abro los menús?" abría un menú y lo explicaba mal
  VOZ  NX-VOZ-001  El micrófono no responde en el primer uso (descarga Whisper)
       NX-VOZ-002  Micrófono equivocado seleccionado (p. ej. DroidCam)
       NX-VOZ-003  Palabra de activación "Nexus" no reconocida / falsos disparos
@@ -842,6 +845,42 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                sistemas también hablaba durante el tutorial.
   Corrección : Cada paso avanza cuando termina su voz (+0,9 s); la verificación
                habla antes y el tutorial la espera.
+
+[NX-LLM-051] Una pregunta de continuación perdía el contexto ("¿y 50 de esos?", "¿qué hora es allí?")
+  Gravedad   : MEDIA            Estado: CORREGIDO (v0.20.0) Observado: SÍ
+  Síntoma    : "¿Cuánto está el dólar?" -> "¿y el euro?" -> "¿y 50 de esos en
+               reales?" respondía "1 real = US$ 0,19". "¿Qué tiempo hace en
+               París?" -> "¿y allí va a llover?" -> "¿qué hora es allí?" daba la
+               hora de São Paulo.
+  Causa      : Las respuestas instantáneas de las integraciones solo miraban el
+               mensaje actual; "esos" y "allí" no decían la moneda ni la ciudad.
+  Corrección : NEXUS completa la continuación con las preguntas anteriores de la
+               misma conversación: "esos" usa la moneda anterior (con la cantidad
+               dicha), "allí" usa el último lugar nombrado, incluso dos preguntas
+               antes.
+
+[NX-LLM-052] La IA inventaba obras en recomendaciones y listas ("Iracema" de Machado de Assis)
+  Gravedad   : MEDIA            Estado: MITIGADO (v0.20.0)  Observado: SÍ
+  Síntoma    : "Recomiéndame un libro de ciencia ficción" -> "El código Da Vinci"
+               o un libro inexistente de Asimov; "otro libro famoso de Machado de
+               Assis" -> "Iracema" y "O Guarani" (son de José de Alencar).
+  Causa      : El modelo de 8B recuerda mal las listas de obras y mezcla autores.
+  Corrección : Las recomendaciones y listas de libros, películas, series y álbumes
+               (de un autor, de un género, "del mismo autor") se consultan antes
+               en Wikipedia; la IA solo nombra lo que encontró. Tarda ~6-10 s más
+               en estas preguntas.
+  Consejos   : Las respuestas sobre obras aún pueden ser incompletas; revisa lo
+               importante.
+
+[NX-LLM-053] "¿Cómo abro los menús?" abría un menú y lo explicaba mal
+  Gravedad   : BAJA             Estado: CORREGIDO (v0.20.0) Observado: SÍ
+  Síntoma    : "No entendí el tutorial, ¿cómo abro los menús?" abría la
+               Configuración y decía que Ctrl+Espacio muestra los menús
+               (Ctrl+Espacio es para hablar).
+  Corrección : Las preguntas de "cómo hacer" sobre NEXUS reciben las
+               instrucciones reales en el contexto; la herramienta de abrir menús
+               se niega cuando solo se preguntó cómo (un "abre..." explícito sigue
+               abriendo).
 
 ================================================================================
  VOZ — RECONOCIMIENTO Y SÍNTESIS

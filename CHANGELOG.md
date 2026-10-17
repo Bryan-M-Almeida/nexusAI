@@ -8,6 +8,67 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.20.0 — Protótipo · 2026-10-16
+
+**Etapa final: tutorial roteirizado e falado sem IA (com voltar, avançar e pular) enquanto o NEXUS se prepara em segundo
+plano, aviso de protótipo, abas Sobre, Atualizações e Possíveis erros, funções com erros movidas para o Beta e o
+contexto da conversa respeitado nas perguntas de continuação.**
+
+### Novo
+- **Tutorial roteirizado, sem IA**: o texto é fixo e falado; cada passo avança quando a fala termina. Botões **Voltar**,
+  **Próximo** e **Pular** — pular leva ao último passo, que explica que dá para pedir "Nexus, mostra o tutorial" de novo
+  e que a IA ajuda com qualquer dúvida. Esc também pula.
+- **IA fechada durante o tutorial**: o que você fala ou escreve só move o tutorial ("próximo", "voltar", "pular", em
+  PT/EN/ES); o resto recebe "a IA fica disponível quando o tutorial terminar". Nada vai para o modelo — sem conflito com
+  a voz do tutorial e sem gastar a placa de vídeo.
+- **Preparação em segundo plano** durante o tutorial (com o progresso no cartão: IA ✓ · voz ✓ · apps ✓ ·
+  integrações ✓): a IA carrega e guarda o prompt em cache, a voz (Whisper) carrega ou é baixada, a lista de apps é lida
+  e o clima e a cotação da sua cidade ficam em cache.
+- **Aviso de protótipo**: "a IA pode cometer erros" embaixo da conversa, discreto no canto da tela, no primeiro passo
+  do tutorial e em Configurações → Sobre.
+- **Configurações → Sobre o NEXUS** (grupo novo):
+  - **Sobre**: versão, o que **funciona**, o que está **em beta** (a mesma lista da seção Beta) e o que **ainda não
+    funciona**, e a autoria.
+  - **Atualizações**: cada versão do CHANGELOG com o resumo e o que foi novo, corrigido e medido.
+  - **Possíveis erros**: os 70 problemas do catálogo que ainda podem acontecer (os corrigidos ficam em Atualizações),
+    com busca, filtro por área, o que acontece, por quê e como resolver — no idioma do NEXUS.
+- **Funções movidas para o Beta** (desligadas no modo usuário, ligadas no modo desenvolvedor):
+  **letras de músicas** (dependem de serviços de fora; a API do Vagalume estava fora do ar nos testes),
+  **suas integrações** (serviços da web por palavra-chave) e **AMD: ROCm e NPU (Lemonade)** (sem hardware para testar;
+  na RX 6600 XT o ROCm manda a IA para o processador). Voltar para o Vulkan sempre funciona.
+- **Autoria, nome e identidade visual**: arquivo NOTICE, README e Termos (versão 1.3): o código continua MIT; o nome
+  N.E.X.U.S, os nomes NEX-1.0, o logo, o ícone, o PET e a identidade visual não fazem parte da licença.
+
+### Corrigido
+- **NX-LLM-051 — continuação perdia o contexto**: "e 50 desses em reais?" (depois de "e o euro?") respondia a cotação do
+  real; agora usa a moeda e a quantia (50 euros = R$ 285,98). "que horas são lá?" (depois de "e lá, vai chover?") dava
+  São Paulo; agora usa o último lugar citado (Paris).
+- **NX-LLM-052 — obras inventadas** em recomendações e listas ("O Código Da Vinci" como ficção científica, "Iracema" de
+  Machado de Assis): recomendações e listas de livros, filmes, séries e álbuns consultam a Wikipédia antes
+  (ficção científica → "Duna"; Machado de Assis → "Memórias Póstumas de Brás Cubas").
+- **NX-LLM-053 — "como eu abro os menus?"** abria um menu e dizia que Ctrl+Espaço mostra os menus: perguntas de "como
+  fazer" recebem as instruções reais do NEXUS, e a ferramenta de abrir menus só abre quando você pede.
+- Comandos digitados durante o tutorial não eram tratados (iam para a IA no meio da fala).
+
+### Desempenho
+- Depois do tutorial, "como está o tempo?" e "quanto está o dólar?" respondem em **0,000 s** (do cache preenchido
+  durante o tutorial) — antes, a primeira vez levava **2,4 s** (clima) e 0,35 s (câmbio). A preparação inteira leva ~2 s
+  enquanto o tutorial fala.
+- Continuações de clima/horário ("e lá?") respondem em **0,2 s** sem o modelo (antes ~5 s pelo modelo, e com a cidade
+  errada no horário).
+- Avaliação de conversa: média **5,0 s** por resposta (v0.19.7: 5,5 s).
+
+### Testes desta versão
+- 347/347 testes unitários (12 novos: comandos do tutorial em PT/EN/ES, "50 desses", "lá" duas perguntas depois, obras
+  consultadas, "como abro" explicado e "abre" abrindo, instruções do NEXUS no contexto, aba Atualizações, aba Possíveis
+  erros nos 3 idiomas, novas funções beta desligadas, letras fora com o beta desligado, seções e botão Voltar na
+  interface, documentos no executável).
+- Avaliação de conversa com o modelo real: **36/37** — o caso do simulado falhou uma vez (variação do modelo, NX-LLM-012)
+  e passou 3/3 ao repetir. Bateria de contexto: 13 conversas de continuação com o modelo real.
+- Tutorial, Atualizações e Possíveis erros conferidos na prévia da interface.
+
+---
+
 ## v0.19.7 — Protótipo · 2026-10-16
 
 **Correções do uso real no modo convidado: a IA não inventa mais fatos nem letras, letras com a fonte que você diz,

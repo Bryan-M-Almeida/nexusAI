@@ -13,7 +13,7 @@ import webview
 
 from . import (__version__, assistant, bridge, control, features, gpu_tune, i18n, knowledge, legal, llm, memory,
                memory_import, notify, profile, training, apps, connectors, media, amd, prefs, models, accounts,
-               downloads, storage,
+               downloads, docs, storage, tutorial,
                library, netprobe, performance, scheduler, skills, tools, workspace)
 from . import files as filereader
 from .logs import log, setup as setup_logs
@@ -97,6 +97,8 @@ class Api:
         bridge.start(settings["bridge_port"], self._on_profile)
         self._tts_buf, self._tts_streamed, self._reply_lang = "", False, None
         self.ai_state = "cold"  # cold | warming | ready | offline
+        self._tutorial = False  # v0.20.0: while the scripted tutorial runs the AI is closed
+        self._tutorial_bg = None
         self._hidden_since = None  # v0.14: when the window was minimized (None = visible)
         self._podcast = None  # v0.15: {"id", "pos", "title"} while a book is being read aloud
         self._attachments: list[dict] = []  # v0.15: files attached to the next message
@@ -230,6 +232,34 @@ class Api:
             result["spoken"] = True
         return result
 
+    # -- Settings > About (v0.20.0) -------------------------------------------------------------------------------
+    @staticmethod
+    def about_updates():
+        return {"version": __version__, "versions": docs.changelog()}
+
+    @staticmethod
+    def about_errors():
+        return {"version": __version__, "errors": docs.known_errors(lang())}
+
+    def tutorial_begin(self):
+        """v0.20.0: the AI closes until tutorial_end; meanwhile NEXUS gets ready in the background (once)."""
+        self._tutorial = True
+        if self._tutorial_bg is None or not self._tutorial_bg.is_alive():
+            self._tutorial_bg = threading.Thread(target=tutorial.background, args=(self, emit), daemon=True,
+                                                 name="tutorial-bg")
+            self._tutorial_bg.start()
+        return {"ok": True}
+
+    def tutorial_end(self):
+        self._tutorial = False
+        return {"ok": True}
+
+    def _tutorial_input(self, text):
+        """A message while the tutorial runs: next / back / skip, anything else waits for the end (no AI)."""
+        cmd = tutorial.detect(text) or "busy"
+        emit("tutorial_cmd", {"cmd": cmd, "text": text})
+        return cmd
+
     def speak_tutorial(self, text, step):
         """One tutorial step; "tutorial_spoken" tells the interface when it has been said to the end, so the next
         step never starts while NEXUS is still talking (v0.19.6: a busy PC made the steps skip ahead)."""
@@ -337,6 +367,8 @@ class Api:
 
     def amd_backend_set(self, choice):
         """The user confirmed: save the choice for Ollama (user variable OLLAMA_VULKAN) and restart it."""
+        if choice == "rocm" and not features.enabled("amd_lab"):  # v0.20.0: beta (going back to Vulkan always works)
+            return {"ok": False, "error": "beta"}
         return gpu_tune.set_backend("rocm" if choice == "rocm" else "auto")
 
     def amd_compare(self):
@@ -344,6 +376,8 @@ class Api:
 
     def amd_use_lemonade(self, on=True):
         """Run the AI through AMD Lemonade Server (Ryzen AI NPU) - or back to Ollama."""
+        if on and not features.enabled("amd_lab"):  # v0.20.0: beta
+            return {"ok": False, "error": "beta"}
         if not on:
             settings.apply({"llm_preset": "ollama", "llm_base_url": "http://127.0.0.1:11434/v1", "llm_provider": "auto"})
             return {"ok": True, "llm": llm.status()}
@@ -674,6 +708,8 @@ class Api:
 
     def send(self, text, spoken=False):
         self._last_activity = time.time()
+        if self._tutorial:
+            return {"control": None, "tutorial": tutorial.detect(text) or "busy"}  # the interface moves it
         action = control.detect(text)
         if action:
             self._handle_control(action, text)
@@ -1077,6 +1113,11 @@ class Api:
         self._last_activity = time.time()
         if self._suspended:  # v0.18.0: "Nexus, ..." while a game runs wakes NEXUS and the request goes on
             self.resume("voice")
+        if self._tutorial:  # v0.20.0: the voice moves the tutorial; the AI waits for the end
+            if tutorial.detect(text) or not during_speech:
+                emit("heard", {"text": text, "control": "tutorial"})
+                self._tutorial_input(text)
+            return
         action = control.detect(text)
         if action:
             emit("heard", {"text": text, "control": action})

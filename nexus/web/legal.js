@@ -1,10 +1,10 @@
 // Terms of Use and Privacy Policy shown on first start and in Settings > Privacy & terms (v0.17.0).
-// Version 1.2 - 2026-10-16 (1.1: MIT License; 1.2: new integrations, apps and media). Keep nexus/legal.py VERSION in sync when the texts change in substance.
+// Version 1.3 - 2026-10-16 (1.1: MIT License; 1.2: new integrations, apps and media; 1.3: name and visual identity not licensed). Keep nexus/legal.py VERSION in sync when the texts change in substance.
 window.LEGAL = {
   pt: {
     terms: `
 <h3>Termos de Uso do N.E.X.U.S</h3>
-<p class="legal-meta">Versão 1.2 · 16/10/2026 · Protótipo</p>
+<p class="legal-meta">Versão 1.3 · 16/10/2026 · Protótipo</p>
 <h4>1. O que é o NEXUS</h4>
 <p>O N.E.X.U.S é um assistente pessoal para Windows, em fase de <b>protótipo</b> (versões 0.x), criado para um hackathon. Ele roda no seu computador: conversa por texto e voz, organiza agenda, tarefas, lembretes, notas e dados, e consulta uma base de conhecimento local.</p>
 <h4>2. Aceite</h4>
@@ -27,6 +27,7 @@ window.LEGAL = {
 <p>Não use o NEXUS para atividades ilegais, para violar direitos de outras pessoas ou para gerar conteúdo que cause dano.</p>
 <h4>11. Licença e propriedade intelectual</h4>
 <p>O código-fonte do NEXUS é software livre, distribuído sob a <b>Licença MIT</b> (arquivo LICENSE do repositório) — © 2026 Bryan Maciel de Almeida. Você pode usar, copiar, modificar, distribuir e até vender o código, desde que mantenha o aviso de direitos autorais e o texto da licença. A licença cobre o código; ela não autoriza apresentar uma versão modificada como se fosse o NEXUS oficial ou endossada pelo autor. Componentes de terceiros seguem as próprias licenças (lista no README). Os seus dados e conteúdos continuam sendo seus.</p>
+<p><b>Autoria, nome e identidade visual.</b> O NEXUS foi criado por Bryan Maciel de Almeida. A licença MIT <b>não</b> inclui o nome "N.E.X.U.S"/"NEXUS", os nomes de modelo "NEX-1.0" (Lite, Mini, Pro, Max), o logo, o ícone, o PET (orbe e olho) nem a identidade visual do aro e da interface: eles são de propriedade exclusiva do autor. Versões modificadas ou redistribuídas devem usar outro nome e arte própria (detalhes no arquivo NOTICE).</p>
 <h4>12. Sem garantia e limitação de responsabilidade</h4>
 <p>Por ser um protótipo, o NEXUS é fornecido "no estado em que se encontra", sem garantias de funcionamento contínuo, ausência de erros ou adequação a um fim específico. Na máxima extensão permitida pela lei, o autor não se responsabiliza por perdas de dados, danos ou prejuízos decorrentes do uso. Faça backups (o NEXUS faz um automático por dia).</p>
 <h4>13. Encerramento</h4>
@@ -37,7 +38,7 @@ window.LEGAL = {
 <p>Dúvidas, pedidos e relatos de problemas: pelo repositório do projeto no GitHub (github.com/Bryan-M-Almeida/nexusAI), na seção Issues.</p>`,
     privacy: `
 <h3>Política de Privacidade do N.E.X.U.S</h3>
-<p class="legal-meta">Versão 1.2 · 16/10/2026</p>
+<p class="legal-meta">Versão 1.3 · 16/10/2026</p>
 <h4>1. Resumo</h4>
 <p>O NEXUS funciona <b>no seu computador</b>. Não há conta, cadastro, anúncios nem telemetria: o autor do NEXUS <b>não recebe</b> seus dados. Algumas funções, que você controla, enviam informações a serviços de terceiros, descritas abaixo.</p>
 <h4>2. Quais dados o NEXUS guarda</h4>
@@ -82,7 +83,7 @@ window.LEGAL = {
   en: {
     terms: `
 <h3>N.E.X.U.S Terms of Use</h3>
-<p class="legal-meta">Version 1.2 · 2026-10-16 · Prototype</p>
+<p class="legal-meta">Version 1.3 · 2026-10-16 · Prototype</p>
 <h4>1. What NEXUS is</h4>
 <p>N.E.X.U.S is a personal assistant for Windows at <b>prototype</b> stage (0.x versions), built for a hackathon. It runs on your computer: it talks by text and voice, organizes your schedule, tasks, reminders, notes and data, and uses a local knowledge base.</p>
 <h4>2. Acceptance</h4>
@@ -105,6 +106,7 @@ window.LEGAL = {
 <p>Don't use NEXUS for illegal activities, to violate other people's rights or to create harmful content.</p>
 <h4>11. License and intellectual property</h4>
 <p>The NEXUS source code is free software, distributed under the <b>MIT License</b> (the repository's LICENSE file) — © 2026 Bryan Maciel de Almeida. You may use, copy, modify, distribute and even sell the code, as long as you keep the copyright notice and the license text. The license covers the code; it doesn't allow presenting a modified version as the official NEXUS or as endorsed by the author. Third-party components follow their own licenses (listed in the README). Your data and content remain yours.</p>
+<p><b>Authorship, name and visual identity.</b> NEXUS was created by Bryan Maciel de Almeida. The MIT License does <b>not</b> cover the name "N.E.X.U.S"/"NEXUS", the model names "NEX-1.0" (Lite, Mini, Pro, Max), the logo, the icon, the PET (orb and eye) or the visual identity of the ring and interface: they are the exclusive property of the author. Modified or redistributed versions must use a different name and their own artwork (details in the NOTICE file).</p>
 <h4>12. No warranty and limitation of liability</h4>
 <p>As a prototype, NEXUS is provided "as is", without warranties of uninterrupted operation, absence of errors or fitness for a particular purpose. To the maximum extent permitted by law, the author is not liable for data loss, damage or losses arising from its use. Keep backups (NEXUS makes an automatic one every day).</p>
 <h4>13. Ending use</h4>
@@ -115,7 +117,7 @@ window.LEGAL = {
 <p>Questions, requests and problem reports: through the project's GitHub repository (github.com/Bryan-M-Almeida/nexusAI), in the Issues section.</p>`,
     privacy: `
 <h3>N.E.X.U.S Privacy Policy</h3>
-<p class="legal-meta">Version 1.2 · 2026-10-16</p>
+<p class="legal-meta">Version 1.3 · 2026-10-16</p>
 <h4>1. Summary</h4>
 <p>NEXUS works <b>on your computer</b>. There is no account, sign-up, ads or telemetry: the author of NEXUS <b>does not receive</b> your data. Some features, which you control, send information to third-party services, described below.</p>
 <h4>2. What NEXUS stores</h4>
@@ -160,7 +162,7 @@ window.LEGAL = {
   es: {
     terms: `
 <h3>Términos de Uso de N.E.X.U.S</h3>
-<p class="legal-meta">Versión 1.2 · 16/10/2026 · Prototipo</p>
+<p class="legal-meta">Versión 1.3 · 16/10/2026 · Prototipo</p>
 <h4>1. Qué es NEXUS</h4>
 <p>N.E.X.U.S es un asistente personal para Windows en fase de <b>prototipo</b> (versiones 0.x), creado para un hackathon. Funciona en tu ordenador: conversa por texto y voz, organiza agenda, tareas, recordatorios, notas y datos, y usa una base de conocimiento local.</p>
 <h4>2. Aceptación</h4>
@@ -183,6 +185,7 @@ window.LEGAL = {
 <p>No uses NEXUS para actividades ilegales, para vulnerar derechos de otras personas ni para generar contenido dañino.</p>
 <h4>11. Licencia y propiedad intelectual</h4>
 <p>El código fuente de NEXUS es software libre, distribuido bajo la <b>Licencia MIT</b> (archivo LICENSE del repositorio) — © 2026 Bryan Maciel de Almeida. Puedes usar, copiar, modificar, distribuir e incluso vender el código, siempre que mantengas el aviso de derechos de autor y el texto de la licencia. La licencia cubre el código; no permite presentar una versión modificada como si fuera el NEXUS oficial o respaldada por el autor. Los componentes de terceros siguen sus propias licencias (lista en el README). Tus datos y contenidos siguen siendo tuyos.</p>
+<p><b>Autoría, nombre e identidad visual.</b> NEXUS fue creado por Bryan Maciel de Almeida. La licencia MIT <b>no</b> incluye el nombre "N.E.X.U.S"/"NEXUS", los nombres de modelo "NEX-1.0" (Lite, Mini, Pro, Max), el logo, el icono, el PET (orbe y ojo) ni la identidad visual del aro y la interfaz: son propiedad exclusiva del autor. Las versiones modificadas o redistribuidas deben usar otro nombre y arte propio (detalles en el archivo NOTICE).</p>
 <h4>12. Sin garantía y limitación de responsabilidad</h4>
 <p>Por ser un prototipo, NEXUS se ofrece "tal cual", sin garantías de funcionamiento continuo, ausencia de errores o idoneidad para un fin concreto. En la máxima medida permitida por la ley, el autor no se responsabiliza de pérdidas de datos, daños o perjuicios derivados del uso. Haz copias de seguridad (NEXUS hace una automática cada día).</p>
 <h4>13. Fin del uso</h4>
@@ -193,7 +196,7 @@ window.LEGAL = {
 <p>Dudas, solicitudes y reportes de problemas: en el repositorio del proyecto en GitHub (github.com/Bryan-M-Almeida/nexusAI), sección Issues.</p>`,
     privacy: `
 <h3>Política de Privacidad de N.E.X.U.S</h3>
-<p class="legal-meta">Versión 1.2 · 16/10/2026</p>
+<p class="legal-meta">Versión 1.3 · 16/10/2026</p>
 <h4>1. Resumen</h4>
 <p>NEXUS funciona <b>en tu ordenador</b>. No hay cuenta, registro, anuncios ni telemetría: el autor de NEXUS <b>no recibe</b> tus datos. Algunas funciones, que tú controlas, envían información a servicios de terceros, descritos abajo.</p>
 <h4>2. Qué datos guarda NEXUS</h4>

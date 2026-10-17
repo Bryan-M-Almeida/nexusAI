@@ -1,6 +1,6 @@
 /* Fonts from Google only when not offline (v0.12). The last known mode is cached so the boot animation doesn't
    flash fallback fonts; offline it falls back to Bahnschrift / Segoe UI / Consolas, already in the CSS. */
-const LEGAL_VERSION = "1.2";  // nexus/legal.py VERSION
+const LEGAL_VERSION = "1.3";  // nexus/legal.py VERSION
 function termsAccepted() { try { return localStorage.getItem("nexus.terms") === LEGAL_VERSION; } catch (e) { return false; } }
 function loadFonts(mode) {
   try { localStorage.setItem("nexus.net", mode); } catch (e) { /* ignore */ }
@@ -184,6 +184,8 @@ window.nexus = {
       case "prefs": return onPrefs(p);
       case "model_progress": return onModelProgress(p);
       case "tutorial_spoken": return onTutorialSpoken(p);
+      case "tutorial_cmd": return onTutorialCmd(p);
+      case "tutorial_bg": return onTutorialBg(p);
       case "check_spoken": return checkSpoken && checkSpoken();
       case "training_progress": return onTrainingProgress(p);
       case "training_done": return showTrainingResult(p);
@@ -265,6 +267,7 @@ async function start() {
     api().first_check().then((r) => { setExchange("nexus", r.said); if (!r.spoken) done(); });
   });
   if (!settings.tutorial_done) {  // first run: narrated tutorial once the profile question is out of the way
+    api().tutorial_begin();  // v0.20.0: AI closed from now until the tutorial ends; NEXUS gets ready meanwhile
     const go = () => checked.then(() => setTimeout(startTutorial, 1200));
     if ($("#onboarding").hidden) go();
     else new MutationObserver((m, obs) => { if ($("#onboarding").hidden) { obs.disconnect(); go(); } })
@@ -450,6 +453,7 @@ async function send(text) {
   renderAttachChips();
   const r = await api().send(text, false);
   if (r && r.control && r.control !== "clearer") { aiBusy = false; setVoiceState("idle"); }
+  if (r && r.tutorial) { aiBusy = false; setVoiceState("idle"); onTutorialCmd({ cmd: r.tutorial }); }
 }
 
 /* ------------------------------------------------------------------ voice state */
@@ -1165,7 +1169,9 @@ function setCursor(style = "ring", size = "medium") {
   root.style.setProperty("--cur-hover", svg(true));
 }
 
-/* First run: a short tutorial narrated by NEXUS (it can be replayed from Settings > General or by asking) */
+/* First run: a short scripted tutorial narrated by NEXUS - no AI (v0.20.0). It can be replayed from Settings >
+   General or by asking. While it runs the AI is closed (typed or spoken words only move it: next / back / skip) and
+   NEXUS loads the model, the voice, the app list and the integrations in the background. */
 const TUTORIAL = [
   { text: "tut1", focus: "center" },
   { text: "tut2", focus: "center" },
@@ -1180,10 +1186,35 @@ function tutorialSteps() {
   const sc = settings.ui_layout === "shortcuts";
   return TUTORIAL.filter((x) => !(x.computer && sc) && !(x.shortcuts && !sc));
 }
+const TUT_BG = ["ai", "voice", "apps", "integrations"];
+let tutBg = {};
 function startTutorial() {
   EXCLUSIVE.forEach((id) => ($("#" + id).hidden = true));
   $("#app").classList.remove("resting", "zen");
+  api().tutorial_begin();
+  renderTutBg();
   tutorialGo(0);
+}
+function renderTutBg() {
+  const mark = { running: "…", done: "✓", skip: "–", error: "!" };
+  const shown = TUT_BG.filter((k) => tutBg[k]);
+  $("#tutBg").hidden = !shown.length;
+  $("#tutBg").textContent = shown.length ? T("tutBg") + "  " + shown.map((k) => `${T("tutBg_" + k)} ${mark[tutBg[k]] || ""}`).join(" · ") : "";
+}
+function onTutorialBg(p) {
+  if (TUT_BG.includes(p.task)) tutBg[p.task] = p.state;
+  renderTutBg();
+}
+function tutorialSkip() {  // "Pular" goes to the last step: how to see it again and that the AI can help
+  const last = tutorialSteps().length - 1;
+  if (tutorialStep >= last) endTutorial(); else tutorialGo(last);
+}
+function onTutorialCmd(p) {
+  if (tutorialStep < 0) return;
+  if (p.cmd === "next") tutorialGo(tutorialStep + 1);
+  else if (p.cmd === "back") tutorialGo(Math.max(0, tutorialStep - 1));
+  else if (p.cmd === "skip") tutorialSkip();
+  else { addMsg("system", T("tutBusy")); caption(T("tutBusy"), 6000); }
 }
 function tutorialGo(i) {
   const steps = tutorialSteps();
@@ -1198,6 +1229,8 @@ function tutorialGo(i) {
   $("#tutText").textContent = text;
   $("#tutCount").textContent = `${i + 1} / ${steps.length}`;
   $("#tutNext").textContent = T(i === steps.length - 1 ? "tutDone" : "tutNext");
+  $("#tutBack").hidden = i === 0;
+  $("#tutSkip").hidden = i === steps.length - 1;
   setExchange("nexus", text);
   // v0.19.6: the next step comes when NEXUS finishes saying this one (event "tutorial_spoken"); the timer is only a
   // safety net (voice off, or the event lost) - before, a busy PC made the steps skip ahead of the voice
@@ -1215,6 +1248,7 @@ async function endTutorial() {
   clearTimeout(tutorialTimer);
   tutorialStep = -1;
   $("#tutorial").hidden = true;
+  api().tutorial_end();  // the AI is open again
   delete $("#guide").dataset.focus;
   toggleGuide(false);
   if (!settings.tutorial_done) settings = (await api().save_settings({ tutorial_done: true })).settings;
@@ -1589,7 +1623,8 @@ const GROUP_ICONS = { grpSystem: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 12h2M18 1
   grpAi: "M9 4h6v4h4v6h-4v6H9v-6H5V8h4z", grpVoice: "M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3zM6 12a6 6 0 0 0 12 0M12 18v3",
   grpLook: "M12 4a8 8 0 1 0 0 16c1 0 1.5-.8 1.5-1.6 0-1.2-1-1.4-1-2.4 0-.8.7-1.5 1.5-1.5H17a3 3 0 0 0 3-3c0-4.4-3.6-7.5-8-7.5z",
   grpConnect: "M8 7h11l-3-3M16 17H5l3 3", grpHardware: "M6 6h12v12H6zM9 9h6v6H9zM9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3",
-  grpData: "M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z" };
+  grpData: "M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z",
+  grpAbout: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5v.5" };
 let foldedGroups = new Set();
 try { foldedGroups = new Set(JSON.parse(localStorage.getItem("nexus.folded") || "[]")); } catch (e) { /* first run */ }
 function initSetGroups() {
@@ -1637,8 +1672,49 @@ function showSection(sec) {
   if (sec === "data") { renderStorage(true); liveTimer = setInterval(() => (secVisible("data") ? renderStorage(false) : clearInterval(liveTimer)), 2000); }
   if (sec === "integ") { renderIntegrations(); integTimer = setInterval(() => { if (!$("#settings").hidden) renderIntegrations(); }, 6000); }
   if (sec === "apps") { if (feature("media")) renderMedia(); if (feature("apps")) renderApps(false); }
+  if (sec === "about") renderAbout();
+  if (sec === "updates") renderUpdates();
+  if (sec === "issues") renderIssues();
   clearInterval(amdTimer);
   if (sec === "amd") { renderAmd(); amdTimer = setInterval(() => { if (!$("#settings").hidden && amdVisible()) amdTick(); else clearInterval(amdTimer); }, 1500); }
+}
+
+/* ------------------------------------------------------------------ about, updates, possible errors (v0.20.0) */
+function renderAbout() {
+  $("#aboutVersion").textContent = $("#version").textContent + " · " + T("protoWord");
+  const list = (id, items) => ($(id).innerHTML = items.filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join(""));
+  list("#aboutStableList", T("aboutStableItems").split("|"));
+  // the beta list is the Beta section itself, so the two never disagree
+  list("#aboutBetaList", $$("#betaList label span").map((x) => x.textContent + (feature(x.previousElementSibling.name.replace("beta_", "")) ? "  ✓" : "")));
+  list("#aboutNotList", T("aboutNotItems").split("|"));
+}
+let updatesCache = null;
+async function renderUpdates() {
+  if (!updatesCache) updatesCache = await api().about_updates();
+  const v = updatesCache.versions || [];
+  $("#updatesList").innerHTML = v.length ? v.map((x, i) => `<details class="upd"${i === 0 ? " open" : ""}>
+      <summary><b class="mono">${esc(x.version)}</b><span class="mono muted">${esc(x.kind)}${x.date ? " · " + esc(x.date) : ""}</span>
+        ${x.version === "v" + updatesCache.version ? `<i class="upd-now mono">${esc(T("updNow"))}</i>` : ""}<small>${x.headline}</small></summary>
+      <div class="upd-body">${x.html}</div></details>`).join("") : `<p class="hint">${esc(T("updatesNone"))}</p>`;
+}
+let issuesCache = null;
+async function renderIssues() {
+  if (!issuesCache) {
+    issuesCache = (await api().about_errors()).errors || [];
+    const areas = [...new Set(issuesCache.map((x) => x.area))];
+    $("#issuesArea").innerHTML = `<option value="">${esc(T("issuesAll"))}</option>` +
+      areas.map((a) => `<option value="${esc(a)}">${esc(T("area_" + a) || a)}</option>`).join("");
+  }
+  const q = ($("#issuesFind").value || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const area = $("#issuesArea").value;
+  const plain = (x) => [x.id, x.title, x.symptom, x.cause, x.fix, x.tips].join(" ").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const shown = issuesCache.filter((x) => (!area || x.area === area) && (!q || plain(x).includes(q)));
+  $("#issuesCount").textContent = T("issuesCount", { n: shown.length, total: issuesCache.length });
+  const block = (label, text) => (text ? `<p><b>${esc(T(label))}</b></p><pre>${esc(text)}</pre>` : "");
+  $("#issuesList").innerHTML = shown.map((x) => `<details class="issue" data-sev="${esc(x.severity)}">
+      <summary><span class="mono iss-id">${esc(x.id)}</span><b>${esc(x.title)}</b><span class="mono iss-st">${esc(x.status)}</span></summary>
+      ${block("issSymptom", x.symptom || x.cause)}${x.symptom ? block("issCause", x.cause) : ""}${block("issFix", x.fix)}${block("issTips", x.tips)}
+    </details>`).join("");
 }
 
 /* ------------------------------------------------------------------ personalisation (v0.18.5) */
@@ -1988,7 +2064,7 @@ function wire() {
     if (!$("#legalModal").hidden) return;  // v0.17.0: nothing works before the terms are accepted
     if (e.key === "Escape" && confirmId) { answerConfirm(false); return; }
     if (e.key === "Escape" && $("#app").classList.contains("zen")) { toggleZen(false); return; }
-    if (e.key === "Escape" && tutorialStep >= 0) { endTutorial(); return; }
+    if (e.key === "Escape" && tutorialStep >= 0) { tutorialSkip(); return; }
     if (e.key === "Escape" && !$("#guide").hidden) { toggleGuide(false); return; }
     const combo = comboOf(e), act = combo && actionFor(combo);
     const typing = e.target.closest && e.target.closest("input, textarea, select");
@@ -2145,7 +2221,10 @@ function wire() {
   $("#btnKeysReset").onclick = async () => { settings = (await api().save_settings({ shortcuts: {} })).settings; renderKeys(); };
   $("#btnTutorial").onclick = () => { $("#settings").hidden = true; startTutorial(); };
   $("#tutNext").onclick = () => tutorialGo(tutorialStep + 1);
-  $("#tutSkip").onclick = () => endTutorial();
+  $("#tutSkip").onclick = () => tutorialSkip();
+  $("#tutBack").onclick = () => tutorialGo(Math.max(0, tutorialStep - 1));
+  $("#issuesFind").oninput = () => renderIssues();
+  $("#issuesArea").onchange = () => renderIssues();
   const cf = $("#settingsForm");
   ["cursor_style", "cursor_size"].forEach((n) => (cf.elements[n].onchange = () => setCursor(cf.elements.cursor_style.value, cf.elements.cursor_size.value)));
   $("#btnQuit").onclick = () => api().quit();

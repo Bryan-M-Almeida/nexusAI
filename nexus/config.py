@@ -141,6 +141,9 @@ DEFAULTS = {
     "music_player": "youtube",    # youtube | youtube music | spotify | limusic
     "beta_media": False,
     "beta_apps": False,
+    "beta_lyrics": False,               # v0.20.0: these three moved to beta (see nexus/features.py)
+    "beta_custom_integrations": False,
+    "beta_amd_lab": False,
     "apps_suspend": "games",      # games (suspend when NEXUS opens a game) | never
     "game_watch": False,          # also suspend when a game started elsewhere comes to the foreground
     "apps_games": [],             # app names the user marked as games

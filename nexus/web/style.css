@@ -928,6 +928,8 @@ body.ai-down { --c-core: #e4574c; }
 .tut-count { margin: 0 0 6px; font-size: 10px; letter-spacing: .24em; color: var(--c-ring-soft); }
 .tut-text { margin: 0 0 12px; font-size: 15px; line-height: 1.55; color: var(--text); }
 .tut-btns { display: flex; justify-content: flex-end; gap: 8px; }
+.tut-btns #tutSkip { margin-right: auto; }
+.tut-bg { margin: -4px 0 12px; font-size: 10px; letter-spacing: .08em; color: var(--muted); }
 #guide[data-focus] { z-index: 29; }
 #guide[data-focus] .g-call, #guide[data-focus] .g-keys { opacity: .12; transition: opacity .4s; }
 #guide[data-focus="center"] .g-center, #guide[data-focus="edges"] .g-top, #guide[data-focus="edges"] .g-left,
@@ -1321,3 +1323,32 @@ body.pet-mode .app.suspended .pet-eye img, body.pet-mode .app.dl .pet-eye { anim
 .app.reduce-motion .pet, body.pet-mode .app.reduce-motion .pet { animation: none; }
 @keyframes petBoot { from { opacity: 0; transform: scale(.82) translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes petWave { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* v0.20.0: prototype notice, About / Updates / Possible errors */
+.proto-note { margin: 6px 2px 0; font-size: 10px; letter-spacing: .08em; color: var(--muted); text-align: center; opacity: .75; }
+.proto-badge { position: absolute; right: 18px; bottom: 14px; margin: 0; font-size: 9.5px; letter-spacing: .14em; color: var(--muted);
+  opacity: .45; pointer-events: none; text-transform: uppercase; }
+.about-head { margin: 0 0 10px; font-size: 14px; letter-spacing: .12em; }
+.about-head span { color: var(--muted); font-size: 11px; margin-left: 8px; }
+.about-list { margin: 0 0 14px; padding-left: 18px; font-size: 13px; line-height: 1.55; }
+.about-list li::marker { color: var(--c-core); }
+.about-list.beta li::marker { color: #f2b33d; }
+.about-list.no li::marker { color: #ff6b6b; }
+.updates details, .issues details { border: 1px solid var(--line); margin: 0 0 8px; background: rgba(255, 255, 255, .02); }
+.updates summary, .issues summary { cursor: var(--cur-hover, pointer); padding: 9px 12px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.updates summary small { flex-basis: 100%; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.upd-now { font-style: normal; font-size: 9.5px; letter-spacing: .14em; color: var(--c-core); border: 1px solid currentColor; padding: 1px 6px; }
+.upd-body, .issues details > p, .issues details > pre { padding: 0 14px; font-size: 12.5px; line-height: 1.55; }
+.upd-body h4 { margin: 10px 0 4px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--c-ring-soft); }
+.upd-body ul { margin: 0 0 8px; padding-left: 18px; }
+.upd-body table { border-collapse: collapse; margin: 6px 0 10px; font-size: 11.5px; }
+.upd-body th, .upd-body td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; }
+.upd-body code, .issues pre { font-family: var(--f-mono); font-size: 11.5px; }
+.issues-tools { display: flex; gap: 8px; margin: 0 0 6px; }
+.issues-tools input { flex: 1; }
+.issues details > p { margin: 8px 0 2px; }
+.issues pre { margin: 0 0 6px; white-space: pre-wrap; color: var(--text); font-family: inherit; font-size: 12.5px; }
+.issues details[open] { padding-bottom: 8px; }
+.iss-id { font-size: 10.5px; color: var(--c-ring-soft); }
+.iss-st { margin-left: auto; font-size: 9.5px; letter-spacing: .12em; color: var(--muted); }
+.issue[data-sev="CRÍTICA"] .iss-id, .issue[data-sev="CRITICAL"] .iss-id, .issue[data-sev="ALTA"] .iss-id, .issue[data-sev="HIGH"] .iss-id { color: #ff8a7a; }

@@ -1,6 +1,7 @@
 """Actions the assistant can execute (OpenAI-style function calling)."""
 import inspect
 import json
+import re
 import time
 from datetime import datetime, timedelta
 
@@ -291,9 +292,18 @@ UI_BETA = {"library": "library", "workspace": "workspace", "skills": "skills", "
 PANEL_TABS = ("memory", "knowledge", "data", "learned", "log")
 
 
+HOW_TO = re.compile(r"\b(como (eu |que |fa[cç]o (para|pra) )?(abr[eo]|abrir|us[ao]|usar|acess[ao]|falo|mudo|vejo|encontro)|"
+                    r"n[aã]o entendi|how (do|can) i|how to|c[oó]mo (abro|uso|accedo|hablo|cambio|veo)|no entend[ií])\b", re.I)
+OPEN_CMD = re.compile(r"(^|[.?!,;]\s*)(nexus\W+)?(abre|abra|abrir|open|mostra|mostre|show|muestra|ens[eé]ñame)\b", re.I)
+
+
 def open_interface(target, section=None):
     from . import features
 
+    # v0.20.0: "não entendi o tutorial, como eu abro os menus?" is a question - the model kept opening a menu instead
+    if HOW_TO.search(current_text or "") and not OPEN_CMD.search(current_text or ""):
+        return {"not_opened": True, "instruction": "The user asked HOW to do it, not to open it. Don't open anything: "
+                                                   "explain the steps in one or two short sentences."}
     if ui_hook is None:
         return {"error": "no interface"}
     if UI_BETA.get(target) and not features.enabled(UI_BETA[target]):

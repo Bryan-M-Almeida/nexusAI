@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 4.0  ·  Data: 2026-10-16  ·  Versão do app: 0.19.7
+ Versão do documento: 4.1  ·  Data: 2026-10-16  ·  Versão do app: 0.20.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -98,6 +98,9 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-048  A IA inventava fatos de músicas/séries ("The New Power", "KAT-TUN")
       NX-LLM-049  "Cante X": a IA escrevia letras inventadas
       NX-LLM-050  Tutorial pulava passos à frente da voz (e falava junto com a verificação)
+      NX-LLM-051  Pergunta de continuação perdia o contexto ("e 50 desses?", "que horas são lá?")
+      NX-LLM-052  A IA inventava obras em recomendações e listas ("Iracema" de Machado de Assis)
+      NX-LLM-053  "Como eu abro os menus?" abria um menu e explicava errado
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -816,6 +819,44 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                verificação de sistemas também falava durante o tutorial.
   Correção   : Cada passo avança quando a fala dele termina (+0,9 s); a
                verificação fala antes e o tutorial espera por ela.
+
+[NX-LLM-051] Pergunta de continuação perdia o contexto ("e 50 desses?", "que horas são lá?")
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.20.0) Observado: SIM
+  Sintoma    : "Quanto está o dólar?" -> "e o euro?" -> "e 50 desses em reais?"
+               respondia "1 real = US$ 0,19". "Como está o tempo em Paris?" ->
+               "e lá, vai chover?" -> "que horas são lá?" dava a hora de São Paulo.
+  Causa      : As respostas instantâneas das integrações olhavam só a mensagem
+               atual; "desses" e "lá" não diziam a moeda nem a cidade.
+  Correção   : O NEXUS completa a continuação com as perguntas anteriores da
+               mesma conversa: "desses" usa a moeda da pergunta anterior (com a
+               quantia dita), "lá" usa o último lugar que você citou, mesmo duas
+               perguntas antes. Teste: 50 euros = R$ 285,98; "que horas são lá?"
+               -> Paris.
+
+[NX-LLM-052] A IA inventava obras em recomendações e listas ("Iracema" de Machado de Assis)
+  Severidade : MÉDIA            Status: MITIGADO (v0.20.0)  Observado: SIM
+  Sintoma    : "Me recomenda um livro de ficção científica" -> "O Código Da Vinci"
+               ou um livro inexistente de Asimov; "outro livro famoso de Machado
+               de Assis" -> "Iracema" e "O Guarani" (são de José de Alencar).
+  Causa      : O modelo de 8B lembra mal listas de obras e mistura autores.
+  Correção   : Recomendações e listas de livros, filmes, séries e álbuns (de um
+               autor, de um gênero, "do mesmo autor") consultam a Wikipédia antes;
+               a IA só cita o que encontrou. Teste: ficção científica -> "Duna",
+               de Frank Herbert; Machado de Assis -> "Memórias Póstumas de Brás
+               Cubas". Leva ~6-10 s a mais nessas perguntas.
+  Dicas      : Respostas sobre obras ainda podem vir incompletas; confira o que for
+               importante.
+
+[NX-LLM-053] "Como eu abro os menus?" abria um menu e explicava errado
+  Severidade : BAIXA            Status: CORRIGIDO (v0.20.0) Observado: SIM
+  Sintoma    : "Não entendi o tutorial, como eu abro os menus?" abria as
+               Configurações e dizia que Ctrl+Espaço mostra os menus (Ctrl+Espaço
+               é para falar). Também citava nomes internos ("set_preference").
+  Correção   : Perguntas de "como fazer" sobre o NEXUS recebem as instruções
+               reais no contexto (bordas da tela, F1, Ctrl+Espaço para falar,
+               Personalização, Atalhos, "mostra o tutorial"); a ferramenta de
+               abrir menus recusa quando a pessoa só perguntou como (um "abre..."
+               explícito continua abrindo).
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE

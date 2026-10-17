@@ -1,0 +1,18 @@
+N.E.X.U.S
+Copyright (c) 2026 Bryan Maciel de Almeida. All rights reserved where not granted by the MIT License.
+
+AUTHORSHIP
+N.E.X.U.S was created and is maintained by Bryan Maciel de Almeida. The MIT License (see LICENSE) requires
+that the copyright notice above be kept in all copies or substantial portions of the software. Forks and
+derived works must not present themselves as the original N.E.X.U.S or imply endorsement by the author.
+
+NAME AND VISUAL IDENTITY ARE NOT LICENSED
+The MIT License covers the source code only. It grants no rights to the name "N.E.X.U.S" / "NEXUS", the
+model names "NEX-1.0" (Lite, Mini, Pro, Max), the logo, the program icon, the PET (orb and eye artwork),
+the ring/HUD visual identity, or any other brand asset of the project, including the files in assets/ and
+the PET images in nexus/web. These remain the exclusive property of Bryan Maciel de Almeida.
+
+You may refer to the project by name to describe it truthfully (for example "based on N.E.X.U.S").
+Any redistributed or modified version must use a different name and its own logo, icon and artwork.
+
+Third-party components keep their own licenses, listed in README.MD.
