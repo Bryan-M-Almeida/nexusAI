@@ -26,7 +26,14 @@ try { setColors(JSON.parse(localStorage.getItem("nexus.colors") || "{}")); } cat
 /* N.E.X.U.S interface. Talks to Python through window.pywebview.api; Python pushes events via nexus.on(). */
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-const BOOT_MIN_MS = 4200;
+// v0.19.0: the full intro (4.2 s) plays on the first start of the day; later starts the same day take 1.4 s
+const BOOT_MIN_MS = (() => {
+  try {
+    const today = new Date().toDateString(), seen = localStorage.getItem("nexus.bootDay") === today;
+    localStorage.setItem("nexus.bootDay", today);
+    return seen ? 1400 : 4200;
+  } catch (e) { return 4200; }
+})();
 
 let L = "pt";
 let settings = {};
@@ -174,6 +181,11 @@ function bootLine(step) {
 async function start() {
   const t0 = Date.now();
   await api().ui_ready();
+  const acc = await api().account_state();  // v0.19.0: the account is chosen / unlocked before anything loads
+  if (acc.locked) await showLogin(acc);
+  state.guest = acc.guest;
+  $("#app").classList.toggle("guest", !!acc.guest);
+  $("#guestChip").hidden = !acc.guest;
   const st = await api().boot();
   settings = st.settings;
   profile = st.profile;
@@ -209,6 +221,7 @@ async function start() {
     else new MutationObserver((m, obs) => { if ($("#onboarding").hidden) { obs.disconnect(); go(); } })
       .observe($("#onboarding"), { attributes: true, attributeFilter: ["hidden"] });
   }
+  if (!settings.system_check_done) setTimeout(() => api().first_check().then((r) => { caption(r.said, 9000); setExchange("nexus", r.said); }), 9000);
   if (!st.llm.online || !st.llm.model_ready) notice(aiHelp(st.llm), T("moreAi"));
   else if (state.ui_mode === "audio" && !state.mic_muted && st.stt === "missing") notice(T("voiceFirstUse"), T("moreVoice"));
 }
@@ -782,7 +795,11 @@ function initMovable() {
   const handle = (e) => {
     const box = e.target.closest(".drawer-box, .conv-box, .modal-box");
     if (!box || e.button !== 0 || box.closest("#confirmModal, #onboarding")) return null;
-    if (e.target.closest("button, input, select, textarea, a, label, .list, .chat, .conv-body, .set-body *, .reader-text, .file-view, .book-grid, .map-stage")) return null;
+    if (e.target.closest("button, input, select, textarea, a, label")) return null;  // controls keep working
+    // v0.19.0: a fixed strip on top of every menu, or the section's title, always drags - before, sections whose
+    // content started at the very top (AMD, Personalization) left nothing to grab
+    if (e.clientY - box.getBoundingClientRect().top <= 30 || e.target.closest(".set-sec > h2, .drawer-box h2, .kicker")) return box;
+    if (e.target.closest(".list, .chat, .conv-body, .set-body *, .reader-text, .file-view, .book-grid, .map-stage")) return null;
     return e.clientY - box.getBoundingClientRect().top <= 52 ? box : null;
   };
   const zoneAt = (e) => e.clientY < 6 ? "maximized" : e.clientX < 6 ? "snap-left" : e.clientX > innerWidth - 7 ? "snap-right" : null;
@@ -1379,11 +1396,188 @@ function collectSettings() {
   return changes;
 }
 
+/* ------------------------------------------------------------------ downloads, storage, system check (v0.19.0) */
+let liveTimer, stFirst = null;
+const secVisible = (sec) => !$("#settings").hidden && !$(`.set-sec[data-sec="${sec}"]`).hidden;
+const fmtBytes = (n) => n >= 2 ** 30 ? (n / 2 ** 30).toFixed(2) + " GB" : n >= 2 ** 20 ? (n / 2 ** 20).toFixed(1) + " MB"
+  : n >= 1024 ? (n / 1024).toFixed(0) + " KB" : (n || 0) + " B";
+const fmtTime = (s) => s == null ? "--" : s >= 3600 ? `${Math.floor(s / 3600)}h${String(Math.floor(s % 3600 / 60)).padStart(2, "0")}m`
+  : s >= 60 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s` : `${s}s`;
+async function renderDownloads() {
+  const r = await api().downloads_state();
+  const bar = (pct) => { const n = Math.round((pct || 0) / 5); return "[" + "#".repeat(n) + ".".repeat(20 - n) + "]"; };
+  $("#dlHead").innerHTML = r.items.length ? r.items.map((d) => {
+    const st = d.status === "done" ? `<span class="ok">${esc(T("dlDone"))}</span>` : d.status === "error" ? `<span class="bad">${esc(T("dlError"))}</span>`
+      : d.stalled ? `<span class="warn">${esc(T("dlStalled", { s: d.idle_s }))}</span>` : `<span class="run">${esc(T("dlRunning"))}</span>`;
+    return `<div>${st} ${esc(d.name)}  ${bar(d.pct)} ${d.pct == null ? "" : d.pct.toFixed(1) + "%"}  ${fmtBytes(d.done)}/${fmtBytes(d.total)}`
+      + (d.status === "running" ? `  ${fmtBytes(d.speed)}/s  ETA ${fmtTime(d.eta_s)}` : "") + `</div>`;
+  }).join("") : `<div class="muted">${esc(T("dlNone"))}</div>`;
+  const log = $("#dlLog"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
+  log.textContent = r.log.map((l) => `${l.ts}  ${l.level === "error" ? "ERR" : l.level === "ok" ? " OK" : "  >"}  ${l.name}  ${l.text}`).join("\n") || "$ _";
+  if (atEnd) log.scrollTop = log.scrollHeight;
+}
+async function renderStorage(full) {
+  const r = await api().storage_report(full);
+  if (full || !stFirst) stFirst = r;
+  const delta = r.data_bytes - stFirst.data_bytes;
+  const usedPct = 100 * (1 - r.disk_free / r.disk_total);
+  $("#stTotal").innerHTML = `<b>${fmtBytes(r.data_bytes)}</b> <span>${esc(T("stInData"))}</span>`
+    + (delta ? `<span class="${delta > 0 ? "up" : "down"}">${delta > 0 ? "+" : ""}${fmtBytes(Math.abs(delta)).replace(/^/, delta < 0 ? "-" : "")}</span>` : "")
+    + `<small>${esc(r.data_dir)}</small><i class="meter"><em style="width:${usedPct.toFixed(1)}%"></em></i>`
+    + `<small>${esc(T("stDisk", { free: fmtBytes(r.disk_free), total: fmtBytes(r.disk_total) }))}</small>`;
+  const cell = (label, bytes, sub = "") => `<div class="st-cell"><small class="mono">${esc(label)}</small><b>${fmtBytes(bytes)}</b><small>${esc(sub)}</small></div>`;
+  $("#stGrid").innerHTML = cell(T("st_db"), r.db_bytes, "nexus.db") + r.parts.map((p) => cell(T("st_" + p.key), p.bytes,
+    T("stFiles", { n: p.files }))).join("") + cell(T("st_program"), r.program_bytes, "NEXUS");
+  $("#stTables").innerHTML = r.tables.map((t) => `<span>${esc(T("tb_" + t.key))} <b>${t.rows.toLocaleString()}</b></span>`).join("");
+  if (full) $("#stModels").innerHTML = (r.voice_models || []).map((m) => cell(T("st_voiceModel"), m.bytes, "whisper " + m.name)).join("")
+    + (r.ai_models || []).map((m) => cell(T("st_aiModel"), m.bytes, m.name)).join("");
+}
+async function runSystemCheck(btn) {
+  if (btn) btn.disabled = true;
+  const r = await api().system_check();
+  $("#sysCheck").hidden = false;
+  $("#sysCheck").innerHTML = r.checks.map((c) => `<div><span class="${c.ok ? "ok" : "warn"}">${c.ok ? "OK" : "!!"}</span> ${esc(T("boot_" + c.key))} <span class="muted">${esc(c.detail)}</span></div>`).join("")
+    + `<div class="said">${esc(r.said)}</div>`;
+  if (btn) btn.disabled = false;
+  return r;
+}
+
+/* ------------------------------------------------------------------ accounts (v0.19.0) */
+let loginResolve = null, loginPick = null;
+function showLogin(acc) {
+  $("#boot").classList.add("behind-login");
+  renderLoginAccounts(acc.accounts || []);
+  $("#loginModal").hidden = false;
+  return new Promise((r) => (loginResolve = r));
+}
+function renderLoginAccounts(list) {
+  $("#loginAccounts").innerHTML = list.map((a) => `<button type="button" class="login-acc" data-acc="${esc(a.id)}" data-pass="${a.has_password ? 1 : 0}">
+      <i>${esc((a.name || T("accOwner")).slice(0, 1).toUpperCase())}</i><b>${esc(a.name || T("accOwner"))}</b>
+      <small>${a.has_password ? "🔒 " + esc(T("accProtected")) : esc(T("accOpen"))}</small></button>`).join("");
+  $("#loginPassForm").hidden = $("#loginNewForm").hidden = true;
+  $("#loginAccounts").hidden = $("#loginActions").hidden = false;
+}
+async function loginAs(id, password = "") {
+  const r = await api().account_login(id, password);
+  if (!r.ok) {
+    $("#loginError").textContent = T(r.error === "wait" ? "loginWait" : "loginWrong");
+    $("#loginError").hidden = false;
+    return;
+  }
+  if (r.restarting) { $("#loginStatus").textContent = T("loginOpening"); return; }
+  $("#loginModal").hidden = true;
+  $("#boot").classList.remove("behind-login");
+  if (loginResolve) { loginResolve(); loginResolve = null; }
+}
+function wireLogin() {
+  $("#loginAccounts").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-acc]");
+    if (!b) return;
+    if (b.dataset.pass === "1") {
+      loginPick = b.dataset.acc;
+      $("#loginPassName").textContent = b.querySelector("b").textContent;
+      $("#loginAccounts").hidden = $("#loginActions").hidden = true;
+      $("#loginPassForm").hidden = false; $("#loginError").hidden = true; $("#loginPass").value = "";
+      setTimeout(() => $("#loginPass").focus(), 50);
+    } else loginAs(b.dataset.acc);
+  });
+  $("#loginPassForm").onsubmit = (e) => { e.preventDefault(); loginAs(loginPick, $("#loginPass").value); };
+  $("#loginBack").onclick = () => renderLoginAccounts([...$$("#loginAccounts [data-acc]")].map((b) => ({ id: b.dataset.acc,
+    name: b.querySelector("b").textContent, has_password: b.dataset.pass === "1" })));
+  $("#loginGuest").onclick = async () => { $("#loginStatus").textContent = T("loginGuestOpening"); await api().account_guest(); };
+  $("#loginNewBtn").onclick = () => { $("#loginAccounts").hidden = $("#loginActions").hidden = true; $("#loginNewForm").hidden = false; $("#loginNewName").focus(); };
+  $("#loginNewCancel").onclick = async () => renderLoginAccounts((await api().account_state()).accounts || []);
+  $("#loginNewForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const r = await api().account_create($("#loginNewName").value, $("#loginNewPass").value);
+    if (!r.ok) { $("#loginNewError").textContent = T(r.error === "short" ? "accShort" : "accNeedName"); $("#loginNewError").hidden = false; return; }
+    $("#loginNewName").value = $("#loginNewPass").value = "";
+    renderLoginAccounts(r.accounts);
+  };
+}
+async function renderAccount() {
+  const r = await api().account_state();
+  $("#accountCard").innerHTML = r.guest ? `<b>${esc(T("accGuest"))}</b><small>${esc(T("accGuestHint"))}</small>`
+    : `<b>${esc(r.name || T("accOwner"))}</b><small>${esc(T("accActive"))}</small>`;
+  $$("[data-account-only]").forEach((el) => (el.hidden = !!r.guest));
+  $("#accountList").innerHTML = (r.accounts || []).map((a) => `<div class="account-row${a.active ? " on" : ""}">
+      <i>${esc((a.name || T("accOwner")).slice(0, 1).toUpperCase())}</i><span>${esc(a.name || T("accOwner"))}${a.has_password ? " 🔒" : ""}</span>
+      ${a.active ? `<small class="mono">${esc(T("accInUse"))}</small>` : `<button type="button" class="link-btn" data-acc-switch="${esc(a.id)}">${esc(T("accSwitch"))}</button>`}
+      ${a.id === "owner" || a.active ? "" : `<button type="button" class="link-btn" data-acc-del="${esc(a.id)}">${esc(T("accDelete"))}</button>`}</div>`).join("");
+}
+function wireAccount() {
+  $("#btnAccPass").onclick = async () => {
+    const r = await api().account_set_password($("#accOldPass").value, $("#accNewPass").value);
+    notice(T(r.ok ? "accPassSaved" : r.error === "short" ? "accShort" : "loginWrong"));
+    if (r.ok) $("#accOldPass").value = $("#accNewPass").value = "";
+  };
+  $("#btnAccLock").onclick = async () => { const r = await api().account_lock(); if (r.ok) location.reload(); else notice(T("accNeedPass")); };
+  $("#btnAccSwitchGuest").onclick = async () => { notice(T("loginGuestOpening")); await api().account_guest(); };
+  $("#accountList").addEventListener("click", async (e) => {
+    const sw = e.target.closest("[data-acc-switch]"), del = e.target.closest("[data-acc-del]");
+    if (sw) { notice(T("loginOpening")); await api().account_switch(sw.dataset.accSwitch); }
+    if (del) {
+      const pw = prompt(T("accDeleteConfirm"));
+      if (pw === null) return;
+      const r = await api().account_delete(del.dataset.accDel, pw);
+      notice(T(r.ok ? "accDeleted" : "loginWrong"));
+      renderAccount();
+    }
+  });
+}
+
+/* Settings groups (v0.19.0): a header with an icon and an arrow; a click folds the group to its title, another click
+   opens it again; "collapse all / expand all" on top. The folded groups are remembered on this PC. */
+const GROUP_ICONS = { grpSystem: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 12h2M18 12h2M12 4v2M12 18v2",
+  grpAi: "M9 4h6v4h4v6h-4v6H9v-6H5V8h4z", grpVoice: "M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3zM6 12a6 6 0 0 0 12 0M12 18v3",
+  grpLook: "M12 4a8 8 0 1 0 0 16c1 0 1.5-.8 1.5-1.6 0-1.2-1-1.4-1-2.4 0-.8.7-1.5 1.5-1.5H17a3 3 0 0 0 3-3c0-4.4-3.6-7.5-8-7.5z",
+  grpConnect: "M8 7h11l-3-3M16 17H5l3 3", grpHardware: "M6 6h12v12H6zM9 9h6v6H9zM9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3",
+  grpData: "M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z" };
+let foldedGroups = new Set();
+try { foldedGroups = new Set(JSON.parse(localStorage.getItem("nexus.folded") || "[]")); } catch (e) { /* first run */ }
+function initSetGroups() {
+  for (const g of $$("#setNav .set-group")) {
+    const id = g.dataset.i18n, label = g.textContent;
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "set-group"; btn.dataset.group = id;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="${GROUP_ICONS[id] || ""}"/></svg><span data-i18n="${id}">${esc(label)}</span><i class="chev">▾</i>`;
+    g.replaceWith(btn);
+  }
+  applyGroups();
+}
+function groupItems(header) {  // the section buttons under a group header, up to the next header
+  const out = [];
+  for (let el = header.nextElementSibling; el && !el.classList.contains("set-group"); el = el.nextElementSibling) out.push(el);
+  return out;
+}
+function applyGroups() {
+  for (const h of $$("#setNav button.set-group")) {
+    const folded = foldedGroups.has(h.dataset.group);
+    h.classList.toggle("folded", folded);
+    groupItems(h).forEach((el) => el.classList.toggle("grp-hidden", folded));
+    const n = groupItems(h).filter((el) => !el.hidden).length;
+    h.title = `${n}`;
+  }
+  try { localStorage.setItem("nexus.folded", JSON.stringify([...foldedGroups])); } catch (e) { /* ignore */ }
+}
+function toggleGroup(id, fold) {
+  if (fold ?? !foldedGroups.has(id)) foldedGroups.add(id); else foldedGroups.delete(id);
+  applyGroups();
+}
+
 function showSection(sec) {
   $$("#setNav [data-sec]").forEach((b) => b.classList.toggle("on", b.dataset.sec === sec));
+  const owner = $(`#setNav [data-sec="${sec}"]`);  // the group of the open section is never folded
+  for (let el = owner?.previousElementSibling; el; el = el.previousElementSibling) {
+    if (el.classList.contains("set-group")) { if (foldedGroups.has(el.dataset.group)) toggleGroup(el.dataset.group, false); break; }
+  }
   $$(".set-sec").forEach((x) => (x.hidden = x.dataset.sec !== sec));
   clearInterval(integTimer);
   if (sec === "ai") renderModels();
+  if (sec === "account") renderAccount();
+  clearInterval(liveTimer);
+  if (sec === "downloads") { renderDownloads(); liveTimer = setInterval(() => (secVisible("downloads") ? renderDownloads() : clearInterval(liveTimer)), 1000); }
+  if (sec === "data") { renderStorage(true); liveTimer = setInterval(() => (secVisible("data") ? renderStorage(false) : clearInterval(liveTimer)), 2000); }
   if (sec === "integ") { renderIntegrations(); integTimer = setInterval(() => { if (!$("#settings").hidden) renderIntegrations(); }, 6000); }
   if (sec === "apps") { if (feature("media")) renderMedia(); if (feature("apps")) renderApps(false); }
   clearInterval(amdTimer);
@@ -1438,6 +1632,8 @@ async function renderAmd() {
   $("#amdName").textContent = card ? card.name : T("amdNoCard");
   $("#amdDriver").textContent = card ? [card.adrenalin && `Adrenalin ${card.adrenalin}`, card.driver && `${T("amdDriver")} ${card.driver}`,
     r.tune && (r.tune.vulkan ? "Vulkan" : "ROCm / Vulkan")].filter(Boolean).join(" · ") : T("amdNoCardHint");
+  $("#amdTech").innerHTML = (r.tech || []).map((t) => `<div class="amd-tech-row st-${t.status}"><b>${esc(T("tech_" + t.id))}</b>
+      <span class="pill mono">${esc(T("techStatus_" + t.status))}</span><small>${esc(T("techd_" + t.id, { d: t.detail }))}</small></div>`).join("");
   $("#amdRefs").innerHTML = (r.refs || []).map((id) => `<button type="button" class="amd-ref" data-ref="${id}"><b>${esc(T("ref_" + id))}</b><small>${esc(T("refd_" + id))}</small></button>`).join("");
   amdCard = card;
   amdTick();
@@ -1754,6 +1950,13 @@ function wire() {
     if (b) { memFilter = b.dataset.src; renderDashboard(dash); }
   });
   $("#btnImportMem").onclick = () => openImport();
+  initSetGroups();
+  wireLogin();
+  wireAccount();
+  $("#btnSysCheck").onclick = (e) => runSystemCheck(e.target);
+  $("#setNav").addEventListener("click", (e) => { const g = e.target.closest("button.set-group"); if (g) toggleGroup(g.dataset.group); });
+  $("#grpCollapseAll").onclick = () => { $$("#setNav button.set-group").forEach((g) => foldedGroups.add(g.dataset.group)); applyGroups(); };
+  $("#grpExpandAll").onclick = () => { foldedGroups.clear(); applyGroups(); };
   $("#integGrid").addEventListener("click", onIntegClick);
   $("#modelGrid").addEventListener("click", onModelsClick);
   $("#modelNo").onclick = () => { $("#modelConfirm").hidden = true; modelPending = null; };

@@ -317,6 +317,9 @@ PREF_REQUEST = re.compile(  # v0.18.5: a request to change NEXUS's look or voice
     rf"\b{_COLOR_WORDS}\w*\b.{{0,15}}\b(ring|core|background)\b|"
     r"\b(tema|theme)\s+(d[oa]\s+|the\s+)?(nexus|amd|radeon|esmeralda|emerald|violeta|violet|[aâá]mbar|amber|grafit[eo]|"
     r"graphite|gelo|ice|hielo)\b|\b(voz|voice)\s+(feminin|masculin|female|male|femenin|de mulher|de homem)", re.I)
+PREF_CLAIM = re.compile(r"\b(pronto|done|listo)\b.{0,20}\b(fundo|aro|n[uú]cleo|tema|background|ring|core|theme|fondo|"
+                        r"anillo)\b|\b(atualizad[oa]|alterad[oa]|mudad[oa]|trocad[oa]|changed|updated|cambiad[oa]|"
+                        r"actualizad[oa])\s+(para|to|a)\s+\w+|j[aá] est[aá] configurad", re.I)
 UI_OPEN_CLAIM = re.compile(r"\b(abri|aberto|aberta|abrindo|abrimos|opened|opening|i've opened|abierto|abierta|abriendo|"
                            r"te levei|levei voc|took you|te llev|vou (te )?(levar|abrir|mostrar)|vamos (abrir|l[aá])|"
                            r"let me (open|take|show)|i'?ll (open|take you|show)|i will (open|take|show)|voy a (abrir|llevar)|"
@@ -338,8 +341,11 @@ def _needs_tool(reply: str, acted: bool, user_text: str = "", called: set | None
             return (f"The user explicitly asked you to store this, but you did NOT call any tool, so nothing was saved. "
                     f"Call `{tool}` now with the information from the user's message, then confirm briefly in the "
                     f"user's language.")
-    # v0.18.5: "Pronto: tema AMD." without calling set_preference (copied from earlier turns) - nothing changed
-    if "set_preference" not in (called or set()) and PREF_REQUEST.search(user_text) and not user_text.strip().endswith("?"):
+    # v0.18.5: "Pronto: tema AMD." without calling set_preference (copied from earlier turns) - nothing changed.
+    # v0.19.0: also when only the reply claims it ("isso é magenta" -> "Pronto: fundo atualizado para magenta.")
+    pref_claim = PREF_CLAIM.search(reply) and not user_text.strip().endswith("?")
+    if "set_preference" not in (called or set()) and (pref_claim or PREF_REQUEST.search(user_text)
+                                                      and not user_text.strip().endswith("?")):
         return ("The user asked to change NEXUS's look or voice, but you did NOT call `set_preference`, so nothing "
                 "changed. Call `set_preference` now (one call per setting), then confirm briefly in the user's language.")
     # v0.16.5 eval: "Aberto o painel de configurações" without calling the tool - nothing opened
@@ -596,6 +602,8 @@ class Assistant:
         nav = ui_nav.detect(text)
         if nav and tools.ui_hook:  # v0.16.5: "abre as configurações", "quero mudar a cor do aro" - instant, no model
             nav, reply = ui_nav.reply(nav)
+            memory.add_message("user", text)  # v0.19.0: in the history too, so the next question knows what opened
+            memory.add_message("assistant", reply)
             tools.ui_hook({**nav, "say": reply})
             self.emit("tool", {"name": "open_interface", "args": nav})
             self.emit("done", {"text": reply, "interrupted": False,  # v0.16.8: saying it is a preference
@@ -617,6 +625,7 @@ class Assistant:
         messages = [{"role": "system", "content": build_system()}, *_history_messages(est_tokens(turn)),
                     {"role": "user", "content": turn}]
         previous = last_reply()
+        tools.current_text = text  # v0.19.0: tools can check what the user actually asked (music service)
         memory.add_message("user", text_for_history)
         reply, changed, nudged, finished, round_text, called = "", False, False, False, "", set()
         # v0.18.0: data the hub already fetched counts as the live tool having run (no "call get_news now" nudge)

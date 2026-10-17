@@ -199,6 +199,37 @@
 </div>
 
 <!-- ============ TERMS OF USE & PRIVACY (v0.17.0): first start, nothing is captured or sent before ============ -->
+<!-- ============ LOGIN (v0.19.0): who is using NEXUS / password; nothing of an account loads before it ============ -->
+<div class="guest-chip mono" id="guestChip" hidden data-i18n="guestChip">MODO CONVIDADO · NADA É GUARDADO</div>
+
+<div class="modal login-modal" id="loginModal" hidden>
+  <div class="login-box">
+    <div class="login-ring"></div>
+    <h2 class="login-title" data-i18n="loginTitle">Quem está usando o NEXUS?</h2>
+    <div class="login-accounts" id="loginAccounts"></div>
+    <form class="login-pass" id="loginPassForm" hidden autocomplete="off">
+      <b id="loginPassName"></b>
+      <input type="password" id="loginPass" data-i18n-ph="loginPassPh" placeholder="Senha">
+      <div class="row-btns"><button class="btn-ghost" type="button" id="loginBack" data-i18n="back">Voltar</button>
+        <button class="btn-primary" type="submit" data-i18n="loginEnter">Entrar</button></div>
+      <p class="hint warn" id="loginError" hidden></p>
+    </form>
+    <form class="login-new" id="loginNewForm" hidden autocomplete="off">
+      <input id="loginNewName" data-i18n-ph="loginNewName" placeholder="Seu nome" maxlength="40">
+      <input type="password" id="loginNewPass" data-i18n-ph="loginNewPass" placeholder="Senha (opcional, 4+ caracteres)">
+      <div class="row-btns"><button class="btn-ghost" type="button" id="loginNewCancel" data-i18n="cancel">Cancelar</button>
+        <button class="btn-primary" type="submit" data-i18n="loginCreate">Criar conta</button></div>
+      <p class="hint warn" id="loginNewError" hidden></p>
+    </form>
+    <div class="login-actions" id="loginActions">
+      <button class="btn-ghost" type="button" id="loginNewBtn" data-i18n="loginNewAccount">+ Nova conta</button>
+      <button class="btn-ghost" type="button" id="loginGuest" data-i18n="loginGuest">Entrar como convidado</button>
+    </div>
+    <p class="hint login-note" data-i18n="loginNote">Cada conta tem as próprias memórias, conversas e agenda. O convidado não guarda nada: tudo é apagado ao fechar.</p>
+    <p class="login-status mono" id="loginStatus"></p>
+  </div>
+</div>
+
 <div class="modal" id="legalModal" hidden>
   <div class="modal-box legal-box" role="dialog" aria-modal="true">
     <p class="kicker mono" data-i18n="legalKicker">ANTES DE COMEÇAR</p>
@@ -459,8 +490,12 @@
     <button class="icon-btn drawer-close" type="button" data-close aria-label="Close">✕</button>
     <nav class="set-nav mono" id="setNav">
       <p class="kicker">NEXUS://config</p>
+      <div class="grp-all mono"><button type="button" id="grpCollapseAll" data-i18n="grpCollapseAll">Recolher tudo</button>
+        <button type="button" id="grpExpandAll" data-i18n="grpExpandAll">Expandir tudo</button></div>
       <p class="set-group" data-i18n="grpSystem">SISTEMA</p>
       <button type="button" data-sec="general" class="on" data-i18n="secGeneral">Geral</button>
+      <button type="button" data-sec="account" data-i18n="secAccount">Conta</button>
+      <button type="button" data-sec="downloads" data-i18n="secDownloads">Downloads</button>
       <p class="set-group" data-i18n="grpAi">INTELIGÊNCIA</p>
       <button type="button" data-sec="ai" data-i18n="secAi">Inteligência</button>
       <button type="button" data-sec="memory" data-i18n="secMemory">Memória e conversas</button>
@@ -493,6 +528,8 @@
         <label class="check"><input type="checkbox" name="greet_on_start"><span data-i18n="greetOnStart">Falar a saudação ao abrir</span></label>
         <label class="check"><input type="checkbox" name="start_fullscreen"><span data-i18n="startFullscreen">Abrir em tela cheia</span></label>
         <label class="check"><input type="checkbox" name="focus_in_workspace"><span data-i18n="focusInWs">Ligar o modo foco na área de trabalho</span></label>
+        <div class="row-btns"><button class="btn-ghost" type="button" id="btnSysCheck" data-i18n="sysCheck">Verificar sistemas</button></div>
+        <div class="syscheck mono" id="sysCheck" hidden></div>
         <div class="row-btns"><button class="btn-ghost" type="button" id="btnReimport" data-i18n="reimport">Reimportar perfil</button>
           <button class="btn-ghost" type="button" id="btnTutorial" data-i18n="tutorialAgain">Ver o tutorial</button></div>
       </section>
@@ -623,6 +660,33 @@
         </div>
       </section>
 
+      <!-- DOWNLOADS (v0.19.0): a terminal of everything NEXUS downloads -->
+      <section class="set-sec" data-sec="downloads" hidden>
+        <h2 data-i18n="secDownloads">Downloads</h2>
+        <p class="hint" data-i18n="dlHint">Tudo o que o NEXUS baixa (modelos de IA, modelo de voz), ao vivo. Se nada chegar por 20 segundos aparece TRAVADO: espere um pouco ou verifique a internet.</p>
+        <div class="term" id="dlTerm"><div class="term-head mono" id="dlHead"></div><pre class="term-log mono" id="dlLog"></pre></div>
+      </section>
+
+      <!-- ACCOUNT (v0.19.0) -->
+      <section class="set-sec" data-sec="account" hidden>
+        <h2 data-i18n="secAccount">Conta</h2>
+        <div class="account-card" id="accountCard"></div>
+        <div data-account-only>
+          <p class="sub mono" data-i18n="accPassTitle">SENHA</p>
+          <p class="hint" data-i18n="accPassHint">Com senha, ao abrir o NEXUS (ou ao bloquear) nada da sua conta aparece e o microfone fica fechado até a senha. Guardamos só uma impressão da senha (scrypt), nunca a senha.</p>
+          <div class="grid-3">
+            <input type="password" id="accOldPass" data-i18n-ph="accOldPass" placeholder="Senha atual">
+            <input type="password" id="accNewPass" data-i18n-ph="accNewPass" placeholder="Nova senha (vazio = sem senha)">
+            <button class="btn-ghost" type="button" id="btnAccPass" data-i18n="accSavePass">Salvar senha</button>
+          </div>
+          <div class="row-btns"><button class="btn-ghost" type="button" id="btnAccLock" data-i18n="accLock">Bloquear agora</button></div>
+        </div>
+        <p class="sub mono" data-i18n="accOthers">CONTAS NESTE COMPUTADOR</p>
+        <div class="account-list" id="accountList"></div>
+        <div class="row-btns"><button class="btn-ghost" type="button" id="btnAccSwitchGuest" data-i18n="loginGuest">Entrar como convidado</button></div>
+        <p class="hint" data-i18n="accSecurityHint">As contas separam os dados de quem divide o computador. Os arquivos ficam na sua pasta do Windows; para proteção total, use também a senha do Windows.</p>
+      </section>
+
       <!-- MEMORY AND CONVERSATIONS (v0.18.5) -->
       <section class="set-sec" data-sec="memory" hidden>
         <h2 data-i18n="secMemory">Memória e conversas</h2>
@@ -714,6 +778,8 @@
               <button class="btn-primary" type="button" id="gpuYes" data-i18n="gpuYes">Aplicar e reiniciar o Ollama</button></div>
           </div>
         </div>
+        <p class="sub mono" data-i18n="amdTechTitle">TECNOLOGIAS AMD NO NEXUS</p>
+        <div class="amd-tech" id="amdTech"></div>
         <p class="sub mono" data-i18n="amdRefTitle">REFERÊNCIAS AMD</p>
         <div class="amd-refs" id="amdRefs"></div>
         <p class="hint" data-i18n="amdTempHint">Temperatura, clocks e ventoinha: abra o AMD Software: Adrenalin Edition (Alt+R) e ative a sobreposição de métricas (Ctrl+Shift+O).</p>
@@ -809,6 +875,13 @@
       <!-- DATA -->
       <section class="set-sec" data-sec="data" hidden>
         <h2 data-i18n="secData">Dados</h2>
+        <p class="sub mono" data-i18n="stTitle">ARMAZENAMENTO · AO VIVO</p>
+        <div class="st-total" id="stTotal"></div>
+        <div class="st-grid" id="stGrid"></div>
+        <p class="sub mono" data-i18n="stDbTitle">DENTRO DO BANCO DE DADOS</p>
+        <div class="st-tables mono" id="stTables"></div>
+        <p class="sub mono" data-i18n="stModelsTitle">MODELOS</p>
+        <div class="st-grid" id="stModels"></div>
         <p class="hint" id="dataPath"></p>
         <div class="row-btns">
           <button class="btn-ghost" type="button" id="btnOpenData" data-i18n="openData">Abrir pasta de dados</button>

@@ -1,11 +1,10 @@
 """Actions the assistant can execute (OpenAI-style function calling)."""
-import functools
 import inspect
 import json
 import time
 from datetime import datetime, timedelta
 
-from . import connectors, integrations, knowledge, memory, profile
+from . import connectors, knowledge, memory, profile
 from .config import DATA_DIR, settings
 from .db import db, now
 
@@ -253,8 +252,24 @@ def _play_music_browser(query, service="youtube"):
     return browser.music_search(query, service)
 
 
+current_text = ""  # v0.19.0: the user's message of this turn (set by the assistant) - tools can check what was asked
+
+
+def _service_asked(service: str) -> str:
+    """The model picks Spotify / YouTube Music on its own sometimes ("toca uma música romântica" opened Spotify):
+    a service is used only when the user named it, else the preferred player from Settings."""
+    import re
+
+    words = {"youtube music": r"music|yt ?music|youtube music", "spotify": r"spotify", "limusic": r"limusic|li music",
+             "youtube": r"youtube|yt\b"}
+    service = (service or "").lower()
+    if service and re.search(words.get(service, r"$^"), current_text, re.I):
+        return service
+    return settings.get("music_player", "youtube") or "youtube"
+
+
 def play_music(query, service=""):
-    service = (service or settings.get("music_player", "youtube")).lower()
+    service = _service_asked(service)
     if service == "limusic":
         from . import apps, media
 
@@ -436,7 +451,7 @@ SCHEMAS = [
         {"query": S}, ["query"]),
     _fn("play_music", "Play a song/artist/video: opens the first YouTube result. service only when the user names "
         "another one.",
-        {"query": S, "service": {"type": "string", "enum": ["youtube", "spotify", "limusic"]}}, ["query"]),
+        {"query": S, "service": {"type": "string", "enum": ["youtube", "youtube music", "spotify", "limusic"]}}, ["query"]),
     _fn("open_interface", "Open (or close) part of the NEXUS interface for the user to SEE: settings with a section, "
         "panel with a tab, menus. To CHANGE colour, theme, size or voice use set_preference.",
         {"target": {"type": "string", "enum": ["settings", "panel", "conversations", "notifications", "library",

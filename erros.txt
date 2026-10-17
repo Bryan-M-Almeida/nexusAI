@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 3.7  ·  Data: 2026-10-16  ·  Versão do app: 0.18.6
+ Versão do documento: 3.8  ·  Data: 2026-10-16  ·  Versão do app: 0.19.0
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -92,6 +92,9 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-LLM-042  "Pronto: tema AMD." sem mudar nada (a IA não chamava set_preference)
       NX-LLM-043  "qwen3:4b" leva ~70 s por resposta (é o modelo que pensa antes de responder)
       NX-LLM-044  "Toca no YouTube" abria o YouTube Music
+      NX-LLM-045  "Isso é magenta, não rosa choque": a IA dizia "Pronto" sem mudar a cor
+      NX-LLM-046  "Toca uma música" abria o Spotify sem o usuário pedir
+      NX-LLM-047  Não dava para arrastar a janela das Configurações em algumas seções
  VOZ  NX-VOZ-001  Microfone não responde no primeiro uso (download do Whisper)
       NX-VOZ-002  Microfone errado selecionado (ex.: DroidCam)
       NX-VOZ-003  Palavra de ativação "Nexus" não reconhecida / falsos disparos
@@ -748,6 +751,34 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                às vezes escolhia mesmo com o usuário dizendo "YouTube".
   Correção   : A IA escolhe só entre YouTube, Spotify e LiMusic; o YouTube
                Music fica como player preferido em Configurações > Apps e mídia.
+
+[NX-LLM-045] "Isso é magenta, não rosa choque": a IA dizia "Pronto" sem mudar a cor
+  Severidade : MÉDIA            Status: CORRIGIDO (v0.19.0) Observado: SIM
+  Sintoma    : "Mude o fundo para rosa choque" aplicava o rosa genérico (que
+               parece magenta); a correção do usuário recebia "Pronto: fundo
+               atualizado para magenta." e depois "já está configurado", sem
+               nenhuma mudança.
+  Correção   : Tons com nome (rosa choque, magenta, preto absoluto, vinho,
+               coral, lavanda...) e "claro/escuro" em qualquer cor. A frase
+               "isso é X, não Y" reaplica Y na última parte mudada. Se a
+               resposta afirma uma mudança de cor/tema sem set_preference, a IA
+               é obrigada a chamar.
+
+[NX-LLM-046] "Toca uma música" abria o Spotify sem o usuário pedir
+  Severidade : BAIXA            Status: CORRIGIDO (v0.19.0) Observado: SIM
+  Causa      : A IA escolhia o serviço por conta própria (e na v0.18.6 o YouTube
+               Music tinha saído da lista, então "abra pelo yt music" abria o
+               YouTube).
+  Correção   : Spotify, YouTube Music e LiMusic só quando a mensagem do usuário
+               cita o serviço; senão, o player preferido das Configurações.
+
+[NX-LLM-047] Não dava para arrastar a janela das Configurações em algumas seções
+  Severidade : BAIXA            Status: CORRIGIDO (v0.19.0) Observado: SIM
+  Causa      : A janela só era arrastada pelos 52 px do topo fora do conteúdo;
+               seções que começam no topo (AMD, Personalização) não deixavam
+               onde segurar.
+  Correção   : Uma faixa fixa de 30 px no topo de toda janela e o título da
+               seção sempre arrastam (botões e campos continuam funcionando).
 
 ================================================================================
  VOZ — RECONHECIMENTO E SÍNTESE

@@ -8,6 +8,66 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v0.19.0 — Protótipo · 2026-10-16
+
+**Contas locais e modo convidado, monitor de downloads, armazenamento ao vivo, verificação de sistemas na primeira
+abertura, tecnologias AMD explicadas, voz já instalada e grupos das Configurações recolhíveis.**
+
+### Novo
+- **Contas locais** (`nexus/accounts.py`): cada conta tem a própria pasta (memórias, conversas, agenda,
+  configurações, backups); a conta principal continua com os dados de sempre (nada é movido).
+  - **Senha opcional**: só um hash scrypt com sal é guardado; 5 erros em 1 minuto fazem esperar. Com senha (ou com mais
+    de uma conta) o NEXUS abre na tela **"Quem está usando o NEXUS?"**: até entrar, **nenhuma chamada de dados
+    responde**, o microfone não abre e os lembretes que tocarem esperam.
+  - **Convidado**: uma pasta temporária, apagada ao fechar (e as que um travamento deixar são limpas no dia seguinte);
+    sem backups. Um aviso "MODO CONVIDADO · NADA É GUARDADO" fica no topo.
+  - **Trocar de conta** reinicia o NEXUS na pasta da outra conta (a senha é conferida antes; a nova janela recebe um
+    código de uso único, válido por 30 s). Configurações → **Conta**: senha, **Bloquear agora**, trocar, apagar
+    (com a senha da conta).
+- **Downloads** (Configurações → Sistema → Downloads): um **terminal** com tudo o que o NEXUS baixa (modelos de IA,
+  modelo de voz) — barra, porcentagem, tamanho, velocidade, tempo restante e **TRAVADO** quando nada chega por 20 s,
+  com o registro de cada etapa.
+- **Dados → Armazenamento ao vivo**: o total da pasta de dados (com quanto mudou desde que a aba abriu), o disco livre
+  e cada parte — banco de dados (e quantas memórias, mensagens, documentos, tarefas... há dentro), biblioteca, áreas de
+  trabalho, backups, logs, cache das integrações, temporários, o programa, os modelos de voz e cada modelo de IA.
+  Atualiza a cada 2 s.
+- **Verificação de sistemas**: na primeira abertura o NEXUS confere banco de dados, IA, placa de vídeo,
+  reconhecimento de voz, voz, microfone, internet, disco e base de conhecimento e diz *"Todos os sistemas estão em
+  completo funcionamento. NEXUS está pronto para uso."* — ou o que precisa de atenção. Botão **Verificar sistemas** em
+  Configurações → Geral.
+- **Tecnologias AMD no NEXUS** (aba AMD): Radeon + Vulkan (em uso), **ROCm** (usado pelo Ollama nas placas com suporte
+  no Windows — RX 7000, RX 6800/6900, Radeon PRO; a RX 6600 XT não está na lista), Adrenalin (versão), processador
+  Ryzen (parte do modelo que não cabe na placa e o Whisper), Ryzen AI / NPU (precisa de um processador Ryzen AI) e as
+  métricas da Radeon — com o estado de cada uma neste PC.
+- **Grupos das Configurações** com ícone, seta e destaque, **recolhíveis** (clique no grupo) e **Recolher tudo /
+  Expandir tudo**; o grupo da seção aberta sempre se abre; a escolha fica lembrada.
+- **A voz já vem com o NEXUS**: o modelo Whisper small vai junto no programa (`build_whisper.py`) — dá para falar logo
+  depois de instalar.
+
+### Desempenho
+- **Primeira fala**: antes baixava 484 MB (~1 min nesta internet); agora o modelo empacotado carrega em **0,9 s**.
+- **Abertura**: a animação completa (4,2 s) só na primeira vez do dia; nas outras a interface aparece em **1,5 s**
+  (medido: 4,26 s → 1,46 s).
+- O tamanho dos modelos de voz deixou de ser contado em dobro (o cache do Hugging Face usa links: 972 MB → 486 MB).
+- Avaliação de conversa 37/37 (média 5,5 s, mesmas 27 perguntas); código: imports sem uso removidos.
+
+### Corrigido
+- NX-LLM-045: "isso é magenta, não rosa choque" — tons com nome, "claro/escuro" em qualquer cor, a correção reaplica a
+  cor e "Pronto" sem mudança faz a IA chamar a ferramenta.
+- NX-LLM-046: a música só abre no Spotify / YouTube Music / LiMusic quando o usuário cita o serviço.
+- NX-LLM-047: a janela das Configurações agora arrasta em todas as seções (faixa do topo e título).
+- As respostas instantâneas de navegação ("abre minhas memórias") entram no histórico da conversa.
+
+### Testes desta versão
+- 322/322 testes unitários (18 novos: tons e correção de cor, rede de segurança do "Pronto", serviço de música, contas
+  — pasta própria, hash, senha certa/errada, espera após 5 erros, tela de quem usa, troca com código de uso único,
+  convidado temporário, chamadas travadas sem dados, apagar com senha —, downloads com TRAVADO, armazenamento,
+  tecnologias AMD, voz empacotada, navegação no histórico).
+- Avaliação de conversa **37/37** e da área de trabalho **7/7** com o modelo real.
+- Autoteste do executável (`--selftest`).
+
+---
+
 ## v0.18.6 — Protótipo · 2026-10-16
 
 **Modelos locais para PCs mais fracos e mais fortes, testados de verdade: catálogo NEX-1.0 Lite / Mini / Pro / Max,

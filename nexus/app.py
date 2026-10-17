@@ -2,19 +2,22 @@
 import json
 import os
 import re
+import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 from datetime import datetime, timedelta
 
 import webview
 
-from . import (MODEL_NAME, __version__, assistant, bridge, control, features, gpu_tune, i18n, knowledge, legal, llm, memory,
-               memory_import, notify, profile, training, apps, connectors, media, amd, prefs, models,
+from . import (__version__, assistant, bridge, control, features, gpu_tune, i18n, knowledge, legal, llm, memory,
+               memory_import, notify, profile, training, apps, connectors, media, amd, prefs, models, accounts,
+               downloads, storage,
                library, netprobe, performance, scheduler, skills, tools, workspace)
 from . import files as filereader
 from .logs import log, setup as setup_logs
-from .config import WEB_DIR, settings
+from .config import DATA_DIR, WEB_DIR, settings
 from .db import db
 from .i18n import LANGS, detect, lang
 
@@ -50,11 +53,33 @@ def _set_priority(low: bool):
         pass
 
 
+# v0.19.0: while an account is locked (login screen) only these calls answer; everything else returns {"locked": True},
+# so nothing of the account (memories, schedule, conversations...) reaches the interface before the password.
+OPEN_WHEN_LOCKED = {"ui_ready", "account_state", "account_login", "account_guest", "account_create", "minimize", "quit",
+                    "toggle_fullscreen"}
+
+
+def _locked_call(*args, **kwargs):
+    return {"locked": True}
+
+
 class Api:
     """Every public method is callable from JS as window.pywebview.api.<name>()."""
 
+    def __getattribute__(self, name):
+        attr = object.__getattribute__(self, name)
+        if (name.startswith("_") or name in OPEN_WHEN_LOCKED or not callable(attr)
+                or not object.__getattribute__(self, "_locked")):
+            return attr
+        return _locked_call
+
+    _locked = False
+
     def __init__(self):
         from .voice import Listener, Speaker
+
+        self._locked = accounts.needs_login()  # v0.19.0: ask who is using NEXUS (or the password) first
+        self._held_alerts: list = []  # reminders that fire while locked are shown after the login
 
         self._brain = assistant.Assistant(self._on_brain_event, control_hook=self._speech_control,
                                           confirm_hook=self._confirm_command)
@@ -67,7 +92,7 @@ class Api:
         self._listener = Listener(self._on_voice_text, lambda s: emit("voice", s), self._speaker,
                                   on_level=lambda level: emit("mic_level", level),
                                   on_progress=lambda pct: emit("stt_progress", pct))
-        scheduler.start(self._on_alert)
+        scheduler.start(self._on_alert_guarded)
         netprobe.start(lambda st: emit("network", {"effective": netprobe.effective(), "quality": st}))
         bridge.start(settings["bridge_port"], self._on_profile)
         self._tts_buf, self._tts_streamed, self._reply_lang = "", False, None
@@ -144,6 +169,127 @@ class Api:
                 woke_for = game
                 self.suspend("game_watch", game)
 
+    # -- downloads, storage, system check (v0.19.0) ---------------------------------------------------------------------
+    def downloads_state(self):
+        return downloads.state()
+
+    def storage_report(self, with_models=True):
+        return storage.report(bool(with_models))
+
+    def system_check(self):
+        """Every part of NEXUS checked at once (first start, or Settings > General > Check systems)."""
+        from . import hardware, netprobe, tts
+
+        checks = []
+
+        def add(key, ok, detail=""):
+            checks.append({"key": key, "ok": bool(ok), "detail": str(detail)})
+
+        try:
+            db.one("PRAGMA quick_check")
+            add("database", True, f"{len(memory.all_memories())}")
+        except Exception as exc:
+            add("database", False, str(exc)[:80])
+        st = llm.status()
+        add("ai", st["online"] and st.get("model_ready"), models.display_name())
+        gpus = hardware.gpus()
+        add("gpu", bool(gpus), gpus[0]["name"] if gpus else "")
+        add("voice", self._listener.model_state in ("ready", "loading") or self._listener.released,
+            f"whisper {settings['stt_model']}")
+        try:
+            voices = len(tts.Engine().voices)
+        except Exception:
+            voices = 0
+        add("speech", voices > 0, f"{voices}")
+        try:
+            import sounddevice as sd
+
+            mic = sd.query_devices(kind="input")["name"]
+        except Exception:
+            mic = ""
+        add("mic", bool(mic), mic)
+        add("internet", netprobe.effective() != "offline", netprobe.effective())
+        free = storage.shutil.disk_usage(DATA_DIR).free
+        add("disk", free > 2 * 2 ** 30, f"{free / 2 ** 30:.0f} GB")
+        add("knowledge", bool(knowledge.stats()), f"{sum(k['chunks'] for k in knowledge.stats())}")
+        ok = all(c["ok"] for c in checks if c["key"] != "internet")  # NEXUS works offline too
+        said = i18n.t("check_ok") if ok else i18n.t("check_bad", parts=", ".join(
+            i18n.t("check_" + c["key"]) for c in checks if not c["ok"] and c["key"] != "internet"))
+        return {"ok": ok, "checks": checks, "said": said}
+
+    def first_check(self):
+        """First start: check everything and say it (once)."""
+        result = self.system_check()
+        if not settings.get("system_check_done"):
+            settings.apply({"system_check_done": True})
+            self._speaker.say(result["said"], force=True)
+            result["spoken"] = True
+        return result
+
+    # -- accounts (v0.19.0) -------------------------------------------------------------------------------------------
+    def account_state(self):
+        me = accounts.get(accounts.ACTIVE)
+        return {"locked": self._locked, "active": accounts.ACTIVE, "guest": accounts.GUEST,
+                "name": (me or {}).get("name", "") if not accounts.GUEST else "",
+                "accounts": accounts.list_accounts() if self._locked or not accounts.GUEST else []}
+
+    def account_login(self, account_id, password=""):
+        """Unlock this account, or restart NEXUS in another one (its password checked here first)."""
+        if accounts.throttled(account_id):
+            return {"ok": False, "error": "wait"}
+        if not accounts.check(account_id, password):
+            return {"ok": False, "error": "wrong"}
+        if account_id == accounts.ACTIVE:
+            self._locked = False
+            self._sync_listening()
+            for alert in self._held_alerts:
+                self._on_alert(alert)
+            self._held_alerts.clear()
+            prof = db.get_profile() or {}
+            if account_id == "owner" and not (accounts.get("owner") or {}).get("name") and prof.get("name"):
+                accounts.rename("owner", prof["name"])  # the owner account takes the profile's name
+            return {"ok": True}
+        self._restart_into(account_id, unlocked=True)
+        return {"ok": True, "restarting": True}
+
+    def account_guest(self):
+        self._restart_into("guest", unlocked=False)
+        return {"ok": True, "restarting": True}
+
+    def account_create(self, name, password=""):
+        result = accounts.create(name, password)
+        return {**result, "accounts": accounts.list_accounts()}
+
+    def account_set_password(self, old, new):
+        if accounts.GUEST:
+            return {"ok": False, "error": "guest"}
+        return accounts.set_password(accounts.ACTIVE, old, new)
+
+    def account_delete(self, account_id, password):
+        return {**accounts.delete(account_id, password), "accounts": accounts.list_accounts()}
+
+    def account_lock(self):
+        """Lock now (Settings > Account or the shortcut): back to the login screen, microphone closed."""
+        me = accounts.get(accounts.ACTIVE)
+        if accounts.GUEST or not (me and me.get("hash")):
+            return {"ok": False, "error": "no_password"}
+        self._speaker.stop()
+        self._locked = True
+        self._sync_listening()
+        return {"ok": True}
+
+    def account_switch(self, account_id):
+        """Another account (its login screen asks the password after the restart)."""
+        if account_id == accounts.ACTIVE:
+            return {"ok": True}
+        self._restart_into(account_id, unlocked=False)
+        return {"ok": True, "restarting": True}
+
+    def _restart_into(self, account_id, unlocked):
+        global _relaunch_env
+        _relaunch_env = accounts.relaunch_env(account_id, unlocked)
+        threading.Timer(0.4, lambda: _window.destroy()).start()  # let the interface show "opening..."
+
     # -- local models (v0.18.6) ----------------------------------------------------------------------------------------
     def models_catalog(self):
         return models.catalog()
@@ -160,7 +306,7 @@ class Api:
 
     # -- AMD panel and preferences (v0.18.5) --------------------------------------------------------------------------
     def amd_status(self):
-        return {**amd.info(), "tune": gpu_tune.status(), "model": llm.loaded(), "ai": llm.perf_summary(),
+        return {**amd.info(), "tune": gpu_tune.status(), "tech": amd.technologies(), "model": llm.loaded(), "ai": llm.perf_summary(),
                 "keep_alive": settings.get("llm_keep_alive", "2h"), "model_name": settings.get("llm_model", ""),
                 "refs": [r for r, _ in amd.REFERENCES]}
 
@@ -249,6 +395,12 @@ class Api:
 
     def confirm_command(self, cid, ok):
         workspace.answer_confirmation(cid, bool(ok))
+
+    def _on_alert_guarded(self, alert):
+        if self._locked:
+            self._held_alerts.append(alert)
+        else:
+            self._on_alert(alert)
 
     def _on_alert(self, alert):
         """Scheduler reminders and the daily briefing: notification center + in-app toast, and - outside quiet
@@ -382,7 +534,8 @@ class Api:
     def _sync_listening(self):
         """Audio mode with the mic unmuted = continuous conversation; otherwise the mic is closed.
         v0.17.0: never before the Terms of Use / Privacy Policy are accepted."""
-        self._listener.set_live(legal.accepted() and settings["ui_mode"] == "audio" and not settings["mic_muted"])
+        self._listener.set_live(legal.accepted() and not self._locked and settings["ui_mode"] == "audio"
+                                and not settings["mic_muted"])
 
     def set_mode(self, mode):
         settings.apply({"ui_mode": "text" if mode == "text" else "audio"})
@@ -1217,7 +1370,12 @@ def _single_instance() -> bool:
 
     global _mutex
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    _mutex = kernel32.CreateMutexW(None, False, "Local\\NEXUS-Assistant-single-instance")
+    for _ in range(40 if os.environ.get("NEXUS_RELAUNCH") else 1):  # a restart into another account waits up to 10 s
+        _mutex = kernel32.CreateMutexW(None, False, "Local\\NEXUS-Assistant-single-instance")
+        if ctypes.get_last_error() != 183:
+            return True
+        kernel32.CloseHandle(_mutex)
+        time.sleep(0.25)
     if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
         ctypes.windll.user32.MessageBoxW(None, i18n.t("already_running"), "N.E.X.U.S", 0x40)
         return False
@@ -1225,6 +1383,7 @@ def _single_instance() -> bool:
 
 
 _mutex = None
+_relaunch_env: dict | None = None  # v0.19.0: set when the user opens another account (or the guest)
 
 
 def main():
@@ -1235,8 +1394,10 @@ def main():
         return
     if not _single_instance():
         return
-    log.info(f"NEXUS {__version__} starting")
-    threading.Thread(target=_daily_backup, daemon=True, name="backup").start()
+    log.info(f"NEXUS {__version__} starting ({'guest' if accounts.GUEST else 'account ' + accounts.ACTIVE})")
+    _clean_old_guests()
+    if not accounts.GUEST:  # a guest leaves nothing behind: no backups either
+        threading.Thread(target=_daily_backup, daemon=True, name="backup").start()
     api = Api()
     _fullscreen = bool(settings["start_fullscreen"] and not os.environ.get("NEXUS_WINDOWED"))
     _window = webview.create_window(
@@ -1245,8 +1406,33 @@ def main():
         fullscreen=_fullscreen, text_select=True,
     )
     webview.start(debug=bool(os.environ.get("NEXUS_DEBUG")))
-    llm.unload()  # window closed: give the VRAM back to games and other apps
+    if _relaunch_env:  # another account: start NEXUS again in its folder (the model stays loaded on the card)
+        log.info(f"switching to account {_relaunch_env['NEXUS_ACCOUNT']}")
+        cmd = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, os.path.abspath(sys.argv[0])]
+        subprocess.Popen(cmd, env=_relaunch_env, creationflags=0x00000008)  # DETACHED_PROCESS
+    else:
+        llm.unload()  # window closed: give the VRAM back to games and other apps
     log.info("NEXUS closed")
+    if accounts.GUEST:  # the guest's temporary folder goes away with everything in it
+        import logging
+        import shutil
+
+        logging.shutdown()
+        db.close() if hasattr(db, "close") else None
+        shutil.rmtree(DATA_DIR, ignore_errors=True)
+
+
+def _clean_old_guests():
+    """Guest folders that a crash left behind (older than a day) are removed at the next start."""
+    import shutil
+    import tempfile
+
+    for d in Path(tempfile.gettempdir()).glob("nexus-guest-*"):
+        try:
+            if time.time() - d.stat().st_mtime > 86400 and str(d) != str(DATA_DIR):
+                shutil.rmtree(d, ignore_errors=True)
+        except OSError:
+            pass
 
 
 def _daily_backup():

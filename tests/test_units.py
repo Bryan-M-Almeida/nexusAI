@@ -1118,5 +1118,84 @@ check("models: catalog marks installed, active and recommended", [m["installed"]
 check("models: switching to a model that isn't installed is refused", not _models.use("qwen3:14b")["ok"])
 _models.installed = _real_inst
 
+# -- v0.19.0: accounts, downloads, storage, AMD technologies, conversation fixes ----------------------------------
+import time as _time  # noqa: E402
+
+from nexus import accounts as _acc  # noqa: E402
+from nexus import app as _app  # noqa: E402
+from nexus import downloads as _dl  # noqa: E402
+from nexus import storage as _st  # noqa: E402
+
+check("colours: shades the user asked for (rosa choque, preto absoluto, vinho, X escuro/claro)",
+      [(_prefs.detect(q) or {}).get("changes") for q in ("mude o fundo para rosa choque", "mude o fundo para preto absoluto",
+                                                         "fundo vinho", "aro azul escuro", "aro laranja escuro")]
+      == [{"color_bg": "#ff1493"}, {"color_bg": "#000000"}, {"color_bg": "#7b1028"}, {"color_ring": "#0b1f5c"},
+          {"color_ring": _prefs._shade("#f97316", "dark")}])
+_prefs.apply({"color_bg": "#ff00ff"})
+check("colours: 'isso é magenta, não rosa choque' re-applies the colour meant",
+      (_prefs.detect("isso é magenta, não rosa choque") or {}).get("changes") == {"color_bg": "#ff1493"})
+check("safety net: 'Pronto: fundo atualizado para magenta.' without the tool makes the model call it",
+      bool(assistant._needs_tool("Pronto: fundo atualizado para magenta.", False, "isso é magenta, não rosa choque", set())))
+tools.current_text = "Romântica"
+_svc1 = tools._service_asked("spotify")
+tools.current_text = "abra pelo yt music"
+check("music: Spotify / YouTube Music only when the user named them", _svc1 == settings.get("music_player", "youtube")
+      and tools._service_asked("youtube music") == "youtube music")
+tools.current_text = ""
+_acc_root0 = _acc.ROOT
+check("accounts: one account and no password -> no login screen", not _acc.needs_login() and len(_acc.list_accounts()) == 1)
+_new = _acc.create("Ana Teste", "abcd")
+check("accounts: a second account with its own folder; the password is stored only as a hash",
+      _new["ok"] and _acc.folder(_new["account"]["id"]).is_dir() and "abcd" not in _acc.FILE.read_text("utf-8")
+      and len(_acc.get(_new["account"]["id"])["hash"]) == 64)
+_aid = _new["account"]["id"]
+check("accounts: right / wrong password", _acc.check(_aid, "abcd") and not _acc.check(_aid, "x"))
+for _ in range(5):
+    _acc.check(_aid, "nope")
+check("accounts: 5 wrong tries in a minute -> waits (even the right password)", _acc.throttled(_aid) and not _acc.check(_aid, "abcd"))
+_acc._fails.clear()
+_acc._skip_login = None
+check("accounts: with two accounts NEXUS asks who is using it", _acc.needs_login())
+_env = _acc.relaunch_env(_aid, unlocked=True)
+check("accounts: switching restarts in the account's folder with a one-time token (not a reusable flag)",
+      _env["NEXUS_HOME"] == str(_acc.folder(_aid)) and _env["NEXUS_ACCOUNT"] == _aid and len(_env["NEXUS_HANDOFF"]) == 32
+      and _acc.HANDOFF.exists())
+_acc.HANDOFF.unlink(missing_ok=True)
+_genv = _acc.relaunch_env("guest", unlocked=False)
+check("guest: a temporary folder, outside the accounts", "nexus-guest-" in _genv["NEXUS_HOME"] and "NEXUS_HANDOFF" not in _genv)
+import shutil as _sh  # noqa: E402
+
+_sh.rmtree(_genv["NEXUS_HOME"], ignore_errors=True)
+_locked_api = _app.Api.__new__(_app.Api)
+object.__setattr__(_locked_api, "_locked", True)
+check("locked: data calls answer nothing, the login calls work",
+      _locked_api.dashboard() == {"locked": True} and _locked_api.history() == {"locked": True}
+      and _locked_api.account_state.__name__ == "account_state")
+check("accounts: deleting needs the password and never the owner", not _acc.delete("owner", "")["ok"]
+      and not _acc.delete(_aid, "wrong")["ok"] and _acc.delete(_aid, "abcd")["ok"] and not _acc.folder(_aid).exists())
+_acc._skip_login = None
+_d = _dl.start("model", "teste", 1000)
+_dl.update(_d, 400)
+_s1 = next(i for i in _dl.state()["items"] if i["id"] == _d)
+_dl.ITEMS[_d]["progress_at"] -= 30
+_s2 = next(i for i in _dl.state()["items"] if i["id"] == _d)
+_dl.finish(_d, True)
+check("downloads: progress, 'stalled' after 20 s without bytes, and the log", _s1["pct"] == 40.0 and not _s1["stalled"]
+      and _s2["stalled"] and any("done" in line["text"] for line in _dl.state()["log"]))
+_rep = _st.report(with_models=False)
+check("storage: database, folders, program and free disk", {"db_bytes", "data_bytes", "tables", "parts", "program_bytes",
+                                                            "disk_free"} <= set(_rep) and any(t["key"] == "memories" for t in _rep["tables"]))
+check("AMD technologies: each one active / available / not on this PC, with ROCm explained",
+      {t["id"] for t in _amd.technologies()} == {"radeon_vulkan", "rocm", "adrenalin", "ryzen_cpu", "ryzen_ai", "amd_counters"}
+      and all(t["status"] in ("active", "available", "unsupported") for t in _amd.technologies()))
+check("voice: the bundled model is found when the build ships it", voice.bundled_model("nonexistent-size") is None)
+memory.new_conversation()
+tools.ui_hook = lambda nav: None
+_bot2 = assistant.Assistant(lambda e, p: None)
+_bot2.ask("abre minhas memórias")
+check("navigation replies are kept in the history (the next question knows what opened)",
+      [m["role"] for m in memory.history(2)] == ["user", "assistant"])
+tools.ui_hook = None
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

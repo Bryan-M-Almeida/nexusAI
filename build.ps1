@@ -6,9 +6,13 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 .\.venv\Scripts\python -m pip install pyinstaller
+# v0.19.0: the voice model ships with NEXUS (talk right after installing, no ~480 MB download on first use)
+.\.venv\Scripts\python build_whisper.py small
+if ($LASTEXITCODE -ne 0) { throw "build_whisper.py falhou" }
 .\.venv\Scripts\python -m PyInstaller --noconfirm --windowed --name NEXUS --distpath $DistPath `
     --add-data "nexus\web;nexus\web" `
     --add-data "nexus\seed;nexus\seed" `
+    --add-data "whisper;whisper" `
     --collect-all faster_whisper `
     --collect-all ctranslate2 `
     --collect-all onnxruntime `

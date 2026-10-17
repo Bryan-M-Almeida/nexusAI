@@ -20,3 +20,4 @@ dist*/
 
 # Local tool config
 .claude/
+whisper/

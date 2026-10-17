@@ -264,6 +264,18 @@ class Speaker:
                 self.on_state("idle")
 
 
+def bundled_model(name: str) -> pathlib.Path | None:
+    """The voice model folder that ships inside NEXUS (build_whisper.py), when this size is the bundled one."""
+    import sys
+
+    roots = [pathlib.Path(getattr(sys, "_MEIPASS", "")) / "whisper"] if getattr(sys, "frozen", False) else []
+    roots.append(pathlib.Path(__file__).resolve().parent.parent / "whisper")
+    for root in roots:
+        if (root / name / "model.bin").exists():
+            return root / name
+    return None
+
+
 def initial_prompt(name: str = "") -> str:
     """Short text that biases Whisper toward the assistant's vocabulary (wake word, user name)."""
     who = f" {name}" if name else ""
@@ -410,8 +422,9 @@ class Listener:
             if download:
                 threading.Thread(target=self._watch_download, args=(watch,), daemon=True, name="stt-dl").start()
             try:
-                self.model = WhisperModel(settings["stt_model"], device="cpu", compute_type="int8",
-                                          local_files_only=not download)
+                bundled = bundled_model(settings["stt_model"])  # v0.19.0: shipped with NEXUS - no download
+                self.model = WhisperModel(str(bundled) if bundled else settings["stt_model"], device="cpu",
+                                          compute_type="int8", local_files_only=not download)
             finally:
                 watch.set()
             self.model_state = "ready"
@@ -435,16 +448,21 @@ class Listener:
             from huggingface_hub.constants import HF_HUB_CACHE
         except Exception:
             return
+        from . import downloads
+
         name = settings["stt_model"]
         folder = pathlib.Path(HF_HUB_CACHE) / f"models--Systran--faster-whisper-{name}"
         total = self.MODEL_BYTES.get(name, 5e8)
+        did = downloads.start("voice", f"whisper {name}", int(total))
         last = -1
         while not done.wait(0.4):
             size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file()) if folder.exists() else 0
+            downloads.update(did, size)
             pct = min(99, int(size * 100 / total))
             if pct != last:
                 self.on_progress(pct)
                 last = pct
+        downloads.finish(did, self.model_state != "error", self.model_error or "")
     def release(self):
         """Free Whisper's memory (~0.5 GB for "small") while voice isn't needed; reloaded on demand."""
         if self.model is not None and self.mode == "off":

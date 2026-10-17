@@ -168,6 +168,30 @@ def live() -> dict:
     }
 
 
+def technologies() -> list[dict]:
+    """AMD technologies in NEXUS on this PC: "active", "available" (would work here) or "unsupported" (with why)."""
+    from . import gpu_tune, hardware
+
+    cards = info()["cards"]
+    tune = gpu_tune.status()
+    cpu = hardware.cpu_name()
+    name = cards[0]["name"] if cards else ""
+    rocm_cards = re.search(r"RX 7\d{3}|RX 9\d{3}|RX 6[89]\d0|Radeon PRO W7|Radeon PRO W6[89]|Instinct", name, re.I)
+    out = [
+        {"id": "radeon_vulkan", "status": "active" if cards and tune["vulkan"] else ("available" if cards else "unsupported"),
+         "detail": name},
+        {"id": "rocm", "status": "active" if cards and not tune["vulkan"] else ("available" if rocm_cards else "unsupported"),
+         "detail": name},
+        {"id": "adrenalin", "status": "active" if cards and cards[0]["adrenalin"] else "unsupported",
+         "detail": cards[0]["adrenalin"] if cards else ""},
+        {"id": "ryzen_cpu", "status": "active" if "ryzen" in cpu.lower() else "unsupported", "detail": cpu},
+        {"id": "ryzen_ai", "status": "available" if re.search(r"ryzen ai|\bAI (9|7|5) ", cpu, re.I) else "unsupported",
+         "detail": cpu},
+        {"id": "amd_counters", "status": "active" if cards else "unsupported", "detail": ""},
+    ]
+    return out
+
+
 REFERENCES = [  # shown in the AMD tab; only these addresses can be opened from it
     ("adrenalin", "https://www.amd.com/en/products/software/adrenalin.html"),
     ("rocm", "https://rocm.docs.amd.com/"),

@@ -112,6 +112,9 @@ def pull(model_id: str, progress=lambda pct: None) -> dict:
     if _pull.get("id"):
         return {"ok": False, "error": "busy"}
     _pull.update(id=model_id, pct=0, status="starting", error="")
+    from . import downloads
+
+    did = downloads.start("model", model_id, int(BY_ID[model_id]["file_gb"] * 2 ** 30))
     last = -1
     try:
         with httpx.stream("POST", f"{llm._ollama_root()}/api/pull", json={"model": model_id, "stream": True},
@@ -124,6 +127,10 @@ def pull(model_id: str, progress=lambda pct: None) -> dict:
                     raise RuntimeError(chunk["error"])
                 _pull["status"] = chunk.get("status", "")
                 total, done = chunk.get("total") or 0, chunk.get("completed") or 0
+                if total > 50 * 2 ** 20:
+                    downloads.update(did, done, total)
+                elif chunk.get("status") and not total:
+                    downloads.update(did, 0, None, note=chunk["status"])  # "pulling manifest", "verifying sha256 digest"...
                 if total > 50 * 2 ** 20:  # the big layer (the weights) drives the percentage
                     pct = min(99, int(100 * done / total))
                     if pct != last:
@@ -131,8 +138,10 @@ def pull(model_id: str, progress=lambda pct: None) -> dict:
                         _pull["pct"] = pct
                         progress(pct)
         progress(100)
+        downloads.finish(did, True)
         return {"ok": True, "id": model_id}
     except (httpx.HTTPError, RuntimeError, ValueError) as exc:
+        downloads.finish(did, False, str(exc))
         _pull["error"] = str(exc)[:200]
         progress(-1)
         return {"ok": False, "error": str(exc)[:200]}

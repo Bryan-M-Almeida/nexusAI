@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 3.7  ·  Date: 2026-10-16  ·  App version: 0.18.6
+ Document version: 3.8  ·  Date: 2026-10-16  ·  App version: 0.19.0
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -94,6 +94,9 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-LLM-042  "Done: AMD theme." without changing anything (the AI didn't call set_preference)
       NX-LLM-043  "qwen3:4b" takes ~70 s per answer (it is the model that thinks before answering)
       NX-LLM-044  "Play it on YouTube" opened YouTube Music
+      NX-LLM-045  "That's magenta, not hot pink": the AI said "Done" without changing the colour
+      NX-LLM-046  "Play a song" opened Spotify without the user asking
+      NX-LLM-047  The Settings window couldn't be dragged in some sections
  VOZ  NX-VOZ-001  Microphone doesn't respond on first use (Whisper download)
       NX-VOZ-002  Wrong microphone selected (e.g. DroidCam)
       NX-VOZ-003  Wake word "Nexus" not recognized / false triggers
@@ -747,6 +750,31 @@ QUICK DIAGNOSTICS (run these before investigating)
                did even when the user said "YouTube".
   Fix        : The AI chooses only between YouTube, Spotify and LiMusic; YouTube
                Music is the preferred player option in Settings > Apps and media.
+
+[NX-LLM-045] "That's magenta, not hot pink": the AI said "Done" without changing the colour
+  Severity   : MEDIUM           Status: FIXED (v0.19.0)    Observed: YES
+  Symptom    : "Make the background hot pink" applied the generic pink (it looks
+               magenta); the user's correction got "Done: background updated to
+               magenta." and then "it's already set", with no change at all.
+  Fix        : Named shades (hot pink, magenta, pure black, burgundy, coral,
+               lavender...) and "light/dark" on any colour. "That's X, not Y"
+               re-applies Y to the last changed part. When the reply claims a
+               colour/theme change without set_preference, the AI must call it.
+
+[NX-LLM-046] "Play a song" opened Spotify without the user asking
+  Severity   : LOW              Status: FIXED (v0.19.0)    Observed: YES
+  Cause      : The AI picked the service on its own (and in v0.18.6 YouTube Music
+               had left the list, so "open it on yt music" opened YouTube).
+  Fix        : Spotify, YouTube Music and LiMusic only when the user's message
+               names the service; otherwise the preferred player from Settings.
+
+[NX-LLM-047] The Settings window couldn't be dragged in some sections
+  Severity   : LOW              Status: FIXED (v0.19.0)    Observed: YES
+  Cause      : The window was dragged only by the top 52 px outside the content;
+               sections that start at the top (AMD, Personalization) left nothing
+               to grab.
+  Fix        : A fixed 30 px strip on top of every window and the section title
+               always drag (buttons and fields keep working).
 
 ================================================================================
  VOZ — SPEECH RECOGNITION AND SYNTHESIS

@@ -23,6 +23,25 @@ THEME_WORDS = [("amd", r"amd|radeon|vermelh[oa] amd|red amd"), ("nexus", r"nexus
                ("amber", r"ambar|amber"), ("graphite", r"grafite|graphite|grafito|cinza|gray|grey|gris"),
                ("ice", r"gelo|ice|hielo")]
 COLORS = [  # (regex after _norm, hex) - the more specific first
+    (r"rosa choque|hot pink|rosa chiclete|rosa fucsia|pink neon|rosa neon", "#ff1493"),
+    (r"magenta|fucsia|fuchsia", "#ff00ff"),
+    (r"rosa claro|light pink|rosa bebe|rosa palido", "#ffb6c1"),
+    (r"preto absoluto|preto puro|pure black|negro puro|negro absoluto", "#000000"),
+    (r"branco puro|pure white|blanco puro", "#ffffff"),
+    (r"vinho|bordo|borgonha|burgundy|wine|vino|granate", "#7b1028"),
+    (r"vermelho escuro|dark red|rojo oscuro", "#8b0000"),
+    (r"verde escuro|dark green|verde oscuro", "#0b5d2a"),
+    (r"verde neon|neon green|verde lima", "#39ff14"),
+    (r"verde agua|aquamarine|aguamarina|verde menta|menta|mint", "#5fe3b0"),
+    (r"azul royal|royal blue|azul rei", "#4169e1"),
+    (r"azul neon|neon blue", "#1f51ff"),
+    (r"azul petroleo|petrol blue|teal|azul verdoso", "#0e7c86"),
+    (r"lilas|lilac|lavanda|lavender", "#b57edc"),
+    (r"coral", "#ff7f50"),
+    (r"salmao|salmon", "#fa8072"),
+    (r"bege|beige|creme|cream|crema", "#efe3c8"),
+    (r"mostarda|mustard|mostaza", "#e1ad01"),
+    (r"oliva|olive|verde oliva", "#708238"),
     (r"azul escuro|dark blue|azul oscuro|azul marinho|navy", "#0b1f5c"),
     (r"azul claro|light blue|celeste|azul celeste", "#7cc4ff"),
     (r"verde claro|light green|verde limao|lime", "#84f0a0"),
@@ -125,8 +144,29 @@ UNDO_RX = re.compile(r"^(desfaz|desfazer|desfaca|volta (como|ao que) estava|volt
                      r"vuelve como estaba)( isso| that| eso| a mudanca| the change)?$")
 
 
+def _shade(hex_color: str, toward: str, amount: float = 0.45) -> str:
+    """'azul escuro' -> mix with black; 'verde claro' -> mix with white (for colours without a named shade)."""
+    target = 0 if toward == "dark" else 255
+    rgb = [int(hex_color[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{round(c + (target - c) * amount):02x}" for c in rgb)
+
+
 def _color_in(fragment: str) -> str | None:
-    return next((h for rx, h in COLORS if re.search(rf"\b(?:{rx})\b", fragment)), None)
+    for rx, h in COLORS:
+        m = re.search(rf"\b(?:{rx})\b", fragment)
+        if m:
+            after = fragment[m.end():m.end() + 12]
+            if re.match(r"\s+(escur[oa]|dark|oscur[oa])\b", after):
+                return _shade(h, "dark")
+            if re.match(r"\s+(clar[oa]|light|palid[oa])\b", after):
+                return _shade(h, "light")
+            return h
+    return None
+
+
+# "isso é magenta, não rosa choque": the last colour change came out wrong - apply the one the user meant
+CORRECTION_RX = re.compile(r"^(isso|isto|ta|esta|this|that|it|eso|esto)\s+(e|eh|is|s|es|esta|ficou)\s+(.+?),?\s+"
+                           r"(nao|not|no)\s+(e\s+|is\s+|es\s+)?(.+)$")
 
 
 def detect(text: str) -> dict | None:
@@ -136,6 +176,12 @@ def detect(text: str) -> dict | None:
         return None
     if UNDO_RX.match(n):
         return {"undo": True}
+    m = CORRECTION_RX.match(n)
+    if m and _undo:
+        wanted = _color_in(m.group(6))
+        parts = [k for k in _undo[-1] if k.startswith("color_")]
+        if wanted and parts:
+            return {"changes": {parts[0]: wanted}}
     changes = {}
     m = re.search(r"\b(tema|theme|estilo|cores d[ao]|colors of|colores de)\s+(d[ao]\s+|the\s+|el\s+|la\s+)?(\w+)", n)
     if m and re.search(rf"\b{CHANGE}\b|^(tema|theme)\b", n):

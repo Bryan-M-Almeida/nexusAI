@@ -130,6 +130,21 @@ Atalhos (lista completa no guia, **F1**): `Ctrl+Espaço` fala (push-to-talk, nos
   funções beta), `Ctrl+M` texto ⇄ áudio.
 - **Configurações → Interface → Cores**: aro, núcleo e fundo, com prévia ao vivo.
 
+### Contas locais, convidado, downloads e armazenamento (v0.19.0)
+
+- **Contas locais**: cada pessoa que usa o PC tem as próprias memórias, conversas, agenda e configurações (pastas
+  separadas). Senha opcional (só um hash scrypt é guardado); com senha, nada da conta aparece nem o microfone abre
+  antes dela. **Convidado**: pasta temporária apagada ao fechar. Configurações → Conta: senha, bloquear, trocar de conta.
+- **Downloads** (Configurações → Sistema): um terminal com tudo o que o NEXUS baixa — barra, velocidade, tempo
+  restante e **TRAVADO** quando nada chega por 20 s.
+- **Dados → Armazenamento ao vivo**: o espaço de cada parte (banco e o que tem dentro, backups, logs, livros, cache,
+  modelos de voz e de IA, o programa) e o disco livre, atualizando a cada 2 s.
+- **Verificar sistemas**: na primeira abertura o NEXUS confere tudo e diz *"Todos os sistemas estão em completo
+  funcionamento. NEXUS está pronto para uso."* (ou o que precisa de atenção). Também em Configurações → Geral.
+- **Tecnologias AMD** (aba AMD): Radeon + Vulkan, ROCm, Adrenalin, Ryzen, Ryzen AI e as métricas da Radeon — o que
+  está em uso neste PC e por quê.
+- A voz (Whisper small) **já vem com o NEXUS**: dá para falar logo depois de instalar, sem baixar 480 MB.
+
 ### Modelos locais para cada PC (v0.18.6)
 
 Configurações → Inteligência → **Modelos locais**: o NEXUS mostra quanto de cada modelo cabe na sua placa, recomenda
@@ -419,6 +434,9 @@ nexus/
   prefs.py      o NEXUS muda a própria aparência e voz quando pedem (temas, cores, tamanhos, desfazer)
   amd.py        painel AMD: placa e driver (registro), uso e memória ao vivo (contadores do Windows)
   models.py     modelos locais: catálogo NEX-1.0 Lite/Mini/Pro/Max, o que cabe no PC, download e troca
+  accounts.py   contas locais (pastas separadas, senha com scrypt), convidado, troca de conta
+  downloads.py  monitor de downloads (velocidade, tempo restante, travado)
+  storage.py    espaço usado por cada parte do NEXUS e do disco
   bridge.py     endpoint local para o formulário da landing
   profile.py    importação e normalização do perfil
   i18n.py       textos em PT/EN/ES
@@ -452,4 +470,4 @@ Componentes de terceiros e suas licenças:
 
 O NEXUS é entregue em **releases funcionais**. Durante o hackathon, todas são **protótipos** (`0.x`). Histórico completo e próximas versões em [CHANGELOG.md](CHANGELOG.md).
 
-Versão atual: **v0.18.6 (protótipo)**.
+Versão atual: **v0.19.0 (protótipo)**.

@@ -1203,3 +1203,88 @@ body.font-clean { --f-brand: "Bahnschrift", "Segoe UI", "Arial", sans-serif; }
 .model-fit span { position: relative; padding-left: 6px; font-size: 9.5px; line-height: 14px; color: #fff; letter-spacing: .04em; }
 .model-act { margin-top: 4px; }
 .model-act .btn-ghost { width: 100%; }
+
+/* ================================================================ v0.19.0 settings groups: headers, folding */
+.set-nav .grp-all { display: flex; gap: 6px; margin: 0 8px 8px; }
+.set-nav .grp-all button { flex: 1; padding: 4px 6px; font-size: 9px; letter-spacing: .08em; text-align: center; color: var(--muted);
+  border: 1px solid var(--line); border-left: 1px solid var(--line); background: rgba(255, 255, 255, .02); }
+.set-nav .grp-all button:hover { color: var(--text); border-color: var(--line-strong); }
+.set-nav button.set-group { display: flex; align-items: center; gap: 8px; width: 100%; margin: 10px 0 2px; padding: 7px 10px;
+  font-family: var(--f-mono); font-size: 10px; font-weight: 700; letter-spacing: .18em; text-align: left;
+  color: color-mix(in srgb, var(--c-ring) 80%, white); background: color-mix(in srgb, var(--c-core) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-ring) 18%, transparent); border-left: 2px solid var(--c-core); }
+.set-nav button.set-group:first-of-type { margin-top: 0; }
+.set-nav button.set-group:hover { background: color-mix(in srgb, var(--c-core) 16%, transparent); }
+.set-nav button.set-group svg { flex: none; color: var(--c-core-hot, var(--c-core)); }
+.set-nav button.set-group span { flex: 1; }
+.set-nav button.set-group .chev { font-style: normal; font-size: 11px; transition: transform .2s; opacity: .75; }
+.set-nav button.set-group.folded .chev { transform: rotate(-90deg); }
+.set-nav button.set-group.folded { opacity: .8; }
+.set-nav button[data-sec] { padding-left: 26px; }
+.set-nav .grp-hidden { display: none !important; }
+
+/* ================================================================ v0.19.0 login, accounts, guest */
+#loginModal { z-index: 50; background: radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--c-bg) 70%, #000), #020308 75%); }
+.boot.behind-login { opacity: 0; pointer-events: none; }
+.login-box { width: min(560px, 100%); display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.login-ring { width: 86px; height: 86px; border-radius: 50%; border: 2px solid var(--c-ring);
+  background: radial-gradient(circle, var(--c-core-hot) 0 14%, var(--c-core) 15% 22%, transparent 24%);
+  box-shadow: 0 0 40px -6px var(--c-core), inset 0 0 18px -6px var(--c-ring); animation: loginPulse 3s ease-in-out infinite; }
+.login-title { margin: 0; font-family: var(--f-brand); font-size: 18px; letter-spacing: .12em; color: #fff; }
+.login-accounts { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.login-acc { width: 128px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px 12px;
+  background: rgba(8, 12, 20, .7); border: 1px solid var(--line); color: var(--text); transition: border-color .2s, transform .2s; }
+.login-acc:hover { border-color: var(--c-ring); transform: translateY(-2px); }
+.login-acc i, .account-row i { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; font-style: normal;
+  font-family: var(--f-brand); font-size: 18px; color: #fff; background: color-mix(in srgb, var(--c-core) 35%, transparent);
+  border: 1px solid var(--c-ring-soft); }
+.login-acc b { font-size: 14px; } .login-acc small { font-size: 11px; color: var(--muted); }
+.login-pass, .login-new { display: flex; flex-direction: column; gap: 8px; width: min(320px, 100%); }
+.login-pass b { font-size: 15px; color: #fff; }
+.login-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.login-note { max-width: 440px; margin: 0; }
+.login-status { min-height: 1em; font-size: 11px; letter-spacing: .12em; color: var(--c-ring); }
+.account-card { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line);
+  border-left: 2px solid var(--c-core); background: var(--panel); margin-bottom: 6px; }
+.account-card b { font-size: 15px; color: #fff; } .account-card small { color: var(--muted); font-size: 12px; }
+.account-list { display: flex; flex-direction: column; border: 1px solid var(--line); margin-bottom: 4px; }
+.account-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.account-row:last-child { border-bottom: 0; }
+.account-row i { width: 28px; height: 28px; font-size: 12px; }
+.account-row span { flex: 1; }
+.account-row.on { background: color-mix(in srgb, var(--c-core) 8%, transparent); }
+@keyframes loginPulse { 0%, 100% { box-shadow: 0 0 40px -6px var(--c-core); } 50% { box-shadow: 0 0 60px 0 var(--c-core); } }
+.guest-chip { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 6; padding: 4px 12px; font-size: 10px;
+  letter-spacing: .16em; color: #ffd28a; border: 1px solid rgba(255, 210, 138, .45); background: rgba(40, 26, 4, .7); pointer-events: none; }
+
+/* ================================================================ v0.19.0 downloads terminal, storage, AMD tech, checks */
+.term { background: #04070b; border: 1px solid var(--line-strong); box-shadow: inset 0 0 30px -18px var(--c-core); }
+.term-head { padding: 8px 10px; border-bottom: 1px dashed var(--line); font-size: 11.5px; color: #cfe; white-space: pre-wrap; line-height: 1.6; }
+.term-head .ok { color: #7be0a5; } .term-head .bad { color: #ff9b91; } .term-head .warn { color: #ffd28a; animation: blink 1s steps(2) infinite; }
+.term-head .run { color: var(--c-ring); }
+.term-log { margin: 0; padding: 8px 10px; height: 260px; overflow: auto; font-size: 11px; line-height: 1.55; color: #9fe8b8; white-space: pre-wrap; }
+.st-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 12px; border: 1px solid var(--line);
+  background: var(--panel); margin-bottom: 8px; }
+.st-total b { font-family: var(--f-brand); font-size: 26px; color: #fff; }
+.st-total span { color: var(--silver); font-size: 13px; }
+.st-total span.up { color: #ffd28a; font-family: var(--f-mono); font-size: 11px; } .st-total span.down { color: #7be0a5; font-family: var(--f-mono); font-size: 11px; }
+.st-total small { flex-basis: 100%; color: var(--muted); font-size: 11px; word-break: break-all; }
+.st-total .meter { flex-basis: 100%; display: block; height: 4px; background: rgba(255, 255, 255, .07); }
+.st-total .meter em { display: block; height: 100%; background: var(--c-core); }
+.st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-bottom: 8px; }
+.st-cell { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; background: rgba(8, 10, 15, .6); border: 1px solid var(--line); min-width: 0; }
+.st-cell small { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-cell b { font-size: 16px; color: #fff; }
+.st-tables { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.st-tables b { color: var(--text); }
+.amd-tech { display: flex; flex-direction: column; border: 1px solid var(--line); margin-bottom: 8px; }
+.amd-tech-row { display: grid; grid-template-columns: 210px auto 1fr; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.amd-tech-row:last-child { border-bottom: 0; }
+.amd-tech-row b { font-size: 13px; } .amd-tech-row small { font-size: 11.5px; color: var(--muted); }
+.amd-tech-row .pill { padding: 1px 7px; border: 1px solid var(--line-strong); font-size: 9.5px; letter-spacing: .08em; }
+.amd-tech-row.st-active .pill { color: #7be0a5; border-color: rgba(123, 224, 165, .5); }
+.amd-tech-row.st-available .pill { color: #ffd28a; border-color: rgba(255, 210, 138, .5); }
+.amd-tech-row.st-unsupported .pill { color: var(--muted); }
+@media (max-width: 900px) { .amd-tech-row { grid-template-columns: 1fr auto; } .amd-tech-row small { grid-column: 1 / -1; } }
+.syscheck { padding: 8px 10px; border: 1px solid var(--line); background: #04070b; font-size: 11.5px; line-height: 1.7; margin: 6px 0; }
+.syscheck .ok { color: #7be0a5; } .syscheck .warn { color: #ffd28a; } .syscheck .said { margin-top: 6px; color: #fff; }

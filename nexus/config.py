@@ -152,6 +152,7 @@ DEFAULTS = {
     "exchange_size": 14,          # px of the text under the ring
     "bg_style": "glow",           # glow | solid | grid
     "font_brand": "orbitron",     # orbitron (futuristic) | clean
+    "system_check_done": False,   # v0.19.0: the first start checks every system and says the result once
     # v0.16.8
     "speak_menus": True,          # NEXUS says which menu it opened ("Abrindo as configurações")
     "beta_map": False,            # concept map (skills and knowledge around the ring) - beta

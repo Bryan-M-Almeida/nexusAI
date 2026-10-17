@@ -22,7 +22,8 @@ if (!window.pywebview && location.search.includes("mock")) {
   const mockApps = [["RetroArch", "game"], ["PCSX2", "game"], ["Steam", "launcher"], ["XBOX", "launcher"], ["Visual Studio Code", "work"],
     ["Discord", "work"], ["Google Chrome", "work"], ["LiMusic", "work"], ["Notion", "work"], ["WhatsApp", "work"], ["Spotify", "work"]]
     .map(([name, kind]) => ({ name, kind, id: name }));
-  let mockT = 0, mockActive = "qwen3:8b";
+  let mockT = 0, mockActive = "qwen3:8b", mockDl = 30, mockData = 14.2e6, mockLocked = /login=1/.test(location.search);
+  const mockAccounts = [{ id: "owner", name: "Bryan", has_password: false, active: true }, { id: "ana", name: "Ana", has_password: true, active: false }];
   const mockModel = () => [{ name: "qwen3:8b", size_mb: 6782, vram_mb: 6242 }];
   const mockAi = () => ({ count: 9, tok_s: 22.7, prompt_tok_s: 7604, first_s: 2.4, last: { gen_tokens: 72, tok_s: 22.4, total_s: 5.9 },
     history: [22.7, 23.1, 21.8, 22.4, 24.0, 22.9, 23.3, 22.1, 22.4] });
@@ -163,12 +164,38 @@ if (!window.pywebview && location.search.includes("mock")) {
     integration_remove: async (id) => { mockCx = mockCx.filter((c) => c.id !== id); return { ok: true, items: mockCx }; },
     apps_list: async () => ({ items: mockApps }),
     // v0.18.5: AMD panel
-    amd_status: async () => ({ cards: [{ name: "AMD Radeon RX 6600 XT", vram_gb: 8, driver: "32.0.21045.5002", adrenalin: "26.8.1" }],
+    amd_status: async () => ({ tech: [["radeon_vulkan", "active", "AMD Radeon RX 6600 XT"], ["rocm", "unsupported", "AMD Radeon RX 6600 XT"],
+      ["adrenalin", "active", "26.8.1"], ["ryzen_cpu", "active", "AMD Ryzen 5 5600G"], ["ryzen_ai", "unsupported", "AMD Ryzen 5 5600G"], ["amd_counters", "active", ""]]
+      .map(([id, status, detail]) => ({ id, status, detail })), cards: [{ name: "AMD Radeon RX 6600 XT", vram_gb: 8, driver: "32.0.21045.5002", adrenalin: "26.8.1" }],
       tune: { amd: true, vulkan: true, applied: true, suggest: true, installed: true }, model: mockModel(),
       ai: mockAi(), refs: ["adrenalin", "rocm", "gpuopen", "developer", "ryzen_ai", "ollama_amd", "hackathon"] }),
     amd_live: async () => { mockT += 1; const busy = mockT % 6 < 3; return { gpu_pct: busy ? 70 + Math.random() * 15 : 3 + Math.random() * 4,
       engines: busy ? { Copy: 78, "3D": 4 } : { "3D": 4 }, ai_gpu_pct: busy ? 69 : 0, nexus_gpu_pct: 0, vram_used_mb: 7681, shared_used_mb: 1161,
       ai_vram_mb: 6213, ai: mockAi(), model: mockModel() }; },
+    // v0.19.0: accounts, downloads, storage, system check
+    account_state: async () => ({ locked: mockLocked, active: "owner", guest: false, name: "Bryan", accounts: mockAccounts }),
+    account_login: async (id, pw) => { const a = mockAccounts.find((x) => x.id === id); if (a && a.has_password && pw !== "1234") return { ok: false, error: "wrong" };
+      if (id !== "owner") return { ok: true, restarting: true }; mockLocked = false; return { ok: true }; },
+    account_guest: async () => ({ ok: true, restarting: true }),
+    account_create: async (name, pw) => { if (!name) return { ok: false, error: "name" }; mockAccounts.push({ id: name.toLowerCase(), name, has_password: !!pw, active: false }); return { ok: true, accounts: mockAccounts }; },
+    account_set_password: async () => ({ ok: true }), account_lock: async () => ({ ok: false, error: "no_password" }),
+    account_switch: async () => ({ ok: true, restarting: true }), account_delete: async () => ({ ok: true, accounts: mockAccounts }),
+    downloads_state: async () => { mockDl = Math.min(100, mockDl + 3.7); return { active: mockDl < 100 ? 1 : 0, items: [
+      { id: 2, kind: "model", name: "qwen3:14b", total: 9.3 * 2 ** 30, done: mockDl / 100 * 9.3 * 2 ** 30, pct: mockDl, speed: 8.1 * 2 ** 20,
+        eta_s: Math.round((100 - mockDl) * 11), status: mockDl < 100 ? "running" : "done", stalled: mockDl > 40 && mockDl < 52, idle_s: 23 },
+      { id: 1, kind: "voice", name: "whisper small", total: 484e6, done: 484e6, pct: 100, speed: 0, status: "done", stalled: false, idle_s: 0 }],
+      log: [{ ts: "19:40:01", name: "whisper small", text: "start voice whisper small", level: "info" }, { ts: "19:41:05", name: "whisper small", text: "done in 64 s", level: "ok" },
+        { ts: "19:42:10", name: "qwen3:14b", text: "start model qwen3:14b", level: "info" }, { ts: "19:42:11", name: "qwen3:14b", text: "pulling manifest", level: "info" },
+        { ts: "19:43:30", name: "qwen3:14b", text: ` ${Math.round(mockDl)}%  ${(mockDl / 100 * 9.3).toFixed(2)} GB/9.30 GB  8.1 MB/s`, level: "info" }] }; },
+    storage_report: async () => { mockData += 37000; return { data_dir: "C:\\Users\\bryan\\AppData\\Local\\NEXUS", data_bytes: mockData, db_bytes: 1320000,
+      tables: [["memories", 23], ["messages", 119], ["conversations", 21], ["documents", 22], ["chunks", 410], ["tasks", 4], ["events", 6], ["notes", 3], ["actions", 61]].map(([key, rows]) => ({ key, rows })),
+      parts: [["library", 2.1e6, 3], ["workspaces", 4.2e5, 12], ["backups", 9.8e6, 3], ["logs", 4100, 1], ["reports", 0, 0], ["inbox", 0, 0], ["cache", 21000, 1], ["temp", 0, 0]].map(([key, bytes, files]) => ({ key, bytes, files })),
+      program_bytes: 512e6, disk_free: 283e9, disk_total: 1023e9,
+      voice_models: [{ name: "small", bytes: 484e6 }], ai_models: [{ name: "qwen3:8b", bytes: 5.2e9 }, { name: "qwen3:14b", bytes: 9.3e9 }, { name: "qwen3:1.7b", bytes: 1.4e9 }] }; },
+    system_check: async () => ({ ok: true, said: "Todos os sistemas estão em completo funcionamento. NEXUS está pronto para uso.",
+      checks: [["database", "23"], ["ai", "NEX-1.0"], ["gpu", "AMD Radeon RX 6600 XT"], ["voice", "whisper small"], ["speech", "3"], ["mic", "Microfone (DroidCam Audio)"],
+        ["internet", "hybrid"], ["disk", "280 GB"], ["knowledge", "410"]].map(([key, detail]) => ({ key, ok: true, detail })) }),
+    first_check: async () => ({ ok: true, said: "Todos os sistemas estão em completo funcionamento. NEXUS está pronto para uso." }),
     // v0.18.6: local models
     models_catalog: async () => ({ active: mockActive, recommended: "qwen3:8b", pc: { vram_gb: 8, ram_gb: 15.8 }, models: [
       ["qwen3:1.7b", "NEX-1.0 Lite", "lite", 1.4, "gpu", 100, true], ["qwen3:4b", "NEX-1.0 Mini", "mini", 2.5, "gpu", 100, true],
