@@ -64,11 +64,13 @@ class Engine:
         for v in same_lang:
             if v.gender == gender:
                 return v, 0
-        if same_lang:
-            return same_lang[0], FALLBACK_PITCH.get(gender, 0)
-        exact = [v for v in self.voices if v.gender == gender]
+        # v1.0.1: a real voice of that gender in another language (Daniel, pt-BR) sounds better than a female voice
+        # pitched down - Windows ships only Zira (female) in English, and the pitched Zira was the "male" voice
+        exact = sorted((v for v in self.voices if v.gender == gender), key=lambda v: v.lang != "pt")
         if exact:
             return exact[0], 0
+        if same_lang:
+            return same_lang[0], FALLBACK_PITCH.get(gender, 0)
         return (self.voices[0], FALLBACK_PITCH.get(gender, 0)) if self.voices else (None, 0)
 
     def render(self, text: str, voice: Voice | None, pitch: int = 0, speed: int = 0) -> np.ndarray:

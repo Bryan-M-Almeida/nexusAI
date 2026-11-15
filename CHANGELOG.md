@@ -8,6 +8,29 @@ Erros conhecidos e soluções: [erros.txt](erros.txt) · [errors.txt](errors.txt
 
 ---
 
+## v1.0.1 — Correções · 2026-11-14
+
+**Correções encontradas gravando o vídeo de demonstração: lembretes no dia certo, abertura no idioma certo, a voz
+masculina é o Daniel e o efeito de voz se chama N.E.X.U.S.**
+
+### Corrigido
+- **Lembrete no dia errado**: "me lembra de ligar pra mãe às 18h", pedido às 14h50, era salvo para o dia seguinte. Quando
+  o pedido não diz o dia e o horário de hoje ainda não passou, o lembrete fica para hoje; um dia dito no pedido
+  ("amanhã", "sexta", uma data) continua valendo.
+- **Tela de abertura em português num NEXUS em inglês/espanhol**: as linhas da verificação ("MEMÓRIA PERSISTENTE"…)
+  chegavam antes do idioma ser carregado; agora são traduzidas assim que ele chega.
+
+### Mudou
+- **Voz masculina = Daniel** em todos os idiomas. Em inglês o Windows só traz a Zira (feminina), e a voz "masculina"
+  era a Zira com o tom rebaixado; agora é o Daniel (português do Brasil), com sotaque ao falar inglês ou espanhol.
+- O efeito de voz **J.A.R.V.I.S** passa a se chamar **N.E.X.U.S** (o mesmo efeito; as configurações salvas continuam).
+
+### Testes desta versão
+- 355/355 testes unitários (2 novos: lembrete sem dia fica para hoje e com dia é mantido; voz masculina é o Daniel nos três idiomas).
+- Gravação de demonstração de ponta a ponta com o app real (31 falas conferidas com o Whisper, lembrete salvo para hoje).
+
+---
+
 ## v1.0.0 — Versão final · 2026-10-17
 
 **A primeira versão estável do N.E.X.U.S: tudo o que foi construído nas 36 versões de protótipo, revisado, testado com o

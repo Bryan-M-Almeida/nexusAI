@@ -1425,5 +1425,26 @@ check("installer: the model rule matches the app (8 GB card -> NEX-1.0, 4 GB -> 
       and _sp.models.recommended(12.0, 32.0) == "qwen3:14b" and _sp.models.recommended(0.0, 8.0) == "qwen3:1.7b"
       and "Need[2] := 6.6" in _iss and "Vram - 1.8" in _iss and "OnGpu >= 0.75" in _iss)
 
+# -- v1.0.1: a reminder with only a time is for today when that time is still ahead -------------------------------
+from datetime import datetime as _dtm, timedelta as _td  # noqa: E402
+
+_late = (_dtm.now() + _td(days=1)).replace(hour=23, minute=59, second=0, microsecond=0).isoformat(timespec="minutes")
+_res = []
+for _q in ("Remind me to call Mom at 11:59 pm.", "Me lembra de ligar pra mãe às 23h59", "Remind me tomorrow at 11:59 pm",
+           "Recuérdame el viernes a las 23:59"):
+    tools.current_text = _q
+    _res.append(tools._same_day_if_unsaid(_late)[:10])
+tools.current_text = ""
+_today, _tomorrow = _dtm.now().date().isoformat(), (_dtm.now() + _td(days=1)).date().isoformat()
+check("reminders: '6 pm' with no day is today (it was saved for tomorrow); a day said in the request is kept",
+      _res == [_today, _today, _tomorrow, _tomorrow] or _dtm.now().strftime("%H:%M") >= "23:59", _res)
+
+_eng = tts.Engine.__new__(tts.Engine)
+_eng.voices = [tts.Voice(None, "Microsoft Maria", "female", "pt"), tts.Voice(None, "Microsoft Zira", "female", "en"),
+               tts.Voice(None, "Microsoft Daniel", "male", "pt")]
+check("voice: the male voice is Daniel in every language (no more Zira pitched down in English)",
+      [(_eng.pick(l, "male")[0].name, _eng.pick(l, "male")[1]) for l in ("pt", "en", "es")] == [("Microsoft Daniel", 0)] * 3
+      and _eng.pick("en", "female")[0].name == "Microsoft Zira")
+
 print(f"\n{len(failures)} failure(s)")
 raise SystemExit(1 if failures else 0)

@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — KNOWN ISSUES CATALOG, FIXES AND TROUBLESHOOTING
- Document version: 5.0  ·  Date: 2026-10-17  ·  App version: 1.0.0
+ Document version: 5.1  ·  Date: 2026-11-14  ·  App version: 1.0.1
  (Português: erros.txt · Español: errores.txt)
 ================================================================================
 
@@ -113,7 +113,7 @@ QUICK DIAGNOSTICS (run these before investigating)
       NX-VOZ-008  Slow transcription
       NX-VOZ-009  "Mute" only stops at the end of the current sentence
       NX-VOZ-010  Male voice sounds androgynous in some languages
-      NX-VOZ-011  "J.A.R.V.I.S"/"Robot" voice effect sounds muffled or too metallic
+      NX-VOZ-011  "N.E.X.U.S"/"Robot" voice effect sounds muffled or too metallic
       NX-VOZ-012  Commands during speech fail with loudspeakers
       NX-VOZ-013  Sentence said while NEXUS speaks is ignored
       NX-VOZ-014  "Audio only" mode answers nearby conversations / TV
@@ -975,13 +975,13 @@ QUICK DIAGNOSTICS (run these before investigating)
                language > Speech. NEXUS Settings warns when the selected
                gender doesn't exist for the current language.
 
-[NX-VOZ-011] "J.A.R.V.I.S"/"Robot" voice effect sounds muffled or too metallic
+[NX-VOZ-011] "N.E.X.U.S"/"Robot" voice effect sounds muffled or too metallic
   Severity   : LOW              Status: KNOWN              Observed: EXPECTED
-  Cause      : Effects vary a lot with the speaker. Since v0.4 "J.A.R.V.I.S"
+  Cause      : Effects vary a lot with the speaker. Since v0.4 "N.E.X.U.S"
                is clean (2-5 kHz presence boost, 1.2 ms sheen and a short room,
                no ring modulation); "Robot" keeps ring modulation and a
                metallic comb on purpose.
-  Tips       : Use "J.A.R.V.I.S" day to day and "Robot" only for show.
+  Tips       : Use "N.E.X.U.S" day to day and "Robot" only for show.
                "Natural" disables processing. To tune it, edit apply_effect()
                (nexus/tts.py) and use "Test voice".
 
@@ -1011,7 +1011,7 @@ QUICK DIAGNOSTICS (run these before investigating)
 
 [NX-VOZ-015] "Smoker's device" (electrolarynx) voice, hard to understand
   Severity   : HIGH             Status: FIXED (v0.4)       Observed: YES
-  Cause      : The J.A.R.V.I.S effect (v0.2-v0.3) multiplied the voice by a
+  Cause      : The N.E.X.U.S effect (v0.2-v0.3) multiplied the voice by a
                45 Hz tone (ring modulation), plus a metallic comb and a cut
                above 7 kHz. Measured: buzz 16 to 24 times above the natural
                voice and no consonant emphasis.

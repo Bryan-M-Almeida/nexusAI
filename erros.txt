@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERROS CONHECIDOS, CORREÇÕES E SOLUÇÃO DE PROBLEMAS
- Versão do documento: 5.0  ·  Data: 2026-10-17  ·  Versão do app: 1.0.0
+ Versão do documento: 5.1  ·  Data: 2026-11-14  ·  Versão do app: 1.0.1
  (English: errors.txt · Español: errores.txt)
 ================================================================================
 
@@ -111,7 +111,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
       NX-VOZ-008  Transcrição demorada
       NX-VOZ-009  "Silenciar" só interrompe ao fim da frase atual
       NX-VOZ-010  Voz masculina soa andrógina em alguns idiomas
-      NX-VOZ-011  Efeito de voz "J.A.R.V.I.S"/"Robô" soa abafado ou metálico demais
+      NX-VOZ-011  Efeito de voz "N.E.X.U.S"/"Robô" soa abafado ou metálico demais
       NX-VOZ-012  Comandos durante a fala falham com caixas de som
       NX-VOZ-013  Frase dita enquanto o NEXUS fala é ignorada
       NX-VOZ-014  Modo "apenas áudio" responde a conversas ao redor / TV
@@ -983,13 +983,13 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
                e idioma > Fala. A tela de Configurações do NEXUS avisa quando o
                gênero escolhido não existe no idioma atual.
 
-[NX-VOZ-011] Efeito de voz "J.A.R.V.I.S"/"Robô" soa abafado ou metálico demais
+[NX-VOZ-011] Efeito de voz "N.E.X.U.S"/"Robô" soa abafado ou metálico demais
   Severidade : BAIXA            Status: CONHECIDO          Observado: PREVISTO
   Causa      : Efeitos variam muito conforme o alto-falante. Desde a v0.4 o
-               "J.A.R.V.I.S" é limpo (realce de presença 2-5 kHz, brilho de
+               "N.E.X.U.S" é limpo (realce de presença 2-5 kHz, brilho de
                1,2 ms e ambiente curto, sem modulação em anel); o "Robô"
                mantém modulação em anel e filtro metálico de propósito.
-  Dicas      : Use "J.A.R.V.I.S" no dia a dia e "Robô" só para efeito.
+  Dicas      : Use "N.E.X.U.S" no dia a dia e "Robô" só para efeito.
                "Natural" desliga o processamento. Para ajustar, edite
                apply_effect() (nexus/tts.py) e use "Testar voz".
 
@@ -1020,7 +1020,7 @@ DIAGNÓSTICO RÁPIDO (rode estes comandos antes de investigar)
 
 [NX-VOZ-015] Voz "de aparelho de fumante" (laringe eletrônica), difícil de entender
   Severidade : ALTA             Status: CORRIGIDO (v0.4)   Observado: SIM
-  Causa      : O efeito J.A.R.V.I.S (v0.2-v0.3) multiplicava a voz por um tom
+  Causa      : O efeito N.E.X.U.S (v0.2-v0.3) multiplicava a voz por um tom
                de 45 Hz (modulação em anel), além de filtro metálico e corte
                acima de 7 kHz. Medido: zumbido 16 a 24 vezes acima da voz
                natural e consoantes sem realce.

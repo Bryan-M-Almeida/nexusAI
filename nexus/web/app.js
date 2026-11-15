@@ -158,6 +158,8 @@ function applyLang(lang) {
   $$("[data-i18n-ph]").forEach((el) => (el.placeholder = T(el.dataset.i18nPh)));
   $$("[data-i18n-title]").forEach((el) => (el.title = T(el.dataset.i18nTitle)));
   $$("#langSwitch button").forEach((b) => b.classList.toggle("on", b.dataset.lang === L));
+  // v1.0.1: boot lines arrive before the language is known (they showed in Portuguese on an English NEXUS)
+  $$("#bootLog li[data-key] > span:first-child").forEach((el) => (el.textContent = T("boot_" + el.parentElement.dataset.key)));
   $("#bridgeHint").textContent = T("bridgeHint", { port: settings.bridge_port || 47800 });
   setVoiceState(voiceState);
   if (dash) renderDashboard(dash);
@@ -217,6 +219,7 @@ function bootLine(step) {
     const s = bootQueue.shift();
     if (!s) return (bootPumping = false);
     const li = document.createElement("li");
+    li.dataset.key = s.key;
     li.innerHTML = `<span>${esc(T("boot_" + s.key))}</span><span class="fill"></span><span class="${s.ok ? "ok" : "warn"}">${s.ok ? "OK" : "!!"}</span>`
       + (s.detail ? `<span class="muted">${esc(s.detail)}</span>` : "");
     $("#bootLog").appendChild(li);

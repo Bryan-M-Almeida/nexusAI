@@ -1,6 +1,6 @@
 ================================================================================
  N.E.X.U.S — CATÁLOGO DE ERRORES CONOCIDOS, CORRECCIONES Y SOLUCIÓN DE PROBLEMAS
- Versión del documento: 5.0  ·  Fecha: 2026-10-17  ·  Versión de la app: 1.0.0
+ Versión del documento: 5.1  ·  Fecha: 2026-11-14  ·  Versión de la app: 1.0.1
  (Português: erros.txt · English: errors.txt)
 ================================================================================
 
@@ -114,7 +114,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
       NX-VOZ-008  Transcripción lenta
       NX-VOZ-009  "Silenciar" solo interrumpe al final de la frase actual
       NX-VOZ-010  La voz masculina suena andrógina en algunos idiomas
-      NX-VOZ-011  El efecto de voz "J.A.R.V.I.S"/"Robot" suena apagado o demasiado metálico
+      NX-VOZ-011  El efecto de voz "N.E.X.U.S"/"Robot" suena apagado o demasiado metálico
       NX-VOZ-012  Los comandos durante el habla fallan con altavoces
       NX-VOZ-013  Una frase dicha mientras NEXUS habla se ignora
       NX-VOZ-014  El modo "solo audio" responde a conversaciones cercanas / TV
@@ -1008,14 +1008,14 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
                Hora e idioma > Voz. La Configuración de NEXUS avisa cuando el
                género elegido no existe para el idioma actual.
 
-[NX-VOZ-011] El efecto de voz "J.A.R.V.I.S"/"Robot" suena apagado o demasiado metálico
+[NX-VOZ-011] El efecto de voz "N.E.X.U.S"/"Robot" suena apagado o demasiado metálico
   Gravedad   : BAJA             Estado: CONOCIDO           Observado: PREVISTO
   Causa      : Los efectos varían mucho según el altavoz. Desde la v0.4
-               "J.A.R.V.I.S" es limpio (realce de presencia 2-5 kHz, brillo de
+               "N.E.X.U.S" es limpio (realce de presencia 2-5 kHz, brillo de
                1,2 ms y ambiente corto, sin modulación en anillo); "Robot"
                mantiene a propósito la modulación en anillo y el filtro
                metálico.
-  Consejos   : Usa "J.A.R.V.I.S" a diario y "Robot" solo como efecto.
+  Consejos   : Usa "N.E.X.U.S" a diario y "Robot" solo como efecto.
                "Natural" desactiva el procesamiento. Para ajustarlo, edita
                apply_effect() (nexus/tts.py) y usa "Probar voz".
 
@@ -1046,7 +1046,7 @@ DIAGNÓSTICO RÁPIDO (ejecuta estos comandos antes de investigar)
 
 [NX-VOZ-015] Voz de "aparato de fumador" (laringe electrónica), difícil de entender
   Gravedad   : ALTA             Estado: CORREGIDO (v0.4)   Observado: SÍ
-  Causa      : El efecto J.A.R.V.I.S (v0.2-v0.3) multiplicaba la voz por un
+  Causa      : El efecto N.E.X.U.S (v0.2-v0.3) multiplicaba la voz por un
                tono de 45 Hz (modulación en anillo), además de un filtro
                metálico y un corte por encima de 7 kHz. Medido: zumbido 16 a
                24 veces por encima de la voz natural y consonantes sin realce.

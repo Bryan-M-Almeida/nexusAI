@@ -59,8 +59,37 @@ def delete_task(task_id):
 
 
 # ---------------------------------------------------------------- schedule
+# v1.0.1: "remind me to call Mom at 6 pm" at 14:50 was saved for TOMORROW 18:00 - the model moved it a day ahead
+DAY_WORDS = re.compile(r"\b(amanh[aã]|depois de amanh[aã]|ontem|hoje|semana|m[eê]s|dia \d|segunda|ter[cç]a|quarta|quinta|"
+                       r"sexta|s[aá]bado|domingo|tomorrow|today|tonight|yesterday|week|month|monday|tuesday|wednesday|"
+                       r"thursday|friday|saturday|sunday|ma[nñ]ana|hoy|ayer|lunes|martes|mi[eé]rcoles|jueves|viernes|"
+                       r"s[aá]bado|\d{1,2}/\d{1,2}|\d{4}-\d{2}-\d{2}|janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|"
+                       r"agosto|setembro|outubro|novembro|dezembro|january|february|march|april|may|june|july|august|"
+                       r"september|october|november|december|enero|febrero|marzo|mayo|junio|julio|agosto|septiembre|"
+                       r"octubre|noviembre|diciembre)\b", re.I)
+
+
+def _same_day_if_unsaid(start: str | None) -> str | None:
+    """A time with no day in the request means the next time the clock shows it: today if still ahead."""
+    if not start or DAY_WORDS.search(current_text or "") or not current_text:
+        return start
+    try:
+        when = datetime.fromisoformat(start)
+    except ValueError:
+        return start
+    nowdt = datetime.now()
+    today = when.replace(year=nowdt.year, month=nowdt.month, day=nowdt.day)
+    if when.date() > nowdt.date() and today > nowdt:
+        return today.isoformat(timespec="minutes")
+    return start
+
+
 def add_event(title, start, end=None, remind_minutes=10, notes=""):
     start, end = _dt(start), _dt(end)
+    fixed = _same_day_if_unsaid(start)
+    if fixed != start and end:
+        end = _dt((datetime.fromisoformat(end) - (datetime.fromisoformat(start) - datetime.fromisoformat(fixed))).isoformat())
+    start = fixed
     eid = db.execute(
         "INSERT INTO events(title, start, end, notes, remind_minutes, created) VALUES (?,?,?,?,?,?)",
         (title, start, end, notes or "", int(remind_minutes if remind_minutes is not None else 10), now()),
